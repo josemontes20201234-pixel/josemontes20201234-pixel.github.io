@@ -17,7 +17,7 @@ const DEFAULT_CFG = {
     app: "¡{nombre}! Ya tenemos app de Meraki Barbershop 💈 Descargala, entrá con tu Gmail y ahí ves tus sellos en vivo: [link de la Play Store]"
   }
 };
-const TPL_NAMES = {sello:"Sello agregado", premio:"Premio listo", extranamos:"Te extrañamos", cumple:"Cumpleaños", promo:"Promoción libre", tarjeta:"Enviar tarjeta (imagen)", app:"Invitar a la app"};
+const TPL_NAMES = {sello:"Sello agregado", premio:"Premio listo", extranamos:"Te extrañamos", cumple:"Cumpleaños", promo:"Promoción libre", tarjeta:"Enviar tarjeta (imagen)"};
 const VARS = ["{nombre}","{sellos}","{meta}","{faltan}","{premio}","{visitas}","{telefono}"];
 const MESES = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
 const ICON = {
@@ -242,8 +242,7 @@ const SEGMENTS = {
   casi: {label:"A 1–2 del premio", test:c=>{const f=cfg.meta-(c.sellos||0); return f>0 && f<=2;}},
   inactivo: {label:"Inactivos", test:c=>estado(c)==="inactivo"},
   cumple: {label:"Cumplen este mes", test:isBirthMonth},
-  oro: {label:"Nivel Oro", test:c=>tier(c.visitasTotales||0)==="oro"},
-  sinapp: {label:"Sin la app", test:c=>!c.conApp}
+  oro: {label:"Nivel Oro", test:c=>tier(c.visitasTotales||0)==="oro"}
 };
 const Admin = {
   clientes: [], filtro:"todos", query:"", openId:null, scannedId:null, lastStamped:null, freshId:null, sent:new Set(), tab:"clientes", loaded:false, cardCache:{},
@@ -267,7 +266,7 @@ const Admin = {
       '<section class="view" id="v-clientes">'+
         '<div class="stats" id="stats"></div>'+
         '<button class="btn gold lg" data-scan>'+ICON.scan+'Escanear tarjeta</button>'+
-        '<div class="toolbar"><input id="q" class="search" type="search" placeholder="Nombre, teléfono o Nº de tarjeta" aria-label="Buscar cliente"><button class="btn" data-nuevo>+ Cliente sin app</button></div>'+
+        '<div class="toolbar"><input id="q" class="search" type="search" placeholder="Nombre, teléfono o Nº de tarjeta" aria-label="Buscar cliente"><button class="btn" data-nuevo>+ Nuevo cliente</button></div>'+
         '<div class="chips" id="filtros"></div><div class="list" id="lista"></div>'+
       '</section>'+
       '<section class="view" id="v-avisos" hidden><div class="panel"><h2>Enviar avisos</h2>'+
@@ -304,7 +303,7 @@ const Admin = {
     const L = this.clientes, mes = new Date().getMonth(), y = new Date().getFullYear();
     const visitasMes = L.reduce((a,c)=>a+(c.historial||[]).filter(h=>h.t==="visita"&&new Date(h.fecha).getMonth()===mes&&new Date(h.fecha).getFullYear()===y).length,0);
     $("#stats").innerHTML =
-      '<div class="stat"><span class="label">Clientes</span><b class="num">'+L.length+'</b><span class="hint">'+L.filter(c=>c.conApp).length+' con la app</span></div>'+
+      '<div class="stat"><span class="label">Clientes</span><b class="num">'+L.length+'</b><span class="hint">con tarjeta</span></div>'+
       '<div class="stat"><span class="label">Visitas este mes</span><b class="num">'+visitasMes+'</b><span class="hint">sellos puestos</span></div>'+
       '<button class="stat click" data-seg="premio"><span class="label">Premio listo</span><b class="num" style="color:var(--gold-hi)">'+L.filter(SEGMENTS.premio.test).length+'</b><span class="hint">por canjear</span></button>'+
       '<button class="stat click" data-seg="inactivo"><span class="label">Inactivos</span><b class="num" style="color:var(--warn)">'+L.filter(SEGMENTS.inactivo.test).length+'</b><span class="hint">+'+cfg.diasInactivo+' días sin venir</span></button>';
@@ -315,14 +314,14 @@ const Admin = {
     const rows = this.clientes.filter(SEGMENTS[this.filtro].test)
       .filter(c => !q || (c.nombre||"").toLowerCase().includes(q) || (qd.length>=3 && String(c.telefono||"").replace(/\D/g,"").includes(qd)) || (qn.length>=3 && cardNo(c).toLowerCase().includes(qn)))
       .sort((a,b)=>(a.nombre||"").localeCompare(b.nombre||"","es",{sensitivity:"base"}) || a.id.localeCompare(b.id));
-    if (!this.clientes.length){ $("#lista").innerHTML = this.loaded ? '<div class="empty" style="grid-column:1/-1"><h3>Todavía no hay tarjetas</h3><span>Cuando tus clientes entren a la app aparecen aquí solos. También podés registrar a alguien que no tenga la app.</span><button class="btn gold" data-nuevo>+ Cliente sin app</button></div>' : '<div class="empty" style="grid-column:1/-1">Cargando clientes…</div>'; return; }
+    if (!this.clientes.length){ $("#lista").innerHTML = this.loaded ? '<div class="empty" style="grid-column:1/-1"><h3>Todavía no hay tarjetas</h3><span>Registrá a tu primer cliente y ponele su primer sello.</span><button class="btn gold" data-nuevo>+ Nuevo cliente</button></div>' : '<div class="empty" style="grid-column:1/-1">Cargando clientes…</div>'; return; }
     if (!rows.length){ $("#lista").innerHTML = '<div class="empty" style="grid-column:1/-1">Nadie coincide con esa búsqueda.</div>'; return; }
     $("#lista").innerHTML = rows.map(c => {
       const e = estado(c), t = tier(c.visitasTotales||0), d = daysSince(c.ultimaVisita);
       return '<article class="card'+(c.id===this.lastStamped?" just":"")+'">'+
         '<button class="row" data-open="'+c.id+'" style="background:none;border:0;padding:0;text-align:left;width:100%">'+
           '<div style="min-width:0"><h3>'+esc(c.nombre)+'</h3><div class="meta num">Nº '+esc(cardNo(c))+' · '+(d===null?"sin visitas":d===0?"vino hoy":"hace "+d+" d")+'</div></div>'+
-          '<span class="badges">'+(c.conApp?'<span class="tier app">App</span>':'')+'<span class="tier '+t+'">'+tierName(t)+'</span></span></button>'+
+          '<span class="badges">'+''+'<span class="tier '+t+'">'+tierName(t)+'</span></span></button>'+
         stampsHTML(c,false,this.freshId===c.id)+
         '<div class="row" style="align-items:center"><span class="state '+e+'">'+ESTADO_TXT[e]+'</span>'+
           (e==="premio" ? '<button class="btn sm gold" data-redeem="'+c.id+'">Canjear premio</button>' : '<button class="btn sm gold" data-stamp="'+c.id+'">+ Sello</button>')+
@@ -355,12 +354,12 @@ const Admin = {
   renderDetail(){
     const c = this.clientes.find(x=>x.id===this.openId); if (!c){ closeSheetEl(); this.onSheetClosed(); return; }
     const e = estado(c), t = tier(c.visitasTotales||0);
-    const sug = e==="premio"?"premio":e==="inactivo"?"extranamos":isBirthMonth(c)?"cumple":(c.conApp?"sello":"tarjeta");
+    const sug = e==="premio"?"premio":e==="inactivo"?"extranamos":isBirthMonth(c)?"cumple":"sello";
     const sel = document.getElementById("d-tpl")?.value || sug;
     const msg = fill(cfg.plantillas[sel], c), wa = waLink(c.telefono, msg);
     const hist = (c.historial||[]).slice(0,10).map(h=>'<li><span>'+({visita:"Visita",canje:"Premio canjeado",ajuste:"Ajuste"}[h.t]||h.t)+(h.nota?" · "+esc(h.nota):"")+'</span><span>'+fmtDate(h.fecha)+'</span></li>').join("") || '<li><span>Sin movimientos todavía</span><span></span></li>';
     sheet(
-      '<h2>'+esc(c.nombre)+'</h2><div class="label num" style="margin-top:-10px">Tarjeta Nº '+esc(cardNo(c))+(c.conApp?" · usa la app":" · sin app")+'</div>'+
+      '<h2>'+esc(c.nombre)+'</h2><div class="label num" style="margin-top:-10px">Tarjeta Nº '+esc(cardNo(c))+""+'</div>'+
       (this.scannedId===c.id ? '<div class="scanned">Tarjeta escaneada. Tocá "+ Sello" para registrar la visita.</div>' : '')+
       '<div class="loyal"><div class="head"><span class="wm">Meraki</span><span class="tier '+t+'">'+tierName(t)+'</span></div>'+stampsHTML(c,true)+
         '<div class="head"><span class="count num">'+Math.min(c.sellos||0,cfg.meta)+' / '+cfg.meta+'</span><span class="label">'+(e==="premio"?"Ganó "+esc(cfg.premio):"Faltan "+(cfg.meta-(c.sellos||0))+" · "+esc(cfg.premio))+'</span></div></div>'+
@@ -384,7 +383,7 @@ const Admin = {
     const isNew = !c; c = c || {nombre:"",telefono:"",email:"",cumple:"",notas:""};
     const [cm, cd] = (c.cumple||"-").split("-");
     this.openId = null;
-    sheet('<h2>'+(isNew?"Cliente sin app":"Editar cliente")+'</h2>'+(isNew?'<p class="muted" style="margin:0">Para clientes que no quieren descargar la app. Le mandás su tarjeta como imagen por WhatsApp.</p>':'')+
+    sheet('<h2>'+(isNew?"Nuevo cliente":"Editar cliente")+'</h2>'+''+
       '<form class="grid" id="f-cliente">'+
         '<div class="field full"><label class="label" for="fc-nombre">Nombre</label><input id="fc-nombre" required value="'+esc(c.nombre)+'" autocomplete="off"></div>'+
         '<div class="field"><label class="label" for="fc-tel">WhatsApp</label><input id="fc-tel" type="tel" inputmode="tel" placeholder="7XXX XXXX" value="'+esc(c.telefono)+'"></div>'+
