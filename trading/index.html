@@ -84,12 +84,26 @@ textarea{min-height:60px;resize:vertical}
 .bar{height:8px;background:var(--bg);border-radius:99px;overflow:hidden;border:1px solid var(--line)}
 .bar i{display:block;height:100%;background:var(--accent)}
 nav{position:fixed;left:0;right:0;bottom:0;z-index:6;background:var(--surface);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0px);padding-left:env(safe-area-inset-left,0px);padding-right:env(safe-area-inset-right,0px)}
-nav .tabs{max-width:560px;margin:0 auto;display:grid;grid-template-columns:repeat(4,1fr)}
+nav .tabs{max-width:560px;margin:0 auto;display:grid;grid-template-columns:repeat(5,1fr)}
 nav button{border:0;background:transparent;font:inherit;font-size:12px;font-weight:600;color:var(--muted);padding:10px 4px 12px;display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer}
 nav button svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.8}
 nav button.on{color:var(--accent)}
 .muted{color:var(--muted);font-size:13px}
 .hide{display:none}
+.light{display:flex;gap:12px;align-items:center;border-radius:12px;padding:14px;border:2px solid}
+.light .dot{width:22px;height:22px;border-radius:50%;flex:none;background:currentColor}
+.light b{font-family:var(--display);font-size:19px;font-weight:800;display:block}
+.light.g{background:var(--good-bg);border-color:var(--good);color:var(--good)}
+.light.y{background:var(--warn-bg);border-color:var(--warn);color:var(--warn)}
+.light.r{background:var(--bad-bg);border-color:var(--bad);color:var(--bad)}
+.ind{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;padding:10px 0;border-bottom:1px solid var(--line)}
+.ind:last-child{border-bottom:0}
+.ind .tag{font-size:12px;font-weight:600;padding:2px 8px;border-radius:99px;border:1px solid currentColor;align-self:start;white-space:nowrap}
+.ind p{margin:0;font-size:14px} .ind .nm{font-weight:600;font-size:14px}
+canvas{width:100%;height:170px;display:block}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted)}
+.legend i{display:inline-block;width:14px;height:3px;border-radius:2px;vertical-align:middle;margin-right:4px}
+.inline{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:end}
 @media (prefers-reduced-motion: no-preference){.verdict,.alert{transition:background .2s,border-color .2s}}
 </style>
 </head>
@@ -110,6 +124,11 @@ nav button.on{color:var(--accent)}
   <div class="card stack">
     <div class="seg" id="mkt"><button data-v="spot" class="on">Spot</button><button data-v="fut">Futuros</button></div>
     <div class="seg side hide" id="side"><button data-v="long" class="on">Long (sube)</button><button data-v="short">Short (baja)</button></div>
+    <div class="inline">
+      <label>Par en Binance<input id="c-pair" value="BTCUSDT" autocapitalize="characters" placeholder="BTCUSDT"></label>
+      <button class="btn" type="button" id="livePrice">Precio actual</button>
+    </div>
+    <div class="muted" id="liveMsg" style="margin-top:-4px"></div>
     <div class="grid2">
       <label>Capital total (USDT)<input id="c-cap" type="number" inputmode="decimal" step="any"></label>
       <label>Riesgo por operación (%)<input id="c-risk" type="number" inputmode="decimal" step="0.1"></label>
@@ -130,6 +149,31 @@ nav button.on{color:var(--accent)}
   <div class="row"><button class="btn primary" id="toJournal">Anotar esta operación</button><button class="btn" id="resetCheck">Limpiar checklist</button></div>
 </section>
 
+<!-- ===== GUÍA ===== -->
+<section id="v-guia" class="hide">
+  <h2>Cómo está el mercado</h2>
+  <div class="card stack">
+    <div class="inline">
+      <label>Par<input id="g-pair" value="BTCUSDT" autocapitalize="characters"></label>
+      <label>Gráfico<select id="g-tf"><option value="15m">15 min</option><option value="1h">1 hora</option><option value="4h" selected>4 horas</option><option value="1d">1 día</option></select></label>
+    </div>
+    <button class="btn primary" id="g-go">Leer mercado</button>
+    <div class="muted" id="g-msg">Lee los precios reales de Binance. No adivina el futuro: te dice cómo está el gráfico ahora.</div>
+  </div>
+  <div id="g-out" class="hide">
+    <div style="height:12px"></div>
+    <div id="g-light"></div>
+    <h2>Gráfico</h2>
+    <div class="card stack"><canvas id="g-chart" width="600" height="170"></canvas>
+      <div class="legend"><span><i style="background:var(--fg)"></i>Precio</span><span><i style="background:var(--accent)"></i>Promedio 50</span><span><i style="background:var(--muted)"></i>Promedio 200</span></div></div>
+    <h2>Lo que dice cada indicador</h2>
+    <div class="card" id="g-inds"></div>
+    <div style="height:12px"></div>
+    <div class="row"><button class="btn" id="g-use">Usar este precio en la calculadora</button></div>
+  </div>
+  <p class="muted">Usá la Guía junto con lo que te enseñan en el curso. Si la Guía y tu análisis no coinciden, no entrés.</p>
+</section>
+
 <!-- ===== DIARIO ===== -->
 <section id="v-diario" class="hide">
   <h2 id="formTitle">Nueva operación</h2>
@@ -148,6 +192,7 @@ nav button.on{color:var(--accent)}
     <label>¿Cómo te sentías?<select id="f-mood">
       <option>Tranquilo</option><option>Seguro</option><option>Ansioso</option><option>FOMO (miedo a quedarme fuera)</option><option>Enojado / queriendo recuperar</option><option>Aburrido</option>
     </select></label>
+    <label>¿Respetaste tus reglas en esta operación?<select id="f-rules"><option value="si">Sí: checklist, stop y riesgo</option><option value="no">No, me salté algo</option></select></label>
     <label>Resultado en USDT (vacío si sigue abierta)<input id="f-pnl" type="number" inputmode="decimal" step="any" placeholder="Ej: 12.5 o -8"></label>
     <div class="row"><button class="btn primary" type="submit" id="saveBtn">Guardar</button><button class="btn hide" type="button" id="cancelEdit">Cancelar</button></div>
   </form>
@@ -159,7 +204,9 @@ nav button.on{color:var(--accent)}
 
 <!-- ===== NÚMEROS ===== -->
 <section id="v-numeros" class="hide">
-  <h2>Tus números</h2>
+  <h2>Resumen de esta semana</h2>
+  <div class="card stack" id="weekBox"></div>
+  <h2>Tus números (todo el tiempo)</h2>
   <div class="stats" id="statsBox"></div>
   <h2>Resultado según cómo te sentías</h2>
   <div class="card stack" id="moodBox"></div>
@@ -194,6 +241,7 @@ nav button.on{color:var(--accent)}
 
 <nav><div class="tabs">
   <button data-v="operar" class="on"><svg viewBox="0 0 24 24"><path d="M4 19V5M4 19h16M8 15l4-5 3 3 5-7"/></svg>Operar</button>
+  <button data-v="guia"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M15.5 8.5l-2 5-5 2 2-5z"/></svg>Guía</button>
   <button data-v="diario"><svg viewBox="0 0 24 24"><path d="M6 3h11a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H6zM9 8h6M9 12h6M9 16h4"/></svg>Diario</button>
   <button data-v="numeros"><svg viewBox="0 0 24 24"><path d="M5 20V11M12 20V5M19 20v-6"/></svg>Números</button>
   <button data-v="ajustes"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/></svg>Ajustes</button>
@@ -222,8 +270,8 @@ load();
 /* ---- tabs ---- */
 document.querySelectorAll("nav button").forEach(b=>b.addEventListener("click",()=>show(b.dataset.v)));
 function show(v){document.querySelectorAll("nav button").forEach(b=>b.classList.toggle("on",b.dataset.v===v));
-  ["operar","diario","numeros","ajustes"].forEach(x=>$("v-"+x).classList.toggle("hide",x!==v));
-  if(v==="numeros")renderStats(); if(v==="operar")renderDay(); window.scrollTo(0,0);}
+  ["operar","guia","diario","numeros","ajustes"].forEach(x=>$("v-"+x).classList.toggle("hide",x!==v));
+  if(v==="numeros"){renderStats();renderWeek();} if(v==="operar")renderDay(); window.scrollTo(0,0);}
 
 /* ---- today ---- */
 function todayTrades(){return S.trades.filter(t=>!t.ej&&t.date===today()&&t.pnl!==null&&t.pnl!=="")}
@@ -313,7 +361,7 @@ function renderVerdict(list,auto){
 $("resetCheck").addEventListener("click",()=>{checked={};renderChecklist();});
 $("toJournal").addEventListener("click",()=>{
   resetForm();$("f-mkt").value=mkt;$("f-side").value=mkt==="fut"?side:"long";
-  if(last.margin)$("f-amt").value=+last.margin.toFixed(2);$("f-lev").value=mkt==="fut"?(+$("c-lev").value||1):1;
+  $("f-pair").value=pairFmt($("c-pair").value);if(last.margin)$("f-amt").value=+last.margin.toFixed(2);$("f-lev").value=mkt==="fut"?(+$("c-lev").value||1):1;
   $("f-entry").value=$("c-entry").value;$("f-stop").value=$("c-stop").value;show("diario");$("f-pair").focus();});
 
 /* ---- journal ---- */
@@ -321,7 +369,7 @@ let editId=null;
 function resetForm(){$("tradeForm").reset();$("f-date").value=today();$("f-lev").value=1;editId=null;$("formTitle").textContent="Nueva operación";$("saveBtn").textContent="Guardar";$("cancelEdit").classList.add("hide");}
 $("cancelEdit").addEventListener("click",resetForm);
 $("tradeForm").addEventListener("submit",ev=>{ev.preventDefault();
-  const pnlv=$("f-pnl").value;const t={date:$("f-date").value,pair:$("f-pair").value.trim().toUpperCase(),mkt:$("f-mkt").value,side:$("f-side").value,amt:+$("f-amt").value,lev:+$("f-lev").value||1,entry:+$("f-entry").value||null,stop:+$("f-stop").value||null,why:$("f-why").value.trim(),mood:$("f-mood").value,pnl:pnlv===""?null:+pnlv};
+  const pnlv=$("f-pnl").value;const t={date:$("f-date").value,pair:$("f-pair").value.trim().toUpperCase(),mkt:$("f-mkt").value,side:$("f-side").value,amt:+$("f-amt").value,lev:+$("f-lev").value||1,entry:+$("f-entry").value||null,stop:+$("f-stop").value||null,why:$("f-why").value.trim(),mood:$("f-mood").value,rules:$("f-rules").value,pnl:pnlv===""?null:+pnlv};
   if(editId){const i=S.trades.findIndex(x=>x.id===editId);S.trades[i]=Object.assign(S.trades[i],t,{ej:false});}
   else{t.id=Date.now();S.trades.push(t);}
   save();resetForm();renderList();renderDay();});
@@ -341,7 +389,7 @@ function renderList(){
 }
 function edit(id){const t=S.trades.find(x=>x.id===id);if(!t)return;editId=id;
   $("f-date").value=t.date;$("f-pair").value=t.pair;$("f-mkt").value=t.mkt;$("f-side").value=t.side;$("f-amt").value=t.amt;$("f-lev").value=t.lev;
-  $("f-entry").value=t.entry??"";$("f-stop").value=t.stop??"";$("f-why").value=t.why;$("f-mood").value=t.mood;$("f-pnl").value=t.pnl??"";
+  $("f-entry").value=t.entry??"";$("f-stop").value=t.stop??"";$("f-why").value=t.why;$("f-mood").value=t.mood;$("f-rules").value=t.rules||"si";$("f-pnl").value=t.pnl??"";
   $("formTitle").textContent="Editar operación";$("saveBtn").textContent="Guardar cambios";$("cancelEdit").classList.remove("hide");window.scrollTo(0,0);$("f-pnl").focus();}
 
 /* ---- stats ---- */
@@ -366,6 +414,86 @@ $("saveSettings").addEventListener("click",()=>{S.settings={cap:+$("s-cap").valu
 $("clearEx").addEventListener("click",()=>{S.trades=S.trades.filter(t=>!t.ej);save();renderList();renderDay();$("confirmBox").innerHTML='<div class="alert good">Ejemplos borrados.</div>';});
 $("clearAll").addEventListener("click",()=>{$("confirmBox").innerHTML='<div class="alert bad stack">Esto borra todas tus operaciones y no se puede deshacer.<div class="row"><button class="btn small" id="yesAll">Sí, borrar todo</button><button class="btn small" id="noAll">Cancelar</button></div></div>';
   $("yesAll").onclick=()=>{S.trades=[];save();renderList();renderDay();$("confirmBox").innerHTML='<div class="alert good">Todo borrado.</div>';};$("noAll").onclick=()=>$("confirmBox").innerHTML="";});
+
+/* ---- Binance public data ---- */
+const HOSTS=["https://data-api.binance.vision","https://api.binance.com"];
+async function bget(path){let err;for(const h of HOSTS){try{const r=await fetch(h+path);if(r.ok)return await r.json();
+  const j=await r.json().catch(()=>({}));err=new Error(j.msg||("Error "+r.status));if(r.status===400)throw err;}catch(e){err=e;if(e.message&&e.message.includes("Invalid symbol"))throw e;}}throw err||new Error("sin conexión");}
+const symOf=v=>String(v||"").toUpperCase().replace(/[^A-Z0-9]/g,"");
+function pairFmt(v){const s=symOf(v);for(const q of["USDT","FDUSD","USDC","BTC","ETH","BNB"])if(s.endsWith(q)&&s.length>q.length)return s.slice(0,-q.length)+"/"+q;return s;}
+const errTxt=e=>/symbol/i.test(e.message)?"Ese par no existe en Binance. Escribilo así: BTCUSDT, ETHUSDT, SOLUSDT.":"No pude conectar con Binance. Revisá tu internet e intentá otra vez.";
+$("livePrice").addEventListener("click",async()=>{const s=symOf($("c-pair").value);$("liveMsg").textContent="Buscando precio…";
+  try{const j=await bget("/api/v3/ticker/price?symbol="+s);const p=+j.price;$("c-entry").value=+p.toPrecision(7);
+    $("liveMsg").textContent=pairFmt(s)+" ahora: "+fmt(p,p<10?4:2)+". Ajustá tu stop y take profit.";calc();renderChecklist();}
+  catch(e){$("liveMsg").textContent=errTxt(e);}});
+
+const ema=(a,n)=>{const k=2/(n+1);const o=[];let e=a.slice(0,n).reduce((x,y)=>x+y,0)/n;for(let i=0;i<a.length;i++){if(i<n-1){o.push(NaN);continue}if(i===n-1){o.push(e);continue}e=a[i]*k+e*(1-k);o.push(e);}return o;};
+function rsi(c,n=14){let g=0,l=0;for(let i=1;i<=n;i++){const d=c[i]-c[i-1];d>0?g+=d:l-=d;}g/=n;l/=n;
+  for(let i=n+1;i<c.length;i++){const d=c[i]-c[i-1];g=(g*(n-1)+Math.max(d,0))/n;l=(l*(n-1)+Math.max(-d,0))/n;}return l===0?100:100-100/(1+g/l);}
+function atrSeries(h,l,c,n=14){const tr=[];for(let i=1;i<c.length;i++)tr.push(Math.max(h[i]-l[i],Math.abs(h[i]-c[i-1]),Math.abs(l[i]-c[i-1])));
+  const o=[];let a=tr.slice(0,n).reduce((x,y)=>x+y,0)/n;o.push(a);for(let i=n;i<tr.length;i++){a=(a*(n-1)+tr[i])/n;o.push(a);}return o;}
+let gLast=null;
+$("g-go").addEventListener("click",readMarket);
+async function readMarket(){const s=symOf($("g-pair").value),tf=$("g-tf").value;$("g-msg").textContent="Leyendo Binance…";$("g-go").disabled=true;
+  try{const k=await bget("/api/v3/klines?symbol="+s+"&interval="+tf+"&limit=300");
+    const c=k.map(x=>+x[4]),h=k.map(x=>+x[2]),l=k.map(x=>+x[3]);if(c.length<210)throw new Error("Pocos datos de este par todavía.");
+    analyze(s,tf,c,h,l);$("g-msg").textContent="Actualizado "+new Date().toLocaleTimeString("es-SV",{hour:"2-digit",minute:"2-digit"})+". Tocá otra vez para refrescar.";}
+  catch(e){$("g-msg").textContent=e.message.startsWith("Pocos")?e.message:errTxt(e);$("g-out").classList.add("hide");}
+  $("g-go").disabled=false;}
+const tfName={"15m":"15 minutos","1h":"1 hora","4h":"4 horas","1d":"1 día"};
+function analyze(s,tf,c,h,l){
+  const e50=ema(c,50),e200=ema(c,200),p=c[c.length-1],a=e50[e50.length-1],b=e200[e200.length-1];
+  const r=rsi(c);const at=atrSeries(h,l,c);const atNow=at[at.length-1];const atAvg=at.slice(-100).reduce((x,y)=>x+y,0)/Math.min(100,at.length);const vol=atNow/atAvg;
+  const slope=(a-e50[e50.length-11])/a*100;
+  let trend,tTag,tTxt;
+  if(p>a&&a>b){trend="up";tTag="Sube";tTxt="El precio está arriba de sus promedios de 50 y 200 velas. La tendencia va para arriba.";}
+  else if(p<a&&a<b){trend="down";tTag="Baja";tTxt="El precio está abajo de sus promedios. La tendencia va para abajo: comprar aquí es ir contra la corriente.";}
+  else{trend="side";tTag="De lado";tTxt="Los promedios están mezclados. El mercado no tiene dirección clara, y ahí se pierde mucho por movimientos falsos.";}
+  let rTag,rTxt,rk;
+  if(r>=70){rk="hot";rTag="Caro";rTxt="RSI en "+fmt(r,0)+". Subió muy rápido; comprar aquí es arriesgado porque suele haber retrocesos.";}
+  else if(r<=30){rk="cold";rTag="Barato";rTxt="RSI en "+fmt(r,0)+". Cayó muy fuerte. Puede rebotar, pero en tendencia bajista puede seguir cayendo.";}
+  else{rk="ok";rTag="Normal";rTxt="RSI en "+fmt(r,0)+". Ni muy caro ni muy barato.";}
+  let vTag,vTxt,vk;
+  if(vol>=1.8){vk="wild";vTag="Muy movido";vTxt="Se está moviendo "+fmt(vol,1)+" veces más de lo normal. Los stops saltan fácil; mejor esperá a que se calme.";}
+  else if(vol<=0.6){vk="calm";vTag="Muy quieto";vTxt="Casi no se mueve. Puede estar preparando un movimiento fuerte; esperá a que defina.";}
+  else{vk="ok";vTag="Normal";vTxt="El movimiento está dentro de lo normal para este par.";}
+  let light,lt,lm;
+  if(vk==="wild"||(trend==="down"&&rk!=="cold")||r>=75){light="r";lt="Mejor no entrés";lm=vk==="wild"?"El mercado está demasiado movido ahora.":trend==="down"?"La tendencia va en contra de una compra.":"Subió demasiado rápido.";}
+  else if(trend==="up"&&rk==="ok"&&vk==="ok"){light="g";lt="Condiciones a favor";lm="Tendencia arriba, precio normal y movimiento tranquilo. Aun así, pasá tu checklist completo.";}
+  else{light="y";lt="Condiciones dudosas";lm=trend==="side"?"No hay tendencia clara. Si entrás, que sea con monto chiquito.":"Hay señales mezcladas. Esperá una mejor oportunidad.";}
+  const fut=trend==="down"&&light!=="g"?'<div class="ind"><span class="tag" style="color:var(--muted)">Futuros</span><div><div class="nm">¿Y en Short?</div><p>En tendencia bajista algunos buscan Short en Futuros. Hacelo solo si tu curso ya te enseñó cómo, y siempre con stop.</p></div></div>':"";
+  const tc={up:"var(--good)",down:"var(--bad)",side:"var(--warn)"}[trend],rc={hot:"var(--bad)",cold:"var(--warn)",ok:"var(--good)"}[rk],vc={wild:"var(--bad)",calm:"var(--warn)",ok:"var(--good)"}[vk];
+  $("g-light").innerHTML='<div class="light '+light+'"><span class="dot"></span><div><b>'+lt+'</b><span>'+pairFmt(s)+' en gráfico de '+tfName[tf]+'. '+lm+'</span></div></div>';
+  $("g-inds").innerHTML=
+   '<div class="ind"><span class="tag" style="color:'+tc+'">'+tTag+'</span><div><div class="nm">Tendencia</div><p>'+tTxt+'</p></div></div>'+
+   '<div class="ind"><span class="tag" style="color:'+rc+'">'+rTag+'</span><div><div class="nm">¿Caro o barato? (RSI)</div><p>'+rTxt+'</p></div></div>'+
+   '<div class="ind"><span class="tag" style="color:'+vc+'">'+vTag+'</span><div><div class="nm">Movimiento</div><p>'+vTxt+'</p></div></div>'+
+   '<div class="ind"><span class="tag" style="color:var(--muted)">'+fmt(p,p<10?4:2)+'</span><div><div class="nm">Precio actual</div><p>Promedio 50: '+fmt(a,a<10?4:2)+' · Promedio 200: '+fmt(b,b<10?4:2)+'</p></div></div>'+fut;
+  $("g-out").classList.remove("hide");gLast={s,p};drawChart(c.slice(-120),e50.slice(-120),e200.slice(-120));}
+function drawChart(c,a,b){const cv=$("g-chart"),r=cv.getBoundingClientRect(),dpr=window.devicePixelRatio||1;cv.width=r.width*dpr;cv.height=170*dpr;
+  const x=cv.getContext("2d");x.scale(dpr,dpr);const W=r.width,H=170,pad=6;const all=c.concat(a,b).filter(isFinite);const mn=Math.min(...all),mx=Math.max(...all);
+  const cs=getComputedStyle(document.documentElement);const col=n=>cs.getPropertyValue(n).trim();
+  const X=i=>pad+i/(c.length-1)*(W-2*pad),Y=v=>pad+(1-(v-mn)/(mx-mn||1))*(H-2*pad);
+  x.strokeStyle=col("--line");x.lineWidth=1;for(let i=1;i<4;i++){x.beginPath();x.moveTo(0,H*i/4);x.lineTo(W,H*i/4);x.stroke();}
+  const line=(arr,color,w)=>{x.strokeStyle=color;x.lineWidth=w;x.beginPath();let st=false;arr.forEach((v,i)=>{if(!isFinite(v))return;st?x.lineTo(X(i),Y(v)):(x.moveTo(X(i),Y(v)),st=true)});x.stroke();};
+  line(b,col("--muted"),1.5);line(a,col("--accent"),2);line(c,col("--fg"),1.8);
+  x.fillStyle=col("--fg");x.beginPath();x.arc(X(c.length-1),Y(c[c.length-1]),3.5,0,7);x.fill();}
+$("g-use").addEventListener("click",()=>{if(!gLast)return;$("c-pair").value=gLast.s;$("c-entry").value=+gLast.p.toPrecision(7);$("liveMsg").textContent="Precio traído de la Guía. Ajustá tu stop y take profit.";calc();renderChecklist();show("operar");});
+
+/* ---- weekly summary ---- */
+function weekStart(){const d=new Date();const day=(d.getDay()+6)%7;d.setDate(d.getDate()-day);return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");}
+function renderWeek(){const ws=weekStart();const W=S.trades.filter(t=>!t.ej&&t.date>=ws);const C=W.filter(t=>t.pnl!==null&&t.pnl!=="");
+  const pnl=C.reduce((a,t)=>a+ +t.pnl,0),wins=C.filter(t=>t.pnl>0).length,ok=W.filter(t=>(t.rules||"si")==="si").length;
+  const disc=W.length?ok/W.length*100:0;const wr=C.length?wins/C.length*100:0;
+  const txt="Resumen semanal de trading (desde "+ws+")\n• Operaciones: "+W.length+" ("+C.length+" cerradas)\n• Resultado: "+money(pnl)+"\n• Aciertos: "+fmt(wr,0)+" %\n• Respeté mis reglas: "+ok+" de "+W.length+" ("+fmt(disc,0)+" %)\n• Riesgo por operación: "+S.settings.risk+" %";
+  if(!W.length){$("weekBox").innerHTML='<p class="muted" style="margin:0">Esta semana todavía no anotaste operaciones. Las de ejemplo no cuentan aquí.</p>';return;}
+  $("weekBox").innerHTML='<dl class="out"><dt>Operaciones</dt><dd>'+W.length+'</dd><dt>Resultado</dt><dd class="'+(pnl>=0?'pos':'neg')+'">'+money(pnl)+'</dd><dt>Aciertos</dt><dd>'+fmt(wr,0)+' %</dd><dt>Respetaste tus reglas</dt><dd>'+ok+' de '+W.length+'</dd></dl>'+
+   '<div><div class="muted">Disciplina</div><div class="bar"><i style="width:'+disc+'%"></i></div></div>'+
+   '<p class="muted" style="margin:0">'+(disc>=90?"Excelente disciplina. Eso es lo que de verdad cuenta al empezar.":disc>=70?"Vas bien. Fijate en qué operaciones te saltaste las reglas.":"Te estás saltando muchas reglas. Antes de ganar, toca ser disciplinado.")+'</p>'+
+   '<div class="row"><button class="btn" id="copyWeek">Copiar resumen para WhatsApp</button></div><textarea id="weekTxt" class="hide" readonly></textarea><div class="muted" id="copyMsg"></div>';
+  $("weekTxt").value=txt;
+  $("copyWeek").onclick=()=>{navigator.clipboard?.writeText(txt).then(()=>$("copyMsg").textContent="Copiado. Pegalo en WhatsApp.").catch(()=>{$("weekTxt").classList.remove("hide");$("weekTxt").select();$("copyMsg").textContent="Seleccioná el texto y copialo.";})
+    ??($("weekTxt").classList.remove("hide"),$("weekTxt").select());};}
 
 /* ---- init ---- */
 fillSettings();resetForm();calc();renderList();renderDay();
