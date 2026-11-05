@@ -30,7 +30,7 @@
   --good:#3fc27a; --good-bg:#12291c; --bad:#ef6a5f; --bad-bg:#2e1614; --warn:#f0a83c; --warn-bg:#2d2212; color-scheme:dark}
 *{box-sizing:border-box}
 html,body{background:var(--bg);color:var(--fg)}
-body{font-family:var(--body);font-size:15px;line-height:1.45;margin:0;padding-bottom:calc(76px + env(safe-area-inset-bottom,0px))}
+body{font-family:var(--body);font-size:15px;line-height:1.45;margin:0;padding-bottom:calc(140px + env(safe-area-inset-bottom,0px))}
 body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--bg)}
 .wrap{max-width:560px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:8px 24px}
 header{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);border-bottom:1px solid var(--line)}
@@ -496,6 +496,8 @@ function renderWeek(){const ws=weekStart();const W=S.trades.filter(t=>!t.ej&&t.d
     ??($("weekTxt").classList.remove("hide"),$("weekTxt").select());};}
 
 /* ---- init ---- */
+function padNav(){const n=document.querySelector("nav");if(n)document.body.style.paddingBottom=(n.offsetHeight+40)+"px";}
+addEventListener("resize",padNav);padNav();setTimeout(padNav,500);
 fillSettings();resetForm();calc();renderList();renderDay();
 if("serviceWorker" in navigator&&location.protocol==="https:"&&!/claude|claudeusercontent/.test(location.hostname)){try{navigator.serviceWorker.register("sw.js").catch(()=>{})}catch(e){}}
 })();
