@@ -1,0 +1,16 @@
+{
+  "name": "Bitácora Trader",
+  "short_name": "Bitácora",
+  "description": "Calculadora de riesgo, checklist y diario para operar en Binance con disciplina.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0f1114",
+  "theme_color": "#0f1114",
+  "lang": "es",
+  "icons": [
+    {"src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any"},
+    {"src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable"}
+  ]
+}

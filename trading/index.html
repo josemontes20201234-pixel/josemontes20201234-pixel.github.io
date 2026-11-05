@@ -1,0 +1,377 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<style>:root{padding-top:env(safe-area-inset-top,0px)}body{margin:0}[hidden]{display:none!important}</style>
+<title>Bitácora Trader</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="theme-color" content="#0f1114">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;800&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: one-column phone app, sticky header, bottom tab bar; four views (Operar, Diario, Números, Ajustes) */
+:root{
+  --bg:#f3f2ee; --surface:#ffffff; --line:#dcd9d0; --fg:#17181b; --muted:#6b6a64;
+  --accent:#b8860b; --accent-ink:#ffffff;
+  --good:#1f8a4c; --good-bg:#e3f3e9; --bad:#c43a31; --bad-bg:#fbe7e5; --warn:#a86400; --warn-bg:#fdf0d9;
+  --display:"Archivo",system-ui,sans-serif; --body:"Archivo",system-ui,sans-serif; --mono:"JetBrains Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0f1114; --surface:#181b20; --line:#2a2e35; --fg:#ecebe6; --muted:#8f949c;
+  --accent:#e0b44c; --accent-ink:#141210;
+  --good:#3fc27a; --good-bg:#12291c; --bad:#ef6a5f; --bad-bg:#2e1614; --warn:#f0a83c; --warn-bg:#2d2212; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0f1114; --surface:#181b20; --line:#2a2e35; --fg:#ecebe6; --muted:#8f949c;
+  --accent:#e0b44c; --accent-ink:#141210;
+  --good:#3fc27a; --good-bg:#12291c; --bad:#ef6a5f; --bad-bg:#2e1614; --warn:#f0a83c; --warn-bg:#2d2212; color-scheme:dark}
+*{box-sizing:border-box}
+html,body{background:var(--bg);color:var(--fg)}
+body{font-family:var(--body);font-size:15px;line-height:1.45;margin:0;padding-bottom:calc(76px + env(safe-area-inset-bottom,0px))}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--bg)}
+.wrap{max-width:560px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:8px 24px}
+header{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);border-bottom:1px solid var(--line)}
+header .wrap{padding-block:12px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+.brand{font-family:var(--display);font-weight:800;font-size:19px;letter-spacing:-.01em}
+.brand span{color:var(--accent)}
+.today{font-family:var(--mono);font-size:12px;color:var(--muted);text-align:right}
+h2{font-family:var(--display);font-size:13px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin:22px 0 10px;font-weight:600}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px}
+.stack{display:flex;flex-direction:column;gap:12px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted);min-width:0}
+input,select,textarea{font:inherit;font-size:16px;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:9px 10px;width:100%;min-width:0}
+input:focus,select:focus,textarea:focus,button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+textarea{min-height:60px;resize:vertical}
+.seg{display:grid;grid-template-columns:1fr 1fr;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:3px;gap:3px}
+.seg button{border:0;background:transparent;color:var(--muted);font:inherit;font-weight:600;padding:8px;border-radius:7px;cursor:pointer}
+.seg button.on{background:var(--surface);color:var(--fg);box-shadow:0 1px 2px rgba(0,0,0,.12)}
+.seg.side button.on[data-v="long"]{color:var(--good)} .seg.side button.on[data-v="short"]{color:var(--bad)}
+.btn{font:inherit;font-weight:600;border:1px solid var(--line);background:var(--surface);color:var(--fg);padding:10px 14px;border-radius:10px;cursor:pointer}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.small{padding:6px 10px;font-size:13px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.out{display:grid;grid-template-columns:1fr auto;gap:6px 12px;font-size:14px}
+.out dt{color:var(--muted)} .out dd{margin:0;text-align:right;font-family:var(--mono);font-variant-numeric:tabular-nums}
+.out dd.big{font-size:18px;font-weight:600;color:var(--accent)}
+.alert{border-radius:10px;padding:10px 12px;font-size:14px;border:1px solid}
+.alert.bad{background:var(--bad-bg);color:var(--bad);border-color:var(--bad)}
+.alert.warn{background:var(--warn-bg);color:var(--warn);border-color:var(--warn)}
+.alert.good{background:var(--good-bg);color:var(--good);border-color:var(--good)}
+.check{display:flex;gap:10px;align-items:flex-start;padding:10px 0;border-bottom:1px solid var(--line);cursor:pointer;font-size:15px;color:var(--fg)}
+.check:last-child{border-bottom:0}
+.check input{width:20px;height:20px;flex:none;margin-top:1px;accent-color:var(--accent)}
+.check small{display:block;color:var(--muted);font-size:12px}
+.verdict{border-radius:12px;padding:16px;text-align:center;border:2px solid}
+.verdict b{display:block;font-family:var(--display);font-size:22px;font-weight:800;letter-spacing:-.01em}
+.verdict.go{background:var(--good-bg);border-color:var(--good);color:var(--good)}
+.verdict.stop{background:var(--bad-bg);border-color:var(--bad);color:var(--bad)}
+.trade{display:grid;grid-template-columns:1fr auto;gap:2px 10px;padding:12px 0;border-bottom:1px solid var(--line)}
+.trade:last-child{border-bottom:0}
+.trade .t1{font-weight:600} .trade .t2{font-size:12px;color:var(--muted)}
+.trade .pnl{text-align:right;font-family:var(--mono);font-weight:600}
+.pill{display:inline-block;font-size:11px;font-weight:600;padding:1px 7px;border-radius:99px;border:1px solid var(--line);color:var(--muted);margin-left:4px;vertical-align:1px}
+.pill.long{color:var(--good);border-color:var(--good)} .pill.short{color:var(--bad);border-color:var(--bad)}
+.pill.ej{color:var(--warn);border-color:var(--warn)}
+.pos{color:var(--good)} .neg{color:var(--bad)}
+.stats{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+.stat{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px}
+.stat .k{font-size:12px;color:var(--muted)} .stat .v{font-family:var(--mono);font-size:22px;font-weight:600;font-variant-numeric:tabular-nums}
+.bar{height:8px;background:var(--bg);border-radius:99px;overflow:hidden;border:1px solid var(--line)}
+.bar i{display:block;height:100%;background:var(--accent)}
+nav{position:fixed;left:0;right:0;bottom:0;z-index:6;background:var(--surface);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0px);padding-left:env(safe-area-inset-left,0px);padding-right:env(safe-area-inset-right,0px)}
+nav .tabs{max-width:560px;margin:0 auto;display:grid;grid-template-columns:repeat(4,1fr)}
+nav button{border:0;background:transparent;font:inherit;font-size:12px;font-weight:600;color:var(--muted);padding:10px 4px 12px;display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer}
+nav button svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.8}
+nav button.on{color:var(--accent)}
+.muted{color:var(--muted);font-size:13px}
+.hide{display:none}
+@media (prefers-reduced-motion: no-preference){.verdict,.alert{transition:background .2s,border-color .2s}}
+</style>
+</head>
+<body>
+
+<header><div class="wrap">
+  <div class="brand">Bitácora <span>Trader</span></div>
+  <div class="today num" id="todayBox"></div>
+</div></header>
+
+<main class="wrap">
+
+<!-- ===== OPERAR ===== -->
+<section id="v-operar">
+  <div id="dayLimit"></div>
+
+  <h2>Calculadora de riesgo</h2>
+  <div class="card stack">
+    <div class="seg" id="mkt"><button data-v="spot" class="on">Spot</button><button data-v="fut">Futuros</button></div>
+    <div class="seg side hide" id="side"><button data-v="long" class="on">Long (sube)</button><button data-v="short">Short (baja)</button></div>
+    <div class="grid2">
+      <label>Capital total (USDT)<input id="c-cap" type="number" inputmode="decimal" step="any"></label>
+      <label>Riesgo por operación (%)<input id="c-risk" type="number" inputmode="decimal" step="0.1"></label>
+      <label>Precio de entrada<input id="c-entry" type="number" inputmode="decimal" step="any" value="100"></label>
+      <label>Stop loss<input id="c-stop" type="number" inputmode="decimal" step="any" value="97"></label>
+      <label>Take profit<input id="c-tp" type="number" inputmode="decimal" step="any" value="107"></label>
+      <label class="fut-only hide">Apalancamiento (x)<input id="c-lev" type="number" inputmode="numeric" step="1" value="3"></label>
+    </div>
+    <div id="calcAlerts" class="stack"></div>
+    <dl class="out" id="calcOut"></dl>
+  </div>
+
+  <h2>Checklist antes de entrar</h2>
+  <div class="card" id="checklist"></div>
+  <div style="height:12px"></div>
+  <div id="verdict"></div>
+  <div style="height:12px"></div>
+  <div class="row"><button class="btn primary" id="toJournal">Anotar esta operación</button><button class="btn" id="resetCheck">Limpiar checklist</button></div>
+</section>
+
+<!-- ===== DIARIO ===== -->
+<section id="v-diario" class="hide">
+  <h2 id="formTitle">Nueva operación</h2>
+  <form class="card stack" id="tradeForm">
+    <div class="grid2">
+      <label>Fecha<input id="f-date" type="date" required></label>
+      <label>Par<input id="f-pair" placeholder="BTC/USDT" required></label>
+      <label>Mercado<select id="f-mkt"><option value="spot">Spot</option><option value="fut">Futuros</option></select></label>
+      <label>Dirección<select id="f-side"><option value="long">Long</option><option value="short">Short</option></select></label>
+      <label>Monto usado (USDT)<input id="f-amt" type="number" inputmode="decimal" step="any" required></label>
+      <label>Apalancamiento (x)<input id="f-lev" type="number" inputmode="numeric" value="1"></label>
+      <label>Entrada<input id="f-entry" type="number" inputmode="decimal" step="any"></label>
+      <label>Stop loss<input id="f-stop" type="number" inputmode="decimal" step="any"></label>
+    </div>
+    <label>¿Por qué entraste?<textarea id="f-why" placeholder="Ej: rebote en soporte de 4h con volumen"></textarea></label>
+    <label>¿Cómo te sentías?<select id="f-mood">
+      <option>Tranquilo</option><option>Seguro</option><option>Ansioso</option><option>FOMO (miedo a quedarme fuera)</option><option>Enojado / queriendo recuperar</option><option>Aburrido</option>
+    </select></label>
+    <label>Resultado en USDT (vacío si sigue abierta)<input id="f-pnl" type="number" inputmode="decimal" step="any" placeholder="Ej: 12.5 o -8"></label>
+    <div class="row"><button class="btn primary" type="submit" id="saveBtn">Guardar</button><button class="btn hide" type="button" id="cancelEdit">Cancelar</button></div>
+  </form>
+
+  <h2>Historial</h2>
+  <div id="exampleNote"></div>
+  <div class="card" id="tradeList"></div>
+</section>
+
+<!-- ===== NÚMEROS ===== -->
+<section id="v-numeros" class="hide">
+  <h2>Tus números</h2>
+  <div class="stats" id="statsBox"></div>
+  <h2>Resultado según cómo te sentías</h2>
+  <div class="card stack" id="moodBox"></div>
+  <h2>Spot vs Futuros</h2>
+  <div class="card"><dl class="out" id="mktBox"></dl></div>
+  <p class="muted">Si ves que perdés más cuando estás ansioso o con FOMO, esa es tu señal: en esos días no se opera.</p>
+</section>
+
+<!-- ===== AJUSTES ===== -->
+<section id="v-ajustes" class="hide">
+  <h2>Tus reglas</h2>
+  <div class="card stack">
+    <div class="grid2">
+      <label>Capital total (USDT)<input id="s-cap" type="number" inputmode="decimal" step="any"></label>
+      <label>Riesgo por operación (%)<input id="s-risk" type="number" inputmode="decimal" step="0.1"></label>
+      <label>Máx. pérdidas por día<input id="s-maxloss" type="number" inputmode="numeric"></label>
+      <label>Máx. pérdida diaria (%)<input id="s-maxday" type="number" inputmode="decimal" step="0.5"></label>
+      <label>Apalancamiento máximo (x)<input id="s-maxlev" type="number" inputmode="numeric"></label>
+      <label>Comisión Binance (%)<input id="s-fee" type="number" inputmode="decimal" step="0.01"></label>
+    </div>
+    <p class="muted" style="margin:0">Recomendado para empezar: riesgo 1%, máximo 3 pérdidas o 3% al día, apalancamiento 5x como mucho.</p>
+    <div class="row"><button class="btn primary" id="saveSettings">Guardar reglas</button></div>
+  </div>
+  <h2>Datos</h2>
+  <div class="card stack">
+    <p class="muted" style="margin:0">Tus operaciones se guardan solo en este teléfono.</p>
+    <div class="row"><button class="btn" id="clearEx">Borrar ejemplos</button><button class="btn" id="clearAll">Borrar todo</button></div>
+    <div id="confirmBox"></div>
+  </div>
+</section>
+</main>
+
+<nav><div class="tabs">
+  <button data-v="operar" class="on"><svg viewBox="0 0 24 24"><path d="M4 19V5M4 19h16M8 15l4-5 3 3 5-7"/></svg>Operar</button>
+  <button data-v="diario"><svg viewBox="0 0 24 24"><path d="M6 3h11a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H6zM9 8h6M9 12h6M9 16h4"/></svg>Diario</button>
+  <button data-v="numeros"><svg viewBox="0 0 24 24"><path d="M5 20V11M12 20V5M19 20v-6"/></svg>Números</button>
+  <button data-v="ajustes"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/></svg>Ajustes</button>
+</div></nav>
+
+<script>
+(function(){
+const KEY="bitacora-trader-v1";
+const $=id=>document.getElementById(id);
+const today=()=>{const d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")};
+const fmt=(n,d=2)=>isFinite(n)?Number(n).toLocaleString("es-SV",{minimumFractionDigits:d,maximumFractionDigits:d}):"—";
+const money=n=>(n>0?"+":"")+fmt(n)+" USDT";
+const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+const defaults={settings:{cap:200,risk:1,maxloss:3,maxday:3,maxlev:5,fee:0.1},trades:[
+  {id:1,ej:true,date:"2026-11-01",pair:"BTC/USDT",mkt:"spot",side:"long",amt:60,lev:1,entry:68500,stop:66500,why:"Rebote en soporte diario",mood:"Tranquilo",pnl:4.2},
+  {id:2,ej:true,date:"2026-11-02",pair:"ETH/USDT",mkt:"fut",side:"long",amt:20,lev:10,entry:2450,stop:2380,why:"Vi que todos estaban comprando",mood:"FOMO (miedo a quedarme fuera)",pnl:-9.5},
+  {id:3,ej:true,date:"2026-11-03",pair:"SOL/USDT",mkt:"spot",side:"long",amt:40,lev:1,entry:158,stop:151,why:"Ruptura de resistencia con volumen",mood:"Seguro",pnl:3.1}
+]};
+let S;
+function load(){try{S=JSON.parse(localStorage.getItem(KEY))}catch(e){S=null}
+  if(!S||!S.settings)S=JSON.parse(JSON.stringify(defaults));}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
+load();
+
+/* ---- tabs ---- */
+document.querySelectorAll("nav button").forEach(b=>b.addEventListener("click",()=>show(b.dataset.v)));
+function show(v){document.querySelectorAll("nav button").forEach(b=>b.classList.toggle("on",b.dataset.v===v));
+  ["operar","diario","numeros","ajustes"].forEach(x=>$("v-"+x).classList.toggle("hide",x!==v));
+  if(v==="numeros")renderStats(); if(v==="operar")renderDay(); window.scrollTo(0,0);}
+
+/* ---- today ---- */
+function todayTrades(){return S.trades.filter(t=>!t.ej&&t.date===today()&&t.pnl!==null&&t.pnl!=="")}
+function dayState(){const tt=todayTrades();const losses=tt.filter(t=>t.pnl<0).length;
+  const pnl=tt.reduce((a,t)=>a+Number(t.pnl),0);const lossPct=S.settings.cap>0?-pnl/S.settings.cap*100:0;
+  let streak=0;for(let i=tt.length-1;i>=0&&tt[i].pnl<0;i--)streak++;
+  return{losses,pnl,lossPct,streak,blocked:losses>=S.settings.maxloss||lossPct>=S.settings.maxday};}
+function renderDay(){const d=dayState();
+  $("todayBox").innerHTML="Hoy "+(d.pnl>=0?'<span class="pos">':'<span class="neg">')+money(d.pnl)+"</span><br>"+d.losses+" de "+S.settings.maxloss+" pérdidas";
+  $("dayLimit").innerHTML=d.blocked?'<div class="alert bad" style="margin-top:12px"><b>Hoy ya no se opera.</b> Llegaste a tu límite de pérdidas del día. Cerrá Binance y volvé mañana con la cabeza fría.</div>'
+   :(d.losses>0&&d.losses===S.settings.maxloss-1?'<div class="alert warn" style="margin-top:12px">Te queda una pérdida antes de tu límite de hoy. Solo entrá si la operación es muy clara.</div>':"");
+  renderChecklist();}
+
+/* ---- calculator ---- */
+let mkt="spot",side="long";
+function segs(id,cb){$(id).querySelectorAll("button").forEach(b=>b.addEventListener("click",()=>{$(id).querySelectorAll("button").forEach(x=>x.classList.toggle("on",x===b));cb(b.dataset.v);calc();renderChecklist();}))}
+segs("mkt",v=>{mkt=v;$("side").classList.toggle("hide",v!=="fut");document.querySelectorAll(".fut-only").forEach(e=>e.classList.toggle("hide",v!=="fut"));});
+segs("side",v=>side=v);
+["c-cap","c-risk","c-entry","c-stop","c-tp","c-lev"].forEach(id=>$(id).addEventListener("input",()=>{calc();renderChecklist();}));
+let last={};
+function calc(){
+  const cap=+$("c-cap").value,risk=+$("c-risk").value,e=+$("c-entry").value,st=+$("c-stop").value,tp=+$("c-tp").value;
+  const lev=mkt==="fut"?Math.max(1,+$("c-lev").value||1):1;const fee=(S.settings.fee||0)/100;
+  const dir=mkt==="fut"?side:"long";const al=[];let out="";
+  if(!(cap>0&&risk>0&&e>0&&st>0)){ $("calcOut").innerHTML='<dt>Llená capital, riesgo, entrada y stop.</dt><dd></dd>';$("calcAlerts").innerHTML="";last={};return;}
+  const wrongSide=dir==="long"?st>=e:st<=e;
+  if(wrongSide){al.push(['bad',dir==="long"?"En Long el stop tiene que ir <b>abajo</b> del precio de entrada.":"En Short el stop tiene que ir <b>arriba</b> del precio de entrada."]);}
+  const dist=Math.abs(e-st)/e;const riskUsd=cap*risk/100;
+  let notional=riskUsd/(dist+2*fee);let capped=false;
+  if(notional/lev>cap){notional=cap*lev;capped=true;}
+  const margin=notional/lev;const qty=notional/e;const lossReal=notional*(dist+2*fee);
+  let rr=NaN,win=NaN;if(tp>0){const td=dir==="long"?(tp-e)/e:(e-tp)/e;rr=td/dist;win=notional*(td-2*fee);
+    if(td<=0)al.push(['bad',"El take profit está del lado equivocado."]);}
+  let liq=NaN;
+  if(mkt==="fut"){const mmr=0.005;liq=dir==="long"?e*(1-1/lev+mmr):e*(1+1/lev-mmr);
+    if(lev>S.settings.maxlev)al.push(['bad',"Estás usando <b>"+lev+"x</b>. Tu regla dice máximo <b>"+S.settings.maxlev+"x</b>. Bajale."]);
+    const liqFirst=dir==="long"?liq>=st:liq<=st;
+    if(liqFirst)al.push(['bad',"<b>Te liquidan antes de tocar tu stop.</b> Bajá el apalancamiento o acercá el stop."]);
+    else if(Math.abs(liq-st)/e<0.01)al.push(['warn',"La liquidación queda muy pegada a tu stop. Dejá más espacio."]);}
+  if(capped)al.push(['warn',"Para ese stop tendrías que meter más de tu capital. Te muestro el máximo; mejor buscá un stop más cerca."]);
+  if(risk>2)al.push(['warn',"Arriesgar más de 2% por operación te puede vaciar la cuenta en una mala racha."]);
+  if(isFinite(rr)&&rr>0&&rr<2)al.push(['warn',"Ganás menos de 2 veces lo que arriesgás. Con eso necesitás acertar muy seguido."]);
+  out+='<dt>'+(mkt==="fut"?"Margen a usar":"USDT a invertir")+'</dt><dd class="big">'+fmt(margin)+'</dd>';
+  if(mkt==="fut")out+='<dt>Tamaño de la posición</dt><dd>'+fmt(notional)+' USDT</dd>';
+  out+='<dt>Cantidad de moneda</dt><dd>'+fmt(qty,qty<1?5:3)+'</dd>';
+  out+='<dt>Si toca el stop perdés</dt><dd class="neg">−'+fmt(lossReal)+' USDT</dd>';
+  if(isFinite(win))out+='<dt>Si toca el take profit ganás</dt><dd class="pos">+'+fmt(win)+' USDT</dd>';
+  if(isFinite(rr)&&rr>0)out+='<dt>Riesgo : beneficio</dt><dd>1 : '+fmt(rr,1)+'</dd>';
+  if(mkt==="fut")out+='<dt>Liquidación aprox.</dt><dd class="neg">'+fmt(liq,liq<10?4:2)+'</dd>';
+  out+='<dt>Distancia al stop</dt><dd>'+fmt(dist*100,2)+' %</dd>';
+  $("calcOut").innerHTML=out;
+  $("calcAlerts").innerHTML=al.map(a=>'<div class="alert '+a[0]+'">'+a[1]+'</div>').join("");
+  last={margin,lev,rr,risk,bad:al.some(a=>a[0]==="bad"),e,st,liqOk:mkt!=="fut"||!al.some(a=>a[1].includes("liquidan"))};
+}
+
+/* ---- checklist ---- */
+const baseChecks=[
+ ["trend","La tendencia en el gráfico grande (4h o diario) va a mi favor"],
+ ["reason","Puedo explicar en una frase por qué entro","Si no la podés escribir, no es una razón."],
+ ["stop","Ya sé dónde pongo el stop loss y lo voy a respetar"],
+ ["risk","Arriesgo 2% o menos de mi capital","Lo calcula la calculadora de arriba."],
+ ["rr","Puedo ganar al menos el doble de lo que arriesgo"],
+ ["mood","No estoy enojado, ansioso ni con FOMO","Si estás queriendo recuperar una pérdida, no entrés."],
+ ["news","No hay noticia fuerte en la próxima hora","Datos de EE.UU., decisiones de la Fed, eventos grandes."],
+ ["money","Es dinero que puedo perder sin que me afecte"]
+];
+const futChecks=[["lev","Apalancamiento dentro de mi límite"],["liq","Mi stop está antes del precio de liquidación"]];
+let checked={};
+function renderChecklist(){
+  const list=baseChecks.concat(mkt==="fut"?futChecks:[]);
+  const auto={risk:last.risk>0&&last.risk<=2,rr:last.rr>=2,lev:last.lev<=S.settings.maxlev,liq:last.liqOk};
+  $("checklist").innerHTML=list.map(([k,t,s])=>'<label class="check"><input type="checkbox" data-k="'+k+'"'+(checked[k]?" checked":"")+'><span>'+t+(s?'<small>'+s+'</small>':'')+(k in auto&&last.e?' <span class="pill '+(auto[k]?'long':'short')+'">'+(auto[k]?'calculadora: sí':'calculadora: no')+'</span>':'')+'</span></label>').join("");
+  $("checklist").querySelectorAll("input").forEach(i=>i.addEventListener("change",()=>{checked[i.dataset.k]=i.checked;renderVerdict(list,auto);}));
+  renderVerdict(list,auto);
+}
+function renderVerdict(list,auto){
+  const d=dayState();const all=list.every(([k])=>checked[k]);
+  const autoFail=Object.keys(auto).some(k=>list.find(x=>x[0]===k)&&last.e&&!auto[k]);
+  let go=all&&!d.blocked&&!last.bad&&!autoFail;let msg;
+  if(d.blocked)msg="Llegaste a tu límite de hoy.";
+  else if(last.bad)msg="La calculadora marca un problema. Revisalo arriba.";
+  else if(autoFail)msg="Marcaste algo que la calculadora no confirma.";
+  else if(!all){const n=list.filter(([k])=>!checked[k]).length;msg="Te faltan "+n+" punto"+(n>1?"s":"")+". Si no podés marcarlos con honestidad, esperá.";}
+  else msg="Todo en orden. Poné tu stop apenas entrés.";
+  $("verdict").innerHTML='<div class="verdict '+(go?'go':'stop')+'"><b>'+(go?'Podés operar':'No operés todavía')+'</b>'+msg+'</div>';
+}
+$("resetCheck").addEventListener("click",()=>{checked={};renderChecklist();});
+$("toJournal").addEventListener("click",()=>{
+  resetForm();$("f-mkt").value=mkt;$("f-side").value=mkt==="fut"?side:"long";
+  if(last.margin)$("f-amt").value=+last.margin.toFixed(2);$("f-lev").value=mkt==="fut"?(+$("c-lev").value||1):1;
+  $("f-entry").value=$("c-entry").value;$("f-stop").value=$("c-stop").value;show("diario");$("f-pair").focus();});
+
+/* ---- journal ---- */
+let editId=null;
+function resetForm(){$("tradeForm").reset();$("f-date").value=today();$("f-lev").value=1;editId=null;$("formTitle").textContent="Nueva operación";$("saveBtn").textContent="Guardar";$("cancelEdit").classList.add("hide");}
+$("cancelEdit").addEventListener("click",resetForm);
+$("tradeForm").addEventListener("submit",ev=>{ev.preventDefault();
+  const pnlv=$("f-pnl").value;const t={date:$("f-date").value,pair:$("f-pair").value.trim().toUpperCase(),mkt:$("f-mkt").value,side:$("f-side").value,amt:+$("f-amt").value,lev:+$("f-lev").value||1,entry:+$("f-entry").value||null,stop:+$("f-stop").value||null,why:$("f-why").value.trim(),mood:$("f-mood").value,pnl:pnlv===""?null:+pnlv};
+  if(editId){const i=S.trades.findIndex(x=>x.id===editId);S.trades[i]=Object.assign(S.trades[i],t,{ej:false});}
+  else{t.id=Date.now();S.trades.push(t);}
+  save();resetForm();renderList();renderDay();});
+function renderList(){
+  const L=S.trades.slice().sort((a,b)=>(b.date+b.id).localeCompare(a.date+a.id));
+  $("exampleNote").innerHTML=S.trades.some(t=>t.ej)?'<div class="alert warn" style="margin-bottom:10px">Las operaciones marcadas como <b>ejemplo</b> no son tuyas. Borralas en Ajustes cuando anotés las tuyas.</div>':"";
+  if(!L.length){$("tradeList").innerHTML='<p class="muted" style="margin:0">Todavía no hay operaciones. Anotá la primera arriba.</p>';return;}
+  $("tradeList").innerHTML=L.map(t=>{const open=t.pnl===null||t.pnl==="";
+    return '<div class="trade"><div><div class="t1">'+esc(t.pair)+'<span class="pill '+t.side+'">'+(t.side==="long"?"Long":"Short")+'</span><span class="pill">'+(t.mkt==="fut"?"Futuros "+t.lev+"x":"Spot")+'</span>'+(t.ej?'<span class="pill ej">ejemplo</span>':'')+'</div>'+
+    '<div class="t2">'+esc(t.date)+' · '+fmt(t.amt)+' USDT · '+esc(t.mood)+'</div>'+(t.why?'<div class="t2">'+esc(t.why)+'</div>':'')+
+    '<div class="row" style="margin-top:6px"><button class="btn small" data-ed="'+t.id+'">'+(open?"Cerrar / editar":"Editar")+'</button><button class="btn small" data-del="'+t.id+'">Borrar</button></div></div>'+
+    '<div class="pnl '+(open?'':(t.pnl>=0?'pos':'neg'))+'">'+(open?'<span class="pill">abierta</span>':money(t.pnl))+'</div></div>';}).join("");
+  $("tradeList").querySelectorAll("[data-ed]").forEach(b=>b.addEventListener("click",()=>edit(+b.dataset.ed)));
+  $("tradeList").querySelectorAll("[data-del]").forEach(b=>b.addEventListener("click",()=>{
+    if(b.dataset.sure){S.trades=S.trades.filter(x=>x.id!==+b.dataset.del);save();renderList();renderDay();}
+    else{b.dataset.sure=1;b.textContent="¿Seguro? Tocá otra vez";}}));
+}
+function edit(id){const t=S.trades.find(x=>x.id===id);if(!t)return;editId=id;
+  $("f-date").value=t.date;$("f-pair").value=t.pair;$("f-mkt").value=t.mkt;$("f-side").value=t.side;$("f-amt").value=t.amt;$("f-lev").value=t.lev;
+  $("f-entry").value=t.entry??"";$("f-stop").value=t.stop??"";$("f-why").value=t.why;$("f-mood").value=t.mood;$("f-pnl").value=t.pnl??"";
+  $("formTitle").textContent="Editar operación";$("saveBtn").textContent="Guardar cambios";$("cancelEdit").classList.remove("hide");window.scrollTo(0,0);$("f-pnl").focus();}
+
+/* ---- stats ---- */
+function renderStats(){
+  const C=S.trades.filter(t=>t.pnl!==null&&t.pnl!=="");const w=C.filter(t=>t.pnl>0),l=C.filter(t=>t.pnl<0);
+  const tot=C.reduce((a,t)=>a+ +t.pnl,0);const avgW=w.length?w.reduce((a,t)=>a+ +t.pnl,0)/w.length:0;const avgL=l.length?l.reduce((a,t)=>a+ +t.pnl,0)/l.length:0;
+  const wr=C.length?w.length/C.length*100:0;
+  const st=(k,v,cls="")=>'<div class="stat"><div class="k">'+k+'</div><div class="v '+cls+'">'+v+'</div></div>';
+  $("statsBox").innerHTML=st("Resultado total",money(tot),tot>=0?"pos":"neg")+st("Aciertos",fmt(wr,0)+" %")+st("Ganancia promedio","+"+fmt(avgW),"pos")+st("Pérdida promedio",fmt(avgL),"neg")+st("Operaciones cerradas",C.length)+st("Abiertas",S.trades.length-C.length);
+  const moods={};C.forEach(t=>{(moods[t.mood]=moods[t.mood]||{n:0,p:0,w:0});moods[t.mood].n++;moods[t.mood].p+= +t.pnl;if(t.pnl>0)moods[t.mood].w++;});
+  const ks=Object.keys(moods);
+  $("moodBox").innerHTML=ks.length?ks.map(k=>{const m=moods[k];return '<div><div class="row" style="justify-content:space-between"><span>'+esc(k)+' <span class="muted">· '+m.n+' op.</span></span><span class="num '+(m.p>=0?'pos':'neg')+'">'+money(m.p)+'</span></div><div class="bar" title="aciertos"><i style="width:'+(m.w/m.n*100)+'%"></i></div><div class="muted">'+fmt(m.w/m.n*100,0)+' % de aciertos</div></div>';}).join(""):'<p class="muted" style="margin:0">Cerrá algunas operaciones para ver esto.</p>';
+  const by=k=>{const a=C.filter(t=>t.mkt===k);return{n:a.length,p:a.reduce((s,t)=>s+ +t.pnl,0)}};const sp=by("spot"),fu=by("fut");
+  $("mktBox").innerHTML='<dt>Spot ('+sp.n+')</dt><dd class="'+(sp.p>=0?'pos':'neg')+'">'+money(sp.p)+'</dd><dt>Futuros ('+fu.n+')</dt><dd class="'+(fu.p>=0?'pos':'neg')+'">'+money(fu.p)+'</dd>';
+}
+
+/* ---- settings ---- */
+function fillSettings(){const s=S.settings;$("s-cap").value=s.cap;$("s-risk").value=s.risk;$("s-maxloss").value=s.maxloss;$("s-maxday").value=s.maxday;$("s-maxlev").value=s.maxlev;$("s-fee").value=s.fee;
+  $("c-cap").value=s.cap;$("c-risk").value=s.risk;}
+$("saveSettings").addEventListener("click",()=>{S.settings={cap:+$("s-cap").value||0,risk:+$("s-risk").value||1,maxloss:+$("s-maxloss").value||3,maxday:+$("s-maxday").value||3,maxlev:+$("s-maxlev").value||5,fee:+$("s-fee").value||0};
+  save();fillSettings();calc();renderDay();$("saveSettings").textContent="Guardado ✓";setTimeout(()=>$("saveSettings").textContent="Guardar reglas",1500);});
+$("clearEx").addEventListener("click",()=>{S.trades=S.trades.filter(t=>!t.ej);save();renderList();renderDay();$("confirmBox").innerHTML='<div class="alert good">Ejemplos borrados.</div>';});
+$("clearAll").addEventListener("click",()=>{$("confirmBox").innerHTML='<div class="alert bad stack">Esto borra todas tus operaciones y no se puede deshacer.<div class="row"><button class="btn small" id="yesAll">Sí, borrar todo</button><button class="btn small" id="noAll">Cancelar</button></div></div>';
+  $("yesAll").onclick=()=>{S.trades=[];save();renderList();renderDay();$("confirmBox").innerHTML='<div class="alert good">Todo borrado.</div>';};$("noAll").onclick=()=>$("confirmBox").innerHTML="";});
+
+/* ---- init ---- */
+fillSettings();resetForm();calc();renderList();renderDay();
+if("serviceWorker" in navigator&&location.protocol==="https:"&&!/claude|claudeusercontent/.test(location.hostname)){try{navigator.serviceWorker.register("sw.js").catch(()=>{})}catch(e){}}
+})();
+</script>
+
+</body>
+</html>
