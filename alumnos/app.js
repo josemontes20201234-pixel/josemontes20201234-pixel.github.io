@@ -182,7 +182,7 @@ function openSheet(title, html, bind, refresh) {
 function closeSheet() { const s = $("#sheet"); if (s) s.innerHTML = ""; SHEET = {} }
 
 function formAlumno(a) {
-  const n = !a; a = a || { estado: "activo", inicio: today(), inscripcion: 25, mensualidad: 85, grupo: (ALUMNOS[0] && ALUMNOS[0].grupo) || "Grupo 1" };
+  const n = !a; a = a || { estado: "activo", inicio: today(), inscripcion: 25, mensualidad: 90, grupo: (ALUMNOS[0] && ALUMNOS[0].grupo) || "Grupo 1" };
   const grupos = [...new Set(ALUMNOS.map(x => x.grupo).filter(Boolean))];
   openSheet(n ? "Inscribir alumno" : "Editar alumno", `<form class="form" id="fa">
    <label>Nombre completo<input id="a_nombre" required maxlength="80" value="${esc(a.nombre)}" autocomplete="off"></label>
