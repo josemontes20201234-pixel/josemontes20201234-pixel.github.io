@@ -1,0 +1,19 @@
+{
+  "name": "Meraki Alumnos",
+  "short_name": "Meraki Alumnos",
+  "description": "Control de inscripciones, alumnos y mensualidades de Meraki Academy.",
+  "lang": "es-SV",
+  "id": "./",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0b0b0a",
+  "theme_color": "#0b0b0a",
+  "categories": ["business", "education"],
+  "icons": [
+    {"src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any"},
+    {"src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any"},
+    {"src": "maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}
+  ]
+}
