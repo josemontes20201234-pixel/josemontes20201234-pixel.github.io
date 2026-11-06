@@ -1,0 +1,900 @@
+<!doctype html>
+<html lang="es-SV">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="description" content="Meraki Academy: aprendé barbería desde la historia hasta la maestría.">
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>Meraki Academy</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="theme-color" content="#0b0b0a">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;800;900&family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+/* Layout: app shell — sticky top bar, one content column (max 760px), fixed bottom tab bar.
+   One bold motif: the barber-pole stripe. Everything else is black, brass gold and quiet type. */
+:root{
+  --bg:#0b0b0a; --surface:#151512; --surface-2:#1e1d19; --line:#2e2c26;
+  --fg:#efe9dc; --muted:#a19b8d; --brass:#d1a957; --brass-soft:rgba(209,169,87,.14); --brass-ink:#14100a;
+  --red:#c2413a; --blue:#3d67a8; --pole-white:#f3efe6;
+  --ok:#62b68c; --ok-soft:rgba(98,182,140,.14); --bad:#e26a5c; --bad-soft:rgba(226,106,92,.14);
+  --skin:#cfa88c; --skin-2:#b78f74; --hair:#6a5444; --hair-dark:#3a2d24;
+  --display:'Big Shoulders Display','Arial Narrow',Impact,sans-serif;
+  --body:'Manrope',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+  --mono:'JetBrains Mono',ui-monospace,Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+@media (prefers-color-scheme: light){:root:not([data-theme="dark"]){
+  --bg:#f2f1ec; --surface:#ffffff; --surface-2:#e8e6df; --line:#d3d0c6;
+  --fg:#16150f; --muted:#5f5b50; --brass:#8c661c; --brass-soft:rgba(140,102,28,.12); --brass-ink:#fffaf0;
+  --ok:#27855a; --ok-soft:rgba(39,133,90,.12); --bad:#b8402f; --bad-soft:rgba(184,64,47,.1);
+  --hair:#3f3026; --hair-dark:#241a14; color-scheme:light }}
+:root[data-theme="light"]{
+  --bg:#f2f1ec; --surface:#ffffff; --surface-2:#e8e6df; --line:#d3d0c6;
+  --fg:#16150f; --muted:#5f5b50; --brass:#8c661c; --brass-soft:rgba(140,102,28,.12); --brass-ink:#fffaf0;
+  --ok:#27855a; --ok-soft:rgba(39,133,90,.12); --bad:#b8402f; --bad-soft:rgba(184,64,47,.1);
+  --hair:#3f3026; --hair-dark:#241a14; color-scheme:light }
+
+*{box-sizing:border-box}
+html,body{background:var(--bg)}
+body{color:var(--fg);font:16px/1.6 var(--body);
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+  padding-block:0 calc(92px + env(safe-area-inset-bottom,0px));-webkit-tap-highlight-color:transparent}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--bg)}
+#app{max-width:760px;margin:0 auto}
+button{font:inherit;color:inherit;cursor:pointer}
+:focus-visible{outline:2px solid var(--brass);outline-offset:2px}
+h1,h2,h3{font-family:var(--display);text-transform:uppercase;line-height:.95;margin:0;text-wrap:balance;letter-spacing:.01em}
+p{margin:0}
+.lbl{font:700 11px/1 var(--body);letter-spacing:.14em;text-transform:uppercase;color:var(--brass)}
+.muted{color:var(--muted)}
+.mono{font-family:var(--mono)}
+
+.pole{height:8px;border-radius:99px;background:repeating-linear-gradient(-45deg,var(--red) 0 12px,var(--pole-white) 12px 24px,var(--blue) 24px 36px,var(--pole-white) 36px 48px);animation:pole 2.4s linear infinite}
+@keyframes pole{to{background-position:67.88px 0}}
+
+/* top bar */
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);display:flex;align-items:center;gap:12px;padding-block:14px 12px;border-bottom:1px solid var(--line)}
+.brand{font:900 22px/1 var(--display);letter-spacing:.06em;text-transform:uppercase}
+.brand span{color:var(--brass)}
+.top .sp{flex:1}
+.chipbtn{border:1px solid var(--line);background:var(--surface);border-radius:99px;padding:7px 12px;font-size:13px;font-weight:600}
+.iconbtn{width:38px;height:38px;border-radius:99px;border:1px solid var(--line);background:var(--surface);display:grid;place-items:center}
+.iconbtn svg{width:18px;height:18px}
+
+/* tab bar */
+.tabs{position:fixed;left:0;right:0;bottom:0;z-index:6;background:var(--surface);border-top:1px solid var(--line);
+  padding:8px max(16px,env(safe-area-inset-right,0px)) calc(8px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
+.tabs nav{max-width:760px;margin:0 auto;display:grid;grid-template-columns:repeat(4,1fr);gap:4px}
+.tabs button{border:0;background:none;display:flex;flex-direction:column;align-items:center;gap:3px;padding:6px 0;border-radius:12px;font-size:11.5px;font-weight:700;color:var(--muted)}
+.tabs button svg{width:22px;height:22px}
+.tabs button[aria-current="page"]{color:var(--brass);background:var(--brass-soft)}
+
+/* home */
+.hero{padding-block:26px 8px;display:grid;gap:14px}
+.hero h1{font-size:clamp(54px,15vw,96px);font-weight:900}
+.hero h1 em{font-style:normal;color:var(--brass);display:block}
+.hero .lead{font-size:17px;color:var(--muted);max-width:34ch}
+.progress-card{display:grid;grid-template-columns:auto 1fr;gap:16px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:16px}
+.ring{width:84px;height:84px}
+.ring text{font:800 20px var(--mono);fill:var(--fg)}
+.namebox{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.namebox input{flex:1;min-width:0;background:var(--surface-2);border:1px solid var(--line);color:var(--fg);border-radius:10px;padding:9px 12px;font:inherit}
+.btn{border:0;border-radius:12px;padding:12px 18px;font-weight:800;background:var(--brass);color:var(--brass-ink);display:inline-flex;align-items:center;gap:8px;justify-content:center}
+.btn.ghost{background:transparent;border:1px solid var(--line);color:var(--fg)}
+.btn.sm{padding:8px 14px;font-size:14px;border-radius:10px}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.shortcuts{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:6px}
+.shortcut{border:1px solid var(--line);background:var(--surface);border-radius:14px;padding:14px 12px;text-align:left;display:grid;gap:4px}
+.shortcut b{font:800 20px/1 var(--display);text-transform:uppercase}
+.shortcut span{font-size:12.5px;color:var(--muted);line-height:1.35}
+.level{margin-top:30px}
+.level-head{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;align-items:end;margin-bottom:12px}
+.level-num{font:900 64px/0.8 var(--display);color:var(--brass);grid-row:span 2}
+.level-head h2{font-size:30px}
+.level-head p{font-size:14px;color:var(--muted)}
+.mods{display:grid;gap:8px}
+.mod{display:grid;grid-template-columns:44px 1fr auto;gap:12px;align-items:center;width:100%;text-align:left;border:1px solid var(--line);background:var(--surface);border-radius:14px;padding:12px 14px}
+.mod .n{font:700 15px var(--mono);color:var(--muted)}
+.mod h3{font-size:21px}
+.mod small{display:block;font-size:13px;color:var(--muted);margin-top:3px;line-height:1.35}
+.pill{font:700 11px/1 var(--body);letter-spacing:.06em;text-transform:uppercase;padding:6px 8px;border-radius:99px;white-space:nowrap;border:1px solid var(--line);color:var(--muted)}
+.pill.ok{background:var(--ok-soft);color:var(--ok);border-color:transparent}
+.pill.go{background:var(--brass-soft);color:var(--brass);border-color:transparent}
+.install{margin-top:30px;border:1px dashed var(--line);border-radius:14px;padding:14px;font-size:14px;color:var(--muted);display:grid;gap:6px}
+.install b{color:var(--fg)}
+
+/* module */
+.modhead{padding-block:18px 6px;display:grid;gap:10px}
+.back{border:0;background:none;padding:0;color:var(--muted);font-weight:700;font-size:14px;display:inline-flex;align-items:center;gap:6px;justify-self:start}
+.modhead h1{font-size:clamp(40px,11vw,64px);font-weight:900}
+.dots{display:flex;gap:6px;flex-wrap:wrap;margin-top:4px}
+.dots button{flex:1;min-width:28px;height:30px;border-radius:8px;border:1px solid var(--line);background:var(--surface);font:700 12px var(--mono);color:var(--muted)}
+.dots button.on{background:var(--brass);color:var(--brass-ink);border-color:transparent}
+.dots button.seen{color:var(--fg)}
+.section{margin-top:18px;display:grid;gap:16px}
+.section > h2{font-size:34px}
+.section p{max-width:65ch}
+.section p b,.section li b{color:var(--fg);font-weight:800}
+.ticks{margin:0;padding:0;list-style:none;display:grid;gap:8px}
+.ticks li{position:relative;padding-left:22px}
+.ticks li::before{content:"";position:absolute;left:2px;top:.62em;width:10px;height:2px;background:var(--brass)}
+.tip,.warn{border-radius:14px;padding:14px 16px;display:grid;gap:6px;border:1px solid transparent}
+.tip{background:var(--brass-soft)}
+.warn{background:var(--bad-soft)}
+.warn .lbl{color:var(--bad)}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px;display:grid;gap:6px;align-content:start}
+.card h3{font-size:22px}
+.card p{font-size:14.5px;color:var(--muted);line-height:1.5}
+.steps{list-style:none;margin:0;padding:0;display:grid;gap:8px;counter-reset:s}
+.steps li{counter-increment:s;background:var(--surface);border:1px solid var(--line);border-radius:14px}
+.steps li > button{width:100%;border:0;background:none;text-align:left;display:grid;grid-template-columns:34px 1fr 22px;gap:10px;align-items:center;padding:12px 14px;font-weight:700}
+.steps li > button::before{content:counter(s);width:30px;height:30px;border-radius:99px;display:grid;place-items:center;font:700 13px var(--mono);border:1px solid var(--line)}
+.steps li.done > button::before{content:"✓";background:var(--ok);color:var(--bg);border-color:transparent}
+.steps li > button i{font-style:normal;color:var(--muted);transition:transform .2s}
+.steps li.open > button i{transform:rotate(45deg)}
+.steps li > div{padding:0 14px 14px 58px;color:var(--muted);font-size:15px}
+.stepwrap{display:grid;gap:8px}
+.stepwrap .bar{height:4px;border-radius:9px;background:var(--surface-2);overflow:hidden}
+.stepwrap .bar span{display:block;height:100%;background:var(--ok);width:0;transition:width .3s}
+.stepsmeta{display:flex;justify-content:space-between;font-size:13px;color:var(--muted);margin-bottom:-2px}
+.modnav{display:flex;gap:10px;justify-content:space-between;margin-top:28px;padding-top:16px;border-top:1px solid var(--line)}
+
+/* visuals */
+.vis{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:16px;display:grid;gap:14px;min-width:0}
+.vis svg{display:block;width:100%;height:auto;max-width:100%}
+.vis .cap{font-size:13px;color:var(--muted)}
+.seg{display:flex;gap:6px;flex-wrap:wrap}
+.seg button{border:1px solid var(--line);background:var(--surface-2);border-radius:99px;padding:8px 13px;font-size:13.5px;font-weight:700}
+.seg button[aria-pressed="true"]{background:var(--brass);color:var(--brass-ink);border-color:transparent}
+.info{background:var(--surface-2);border-radius:12px;padding:14px;display:grid;gap:6px}
+.info h3{font-size:24px}
+.info p{font-size:15px;color:var(--muted)}
+.big-num{font:800 46px/1 var(--mono);color:var(--brass)}
+input[type=range]{width:100%;accent-color:var(--brass)}
+.split{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;align-items:center}
+@media (max-width:560px){.split{grid-template-columns:1fr}}
+.tl-rail{display:flex;gap:8px;overflow-x:auto;padding-bottom:6px;scrollbar-width:thin}
+.tl-rail button{flex:0 0 auto;border:1px solid var(--line);background:var(--surface-2);border-radius:12px;padding:9px 12px;text-align:left;display:grid;gap:2px}
+.tl-rail button b{font:700 12px var(--mono);color:var(--muted)}
+.tl-rail button span{font-weight:800;font-size:14px}
+.tl-rail button[aria-pressed="true"]{border-color:var(--brass);background:var(--brass-soft)}
+.tl-rail button[aria-pressed="true"] b{color:var(--brass)}
+.tl-year{font:900 52px/0.9 var(--display);color:var(--brass)}
+.toolgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.tool{border:1px solid var(--line);background:var(--surface-2);border-radius:14px;padding:12px;text-align:left;display:grid;gap:6px;align-content:start}
+.tool svg{width:56px;height:56px;color:var(--brass)}
+.tool b{font:800 19px/1 var(--display);text-transform:uppercase}
+.tool .more{font-size:13.5px;color:var(--muted);line-height:1.45}
+.tool[aria-expanded="true"]{border-color:var(--brass)}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12.5px;color:var(--muted)}
+.legend i{display:inline-block;width:12px;height:12px;border-radius:3px;vertical-align:-2px;margin-right:6px}
+.calc{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.calc label{display:grid;gap:4px;font-size:13px;color:var(--muted);font-weight:600}
+.calc input{background:var(--surface-2);border:1px solid var(--line);color:var(--fg);border-radius:10px;padding:10px 12px;font:600 16px var(--mono);width:100%}
+.result{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.result div{background:var(--surface-2);border-radius:12px;padding:12px;display:grid;gap:2px}
+.result b{font:800 28px/1.1 var(--mono);color:var(--brass);font-variant-numeric:tabular-nums}
+.result span{font-size:12.5px;color:var(--muted)}
+
+/* quiz */
+.quiz{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:18px;display:grid;gap:14px}
+.quiz .qn{font:700 13px var(--mono);color:var(--muted)}
+.quiz h3{font:800 22px/1.25 var(--body);text-transform:none;letter-spacing:0}
+.opts{display:grid;gap:8px}
+.opt{border:1px solid var(--line);background:var(--surface-2);border-radius:12px;padding:12px 14px;text-align:left;font-weight:600;display:grid;grid-template-columns:26px 1fr;gap:10px}
+.opt::before{content:attr(data-l);font:700 13px var(--mono);color:var(--muted)}
+.opt.right{background:var(--ok-soft);border-color:var(--ok)}
+.opt.wrong{background:var(--bad-soft);border-color:var(--bad)}
+.opt:disabled{cursor:default}
+.expl{font-size:15px;color:var(--muted);border-left:3px solid var(--brass);padding-left:12px}
+.score{font:900 80px/0.9 var(--display);color:var(--brass)}
+.badge{display:grid;justify-items:center;text-align:center;gap:10px;padding-block:10px}
+
+/* glossary */
+.search{width:100%;background:var(--surface);border:1px solid var(--line);color:var(--fg);border-radius:12px;padding:12px 14px;font:inherit;margin-top:18px}
+.gloss{display:grid;gap:0;margin-top:12px}
+.gloss div{padding:12px 2px;border-bottom:1px solid var(--line);display:grid;gap:2px}
+.gloss b{font:800 20px/1.1 var(--display);text-transform:uppercase}
+.gloss span{color:var(--muted);font-size:15px}
+
+/* stage (modo clase) */
+#stage{position:fixed;inset:0;z-index:50;background:var(--bg);display:grid;grid-template-rows:auto 1fr auto;
+  padding:calc(12px + env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) calc(12px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
+#stage .sh{display:flex;align-items:center;gap:10px;padding-bottom:10px;border-bottom:1px solid var(--line)}
+#stage .sh .t{flex:1;min-width:0;font:800 18px/1.1 var(--display);text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#stage .count{font:700 13px var(--mono);color:var(--muted)}
+#stage .body{overflow:auto;padding-block:22px}
+#stage .slide{max-width:1000px;margin:0 auto;display:grid;gap:20px;font-size:clamp(17px,2.2vw,22px)}
+#stage .slide > h2{font-size:clamp(44px,7vw,88px);font-weight:900}
+#stage .slide .card p,#stage .slide .info p{font-size:clamp(15px,1.6vw,18px)}
+#stage .sf{display:flex;gap:10px;justify-content:space-between;align-items:center;padding-top:10px;border-top:1px solid var(--line)}
+#stage .sf .pole{flex:1}
+.classq h3{font:800 clamp(26px,4vw,44px)/1.2 var(--body)}
+.classq .opt{font-size:clamp(16px,2vw,22px)}
+
+@media (prefers-reduced-motion: reduce){.pole,.spin{animation:none!important}*{transition:none!important}}
+</style>
+
+</head>
+<body>
+<div id="app"></div>
+<div class="tabs"><nav id="tabs"></nav></div>
+<div id="stage" hidden></div>
+
+<script>
+/* ============ CONTENIDO ============ */
+const LEVELS=[
+ {n:1,t:'Fundamentos',d:'Historia, herramientas, higiene y la cabeza que vas a cortar.'},
+ {n:2,t:'Diagnóstico',d:'Leer el rostro, el cabello y al cliente antes de tocar la máquina.'},
+ {n:3,t:'Técnica',d:'Ángulos, degradados y acabados limpios.'},
+ {n:4,t:'Maestría y negocio',d:'Barba, navaja, diseños y cómo vivir del oficio.'}
+];
+
+const MODULES=[
+{id:'historia',lv:1,t:'Historia de la barbería',s:'De las navajas de bronce a la barbería premium.',min:15,sec:[
+ {h:'De dónde venimos',b:[
+  {t:'p',x:'La barbería es uno de los oficios más antiguos del mundo. Antes de ser estilo, fue <b>higiene, estatus y medicina</b>. Conocer esta historia te da algo que muchos barberos no tienen: orgullo de oficio y conversación con el cliente.'},
+  {t:'vis',v:'timeline'},
+  {t:'tip',x:'Contale al cliente una historia corta mientras trabajás (el poste, los barberos-cirujanos). La gente recuerda al barbero que le enseñó algo.'}]},
+ {h:'El poste de barbero',b:[
+  {t:'p',x:'Durante siglos los barberos también eran <b>barberos-cirujanos</b>: sacaban muelas, curaban heridas y hacían sangrías. El poste nació de ese pasado. Tocá cada color.'},
+  {t:'vis',v:'pole'}]},
+ {h:'La barbería moderna',b:[
+  {t:'p',x:'Entre 1920 y 1950 la barbería fue el club social de los hombres. Con el pelo largo de los 60 y 70 y los salones unisex, muchas cerraron. En los 90 y 2000 las barberías afroamericanas y latinas de Estados Unidos crearon la técnica moderna del <b>degradado, el perfilado y los diseños</b>.'},
+  {t:'p',x:'Hoy vivimos un renacimiento: barberías premium, redes sociales, barberos como marca personal y academias. Lo que antes era un servicio rápido ahora es una <b>experiencia</b>.'},
+  {t:'cards',x:[{h:'Antes',d:'Servicio rápido, precio bajo, el cliente iba a la más cercana.'},{h:'Ahora',d:'Experiencia, marca, cita agendada. El cliente sigue al barbero, no al local.'},{h:'Tu ventaja',d:'Técnica + trato + imagen. Las tres juntas son las que cobran más.'}]}]}
+],q:[
+ {q:'¿Por qué el poste de barbero tiene rojo y blanco?',o:['Por la bandera de Inglaterra','Por los barberos-cirujanos: sangre y vendas','Porque eran los colores más baratos','Por un equipo de fútbol'],a:1,e:'Los barberos-cirujanos hacían sangrías; el rojo se asocia a la sangre y el blanco a las vendas.'},
+ {q:'¿Qué tenían en común los barberos de Grecia y Roma?',o:['Sólo atendían mujeres','La barbería era punto de reunión social','No usaban navaja','Trabajaban sólo de noche'],a:1,e:'En el ágora griega y en Roma la barbería era lugar de noticias y conversación.'},
+ {q:'¿Quiénes definieron en gran parte la técnica moderna del degradado?',o:['Los peluqueros de París del siglo XVIII','Las barberías afroamericanas y latinas de EE.UU.','Los barberos romanos','Las fábricas de máquinas'],a:1,e:'En los 90 y 2000 esas barberías desarrollaron fades, perfilados y diseños.'},
+ {q:'¿Qué vende de verdad una barbería premium hoy?',o:['El corte más barato','La experiencia completa: técnica, trato e imagen','Sólo productos','Rapidez'],a:1,e:'El cliente premium paga por la experiencia y la confianza, no sólo por el corte.'}]},
+
+{id:'herramientas',lv:1,t:'Herramientas',s:'Tu kit, los peines guía y cómo cuidarlo.',min:18,sec:[
+ {h:'Tu kit de trabajo',b:[
+  {t:'p',x:'Cada herramienta tiene un trabajo. Tocá cada una para ver para qué sirve y un consejo de uso.'},
+  {t:'vis',v:'tools'}]},
+ {h:'Peines guía y medidas',b:[
+  {t:'p',x:'Los números de los peines indican el largo que queda. Mové el control para ver la diferencia real en milímetros.'},
+  {t:'vis',v:'guards'},
+  {t:'tip',x:'La palanca de la máquina también cambia el largo. Abierta corta un poco más largo y cerrada más corto: es como tener <b>medio número extra</b> entre peine y peine. Ahí está el secreto del difuminado.'}]},
+ {h:'Mantenimiento',b:[
+  {t:'p',x:'Una máquina mal cuidada jala el pelo, se calienta y lastima al cliente. Tocá cada paso cuando lo hagás.'},
+  {t:'steps',x:[
+   {h:'Quitar el pelo',d:'Con el cepillo de cerdas limpiá las cuchillas después de cada cliente.'},
+   {h:'Desinfectar',d:'Spray desinfectante para cuchillas, respetando el tiempo de contacto que indica el producto.'},
+   {h:'Aceitar',d:'Tres gotas: una al centro y una en cada extremo de la cuchilla. Encendé la máquina unos segundos y secá el exceso.'},
+   {h:'Revisar el ajuste',d:'La cuchilla móvil nunca debe pasar a la fija. Revisá con luz antes de usarla en piel.'},
+   {h:'Navaja nueva',d:'Hoja desechable nueva por cliente, abierta frente a él.'},
+   {h:'Cargar',d:'Máquinas inalámbricas cargadas al final del día para no quedarte a media cita.'}]},
+  {t:'warn',x:'El ajuste en cero (zero gap) deja la cuchilla muy cerca de la piel. Si la cuchilla móvil sobresale, corta. Sólo hacelo si ya sabés y revisá siempre.'}]}
+],q:[
+ {q:'¿Cuántos milímetros deja aproximadamente el peine #2?',o:['3 mm','6 mm','10 mm','13 mm'],a:1,e:'#1 ≈ 3 mm, #2 ≈ 6 mm, #3 ≈ 10 mm, #4 ≈ 13 mm.'},
+ {q:'¿Para qué sirve la trimmer (detallista)?',o:['Cortar todo el volumen','Contornos, líneas y detalles','Secar el pelo','Afeitar la barba con espuma'],a:1,e:'La trimmer tiene cuchilla fina para perfilar, líneas y diseños.'},
+ {q:'¿Dónde van las gotas de aceite?',o:['En el motor','Centro y extremos de la cuchilla','En el peine guía','En el cable'],a:1,e:'Una gota al centro y una en cada extremo, luego enciendes para que se distribuya.'},
+ {q:'¿Qué pasa al cerrar la palanca de la máquina?',o:['Corta más largo','Corta más corto','La apaga','No cambia nada'],a:1,e:'Cerrada corta más corto; abierta, más largo. Sirve para difuminar entre números.'}]},
+
+{id:'higiene',lv:1,t:'Higiene y bioseguridad',s:'Lo que protege a tu cliente y a tu nombre.',min:12,sec:[
+ {h:'Por qué importa',b:[
+  {t:'p',x:'Una herramienta sucia puede pasar hongos, bacterias e infecciones de un cliente a otro. La higiene no se nota cuando está bien hecha, pero <b>se nota muchísimo cuando falta</b>. Es uno de los valores de Meraki.'},
+  {t:'cards',x:[{h:'Foliculitis',d:'Infección del folículo: granitos rojos después del corte o afeitado. Común con navajas o máquinas sucias.'},{h:'Tiña',d:'Hongo del cuero cabelludo. Se ven parches con descamación. No se corta: se refiere al médico.'},{h:'Sangre',d:'Un corte con navaja expone sangre. Por eso la hoja es desechable y personal.'}]}]},
+ {h:'Protocolo entre clientes',b:[
+  {t:'steps',x:[
+   {h:'Lavarte las manos',d:'Antes de cada cliente, frente a él si podés. Genera confianza.'},
+   {h:'Capa limpia y cuello de papel',d:'El cuello de papel evita que la capa toque la piel.'},
+   {h:'Limpiar herramientas',d:'Quitar todo el pelo de peines, máquinas y tijeras.'},
+   {h:'Desinfectar',d:'Peines y accesorios en solución desinfectante o spray, con el tiempo que indique la etiqueta.'},
+   {h:'Hoja nueva',d:'Navaja desechable nueva para cada cliente.'},
+   {h:'Superficies',d:'Silla, apoyacabezas y mesa limpios.'}]}]},
+ {h:'Limpiar, desinfectar, esterilizar',b:[
+  {t:'cards',x:[{h:'Limpiar',d:'Quitar pelo y suciedad visible. Siempre va primero: sobre suciedad el desinfectante no funciona bien.'},{h:'Desinfectar',d:'Eliminar la mayoría de microbios con un producto químico. Lo normal entre clientes.'},{h:'Esterilizar',d:'Eliminar todo microorganismo (autoclave). Para instrumentos metálicos que lo permitan.'}]},
+  {t:'warn',x:'Nunca reutilices una hoja de navaja, ni "sólo para este cliente que es conocido".'}]}
+],q:[
+ {q:'¿Qué va primero?',o:['Desinfectar','Limpiar','Esterilizar','Aceitar'],a:1,e:'Siempre limpiás primero; el desinfectante no trabaja bien sobre pelo y suciedad.'},
+ {q:'Un cliente tiene parches con descamación en el cuero cabelludo. ¿Qué hacés?',o:['Corto normal','Corto y le echo alcohol','No corto y le recomiendo ir al médico','Le corto sólo arriba'],a:2,e:'Podría ser tiña u otra infección. No trabajás sobre eso y lo referís.'},
+ {q:'¿Para qué sirve el cuello de papel?',o:['Decoración','Que la capa no toque la piel','Absorber el aceite','Medir el cuello'],a:1,e:'Es una barrera higiénica entre la capa y la piel del cliente.'},
+ {q:'¿Cada cuánto cambiás la hoja de navaja?',o:['Cada semana','Cada día','Por cada cliente','Cuando ya no corta'],a:2,e:'Una hoja nueva por cliente, siempre.'}]},
+
+{id:'anatomia',lv:1,t:'Anatomía de la cabeza',s:'Zonas y puntos de referencia para cortar con método.',min:15,sec:[
+ {h:'Zonas de la cabeza',b:[
+  {t:'p',x:'Un barbero profesional no corta "por encima": divide la cabeza en zonas. Tocá cada zona del dibujo.'},
+  {t:'vis',v:'head'}]},
+ {h:'Puntos de referencia',b:[
+  {t:'cards',x:[
+   {h:'Línea parietal',d:'La parte más ancha de la cabeza, donde el lado se convierte en la parte de arriba. Ahí suele terminar un fade alto y es donde más se nota el peso.'},
+   {h:'Hueso occipital',d:'El bulto de atrás. Si es plano, dejá más largo ahí para dar forma redonda.'},
+   {h:'Coronilla',d:'Donde suele estar el remolino. Si cortás muy corto ahí, el pelo se para.'},
+   {h:'Esquinas frontales',d:'Donde la frente se convierte en lado. Definen el contorno y las entradas.'},
+   {h:'Línea de nacimiento',d:'El borde natural del pelo: frente, patillas, alrededor de la oreja y nuca.'}]}]},
+ {h:'Ninguna cabeza es igual',b:[
+  {t:'p',x:'Hay cabezas planas atrás, con bultos, con la coronilla alta o con una oreja más arriba que la otra. Tu trabajo es <b>equilibrar</b>: dejar peso donde falta forma y quitar donde sobra. Pasá la mano por la cabeza del cliente antes de empezar.'},
+  {t:'tip',x:'Para revisar simetría, parate detrás del cliente y miralo en el espejo de frente. Los errores de lado a lado se ven más en el reflejo.'}]}
+],q:[
+ {q:'¿Qué es la línea parietal?',o:['La nuca','La parte más ancha de la cabeza','La línea de la frente','La patilla'],a:1,e:'Es la zona más ancha, donde el lado cambia a la parte superior.'},
+ {q:'Cliente con la parte de atrás plana. ¿Qué hacés en el occipital?',o:['Rapar más','Dejar más peso para dar forma','Nada','Hacer un diseño'],a:1,e:'Dejar más largo crea la ilusión de una cabeza redonda.'},
+ {q:'¿Dónde suele estar el remolino?',o:['En la patilla','En la coronilla','En la nuca siempre','En la frente siempre'],a:1,e:'La coronilla es el lugar más común, aunque puede haber en la frente o la nuca.'},
+ {q:'¿Por qué revisar en el espejo de frente?',o:['Para que el cliente te vea','Las diferencias de lado a lado se notan más','Para tomar fotos','No sirve'],a:1,e:'El reflejo te muestra ambos lados a la vez y se notan las asimetrías.'}]},
+
+{id:'rostro',lv:2,t:'Rostro y estilo',s:'Qué corte favorece a cada forma de cara.',min:15,sec:[
+ {h:'Cómo medir',b:[
+  {t:'p',x:'Mirá al cliente de frente, con el pelo hacia atrás. Compará cuatro medidas:'},
+  {t:'list',x:['<b>Frente:</b> lo ancho de la frente','<b>Pómulos:</b> la parte más ancha de la cara','<b>Mandíbula:</b> de esquina a esquina de la quijada','<b>Largo:</b> del nacimiento del pelo a la barbilla']}]},
+ {h:'Tipos de rostro',b:[
+  {t:'p',x:'Elegí una forma para ver qué le favorece y qué evitar.'},
+  {t:'vis',v:'faces'}]},
+ {h:'La regla de oro',b:[
+  {t:'p',x:'La mayoría de cortes buscan acercar la cara a un <b>óvalo</b>: si la cara es ancha, sumás altura; si es larga, quitás altura y das volumen a los lados.'},
+  {t:'tip',x:'La barba también es una herramienta de forma. Una barba más larga en la barbilla alarga una cara redonda; una barba cuadrada da mandíbula a una cara fina.'}]}
+],q:[
+ {q:'Cara redonda. ¿Qué buscás?',o:['Más volumen a los lados','Altura arriba y lados cortos','Fleco recto','Pelo pegado'],a:1,e:'La altura alarga visualmente una cara redonda.'},
+ {q:'¿Qué forma se considera la más fácil de adaptar?',o:['Ovalada','Cuadrada','Diamante','Corazón'],a:0,e:'El óvalo tiene proporciones equilibradas; casi todo le queda.'},
+ {q:'Cara alargada. ¿Qué evitás?',o:['Lados con algo de volumen','Mucha altura arriba','Fleco','Barba corta'],a:1,e:'Más altura la haría ver más larga.'},
+ {q:'Cara de corazón (frente ancha, barbilla fina). ¿Qué ayuda?',o:['Barba que dé volumen a la barbilla','Rapar los lados a piel y mucha altura','Nada','Pelo largo pegado'],a:0,e:'La barba en la parte baja equilibra la frente ancha.'}]},
+
+{id:'cabello',lv:2,t:'Cabello y cuero cabelludo',s:'Textura, densidad, remolinos y cuándo no cortar.',min:12,sec:[
+ {h:'Textura',b:[
+  {t:'cards',x:[
+   {h:'Liso',d:'Cae pegado y muestra todas las líneas. Los errores se ven más; difuminá con paciencia.'},
+   {h:'Ondulado',d:'Tiene movimiento. Ideal para texturizar arriba. Cortá un poco más largo de lo que pide.'},
+   {h:'Rizado',d:'Se encoge al secar. Cortá en seco o calculá que sube varios centímetros.'},
+   {h:'Crespo o afro',d:'Muy denso y elástico. Perfecto para fades y diseños; peiná con peine de púas anchas o esponja.'}]}]},
+ {h:'Densidad y grosor',b:[
+  {t:'p',x:'<b>Densidad</b> es cuántos pelos hay por centímetro. <b>Grosor</b> es qué tan grueso es cada pelo. Pelo denso y grueso necesita entresacar; pelo fino y poco denso necesita conservar peso para que no se vea el cuero cabelludo.'},
+  {t:'tip',x:'Pelo fino con entradas: no lo cortes demasiado corto arriba. Un poco de largo y textura disimula más que raparlo.'}]},
+ {h:'Dirección y remolinos',b:[
+  {t:'p',x:'El pelo no crece todo hacia abajo. Antes de cortar, peiná en seco en varias direcciones y buscá remolinos en la coronilla, la frente y la nuca. Cortá <b>a favor</b> del remolino o dejalo con largo suficiente para que caiga.'}]},
+ {h:'Cuándo no cortar',b:[
+  {t:'warn',x:'Heridas abiertas, infecciones, piojos o hongos: no trabajás. Explicale al cliente con respeto y recomendale ir al médico. Proteger al siguiente cliente también es parte del servicio.'}]}
+],q:[
+ {q:'El pelo rizado al secarse…',o:['Se alarga','Se encoge','No cambia','Se alisa'],a:1,e:'El rizo se recoge; cortá considerando que sube.'},
+ {q:'¿Qué es la densidad?',o:['El grosor de cada pelo','Cuántos pelos hay por área','El color','La velocidad de crecimiento'],a:1,e:'Densidad = cantidad; grosor = diámetro de cada pelo.'},
+ {q:'Remolino en la coronilla y el cliente quiere arriba muy corto. Riesgo:',o:['Ninguno','Que el pelo se pare','Que se caiga el pelo','Que cambie de color'],a:1,e:'Muy corto sobre un remolino, el pelo se levanta.'},
+ {q:'Ves piojos al empezar. ¿Qué hacés?',o:['Corto rápido','No trabajo y lo explico con respeto','Le pongo alcohol','Corto sólo los lados'],a:1,e:'No trabajás para proteger a otros clientes y explicás con tacto.'}]},
+
+{id:'consulta',lv:2,t:'Consulta con el cliente',s:'Escuchar bien es la mitad del corte.',min:10,sec:[
+ {h:'Los primeros tres minutos',b:[
+  {t:'steps',x:[
+   {h:'Saludo y nombre',d:'Por su nombre, con contacto visual. Puntualidad: si la cita es a las 3, a las 3.'},
+   {h:'Qué quiere',d:'Preguntá y pedí foto de referencia. Una foto evita la mitad de los malentendidos.'},
+   {h:'Su estilo de vida',d:'¿A qué se dedica? ¿Se peina todos los días? ¿Cada cuánto viene?'},
+   {h:'Mirar en seco',d:'Remolinos, densidad, forma de la cabeza, entradas.'},
+   {h:'Ser honesto',d:'Si la foto no le va a funcionar con su pelo, decilo y proponé una opción cercana.'},
+   {h:'Confirmar con números',d:'"Abajo en cero, un fade medio, arriba dejamos 5 centímetros." Que diga sí antes de empezar.'}]}]},
+ {h:'Hablar el mismo idioma',b:[
+  {t:'cards',x:[
+   {h:'"Bajito"',d:'Para uno es #1, para otro es #3. Siempre traducí a números o mostrá el peine.'},
+   {h:'"Sólo las puntas"',d:'Preguntá cuántos centímetros, y mostralo con los dedos.'},
+   {h:'"Como la vez pasada"',d:'Llevá registro: anotá en su ficha los números que usaste.'}]},
+  {t:'tip',x:'Los valores Meraki se viven en la consulta: honestidad, puntualidad, higiene, excelencia y respeto.'}]},
+ {h:'El cierre',b:[
+  {t:'list',x:['Mostrá la parte de atrás con el espejo de mano','Explicale cómo peinarse en casa y con qué producto','Agendá la próxima cita (2 a 3 semanas para fades)','Pedile que te etiquete si sube foto']}]}
+],q:[
+ {q:'El cliente dice "bajito a los lados". ¿Qué hacés?',o:['Uso #1 sin preguntar','Confirmo con números o mostrando el peine','Rapo a piel','Uso #4'],a:1,e:'"Bajito" significa cosas distintas para cada persona.'},
+ {q:'La foto no le va a funcionar con su tipo de pelo. ¿Qué hacés?',o:['Lo hago igual','Le digo con honestidad y propongo algo cercano','Le cobro más','Lo mando a otra barbería'],a:1,e:'La honestidad genera confianza y clientes fijos.'},
+ {q:'¿Cada cuánto recomendás volver con un fade?',o:['2 a 3 semanas','6 meses','1 año','Cada día'],a:0,e:'El fade pierde definición rápido; 2 a 3 semanas lo mantiene limpio.'},
+ {q:'¿Para qué anotar los números que usaste?',o:['No sirve','Para repetir el corte igual la próxima vez','Para cobrar más','Para la policía'],a:1,e:'La consistencia es lo que hace que el cliente regrese.'}]},
+
+{id:'tecnicas',lv:3,t:'Técnicas base',s:'Ángulos de elevación, tijera y máquina sobre peine.',min:20,sec:[
+ {h:'Ángulos de elevación',b:[
+  {t:'p',x:'La elevación es a qué ángulo levantás el pelo de la cabeza antes de cortarlo. Cambia por completo el resultado. Mové el control.'},
+  {t:'vis',v:'elevation'}]},
+ {h:'Tijera sobre peine',b:[
+  {t:'steps',x:[
+   {h:'Peine en la mano izquierda',d:'Entrá con el peine desde abajo, con los dientes hacia arriba, levantando el pelo.'},
+   {h:'Ángulo del peine',d:'El ángulo del peine contra la cabeza define el largo: más pegado, más corto.'},
+   {h:'Hoja fija paralela al peine',d:'La tijera sigue al peine. Sólo se mueve la hoja de arriba (el pulgar).'},
+   {h:'Subir sin parar',d:'Movimiento continuo hacia arriba; peine y tijera suben juntos.'},
+   {h:'Cruzar para revisar',d:'Peiná en otra dirección y repasá. Los cortes cruzados revelan los huecos.'}]}]},
+ {h:'Máquina sobre peine',b:[
+  {t:'p',x:'Igual que tijera sobre peine, pero con la máquina sin guía pasando sobre el peine. Es más rápida y sirve para quitar peso y difuminar zonas que la guía no alcanza, como sobre la oreja y en el occipital.'}]},
+ {h:'Postura',b:[
+  {t:'list',x:['Ajustá la altura de la silla: la cabeza del cliente a la altura de tu pecho','Movete vos alrededor del cliente, no le torcás el cuello','Espalda recta y peso en las dos piernas','Pausa corta y estiramiento entre clientes: es una carrera larga']}]}
+],q:[
+ {q:'¿Qué da cortar a 0° de elevación?',o:['Capas largas','Línea sólida con máximo peso','Pelo rapado','Textura'],a:1,e:'A 0° todo el pelo cae a la misma línea: peso máximo.'},
+ {q:'¿Qué da 90°?',o:['Capas uniformes','Línea sólida','Fleco','Nada'],a:0,e:'Perpendicular a la cabeza, todos los pelos quedan del mismo largo.'},
+ {q:'En tijera sobre peine, ¿qué hoja se mueve?',o:['La de abajo','La de arriba (pulgar)','Las dos','Ninguna'],a:1,e:'La hoja fija va paralela al peine; mueves la del pulgar.'},
+ {q:'¿Altura ideal de la cabeza del cliente?',o:['A tu cintura','A tu pecho','Arriba de tu cabeza','No importa'],a:1,e:'A la altura del pecho cuidas tu espalda y ves mejor.'}]},
+
+{id:'degradados',lv:3,t:'Degradados',s:'Low, mid, high, skin y taper paso a paso.',min:25,sec:[
+ {h:'Tipos de fade',b:[
+  {t:'p',x:'El degradado (fade) es la transición de corto a largo. Lo que cambia entre uno y otro es <b>dónde empieza y dónde termina</b> esa transición. Elegí un tipo y cambiá entre vista suave y vista por peines.'},
+  {t:'vis',v:'fade'}]},
+ {h:'Construir el degradado',b:[
+  {t:'steps',x:[
+   {h:'Lados y atrás con el número más largo',d:'Primero bajá todo el volumen con el número de arriba (por ejemplo #3).'},
+   {h:'Línea base',d:'Marcá la línea más baja con el número más corto o sin peine. Recta y pareja en los dos lados.'},
+   {h:'Subir un número',d:'Con el siguiente número marcá una línea un poco más arriba que la anterior.'},
+   {h:'Difuminar con la palanca',d:'Entre líneas, abrí y cerrá la palanca. Movimiento de cuchara: entrás y sacás la máquina hacia afuera.'},
+   {h:'Borrar líneas',d:'Repasá las líneas marcadas desde abajo. Ninguna línea se debe ver al final.'},
+   {h:'Unir con la parte de arriba',d:'Con tijera o máquina sobre peine conectá el fade con el largo de arriba.'},
+   {h:'Revisar con luz',d:'Girá la silla, mirá de lejos y en el espejo de frente. Corregí manchas.'}]}]},
+ {h:'Errores comunes',b:[
+  {t:'cards',x:[
+   {h:'Línea marcada',d:'No se difuminó entre números. Usá la palanca y medio número.'},
+   {h:'Lados disparejos',d:'Marcá la línea base de ambos lados antes de difuminar.'},
+   {h:'Fade que sube solo',d:'Por corregir se va subiendo. Corregí bajando la presión, no subiendo la línea.'},
+   {h:'Hueco en el occipital',d:'Por la curva de la cabeza la máquina entra de más. Inclinala siguiendo la forma.'}]},
+  {t:'tip',x:'La paciencia gana fades. Un barbero que corrige con calma deja mejor resultado que uno rápido que deja líneas.'}]}
+],q:[
+ {q:'¿Qué diferencia un low fade de un high fade?',o:['El color','La altura donde empieza la transición','La marca de máquina','El precio'],a:1,e:'Low empieza cerca de la línea del pelo; high llega cerca de la parietal.'},
+ {q:'¿Para qué sirve la palanca al difuminar?',o:['Apagar','Crear medios números entre peines','Limpiar','Aceitar'],a:1,e:'Abrir y cerrar la palanca da largos intermedios para borrar líneas.'},
+ {q:'¿Qué es un skin fade?',o:['Empieza en piel, sin pelo','Pelo largo con capas','Sólo la patilla','Un diseño'],a:0,e:'Skin o bald fade empieza en piel con shaver o navaja.'},
+ {q:'Un taper se caracteriza por…',o:['Degradar toda la cabeza','Degradar sólo los bordes: patilla y nuca','Rapar todo','Hacer diseños'],a:1,e:'El taper es discreto y queda sólo en los contornos.'},
+ {q:'El fade se te sigue subiendo al corregir. ¿Qué hacés?',o:['Subo más la línea','Corrijo con menos presión, sin subir la línea','Rapo todo','Lo dejo así'],a:1,e:'Subir la línea para corregir convierte un mid en high sin querer.'}]},
+
+{id:'perfilado',lv:3,t:'Perfilado y acabados',s:'Contornos limpios y el toque final.',min:15,sec:[
+ {h:'El contorno (line up)',b:[
+  {t:'steps',x:[
+   {h:'Frente',d:'Seguí la línea natural. Bajala apenas para limpiar, nunca la subas.'},
+   {h:'Esquinas',d:'Definí el ángulo donde la frente se une al lado. Que queden iguales.'},
+   {h:'Patillas',d:'Parejas. Usá referencias: a la misma altura del ojo o de la oreja de los dos lados.'},
+   {h:'Alrededor de la oreja',d:'Doblá la oreja con cuidado y seguí la curva.'},
+   {h:'Nuca',d:'Redonda, cuadrada o degradada según lo acordado.'}]},
+  {t:'warn',x:'Subir la línea de la frente para que se vea "más limpia" hace ver entradas y ese pelo tarda semanas en volver.'}]},
+ {h:'Formas de nuca',b:[
+  {t:'cards',x:[{h:'Redonda',d:'Suave y natural. Favorece cuellos anchos.'},{h:'Cuadrada',d:'Bloque recto. Se ve muy limpio pero se nota cuando crece.'},{h:'Degradada',d:'Se pierde en piel. La que mejor crece.'}]}]},
+ {h:'El acabado',b:[
+  {t:'list',x:['Quitar todo el pelo suelto del cuello y la cara','Toalla o aftershave en zonas con navaja','Producto según el pelo: pomada para brillo, cera o arcilla para mate, polvo texturizante para volumen','Peinarlo como lo va a llevar','Foto para tus redes con buena luz']}]}
+],q:[
+ {q:'¿Qué evitás al perfilar la frente?',o:['Bajarla un poco','Subirla','Limpiar','Usar trimmer'],a:1,e:'Subirla crea entradas artificiales.'},
+ {q:'¿Qué nuca crece mejor?',o:['Cuadrada','Redonda','Degradada','Ninguna'],a:2,e:'La degradada no deja una línea marcada al crecer.'},
+ {q:'Para un acabado mate con textura usás…',o:['Gel brillante','Cera o arcilla mate','Aceite','Nada'],a:1,e:'Cera o arcilla dan textura sin brillo.'},
+ {q:'¿Cómo emparejás patillas?',o:['A ojo rápido','Con referencias iguales en ambos lados','Con la tijera','No se emparejan'],a:1,e:'Usá la altura del ojo o de la oreja como referencia de los dos lados.'}]},
+
+{id:'barba',lv:4,t:'Barba y afeitado clásico',s:'Diseño de barba y afeitado con toalla caliente.',min:20,sec:[
+ {h:'Diseñar la barba',b:[
+  {t:'p',x:'Una barba bien diseñada tiene dos líneas: la del <b>pómulo</b> arriba y la del <b>cuello</b> abajo. La del cuello es la que más se equivoca.'},
+  {t:'vis',v:'beard'}]},
+ {h:'Afeitado con toalla caliente',b:[
+  {t:'steps',x:[
+   {h:'Revisar la piel',d:'Granos, irritación, heridas. Si hay, no se pasa navaja ahí.'},
+   {h:'Toalla caliente',d:'1 a 2 minutos. Abre los poros y suaviza el pelo. Probá la temperatura en tu muñeca primero.'},
+   {h:'Aceite pre-afeitado',d:'Crea una capa que ayuda a que la navaja deslice.'},
+   {h:'Espuma con brocha',d:'Movimientos circulares: levantan el pelo.'},
+   {h:'Primera pasada a favor del pelo',d:'Piel estirada con la otra mano, navaja a unos 30°.'},
+   {h:'Re-enjabonar',d:'Nunca pasés navaja en piel seca.'},
+   {h:'Segunda pasada de lado',d:'Sólo si la piel lo aguanta.'},
+   {h:'Toalla fría y bálsamo',d:'Cierra poros y calma. Bálsamo sin alcohol para pieles sensibles.'}]},
+  {t:'warn',x:'Contra el pelo sólo en pieles resistentes y nunca en el cuello de clientes con pelo encarnado.'}]},
+ {h:'Ángulo de la navaja',b:[
+  {t:'p',x:'Alrededor de <b>30°</b> entre la hoja y la piel. Más ángulo raspa y corta; menos ángulo no corta el pelo. La piel siempre estirada: la navaja sobre piel floja es como cortar sobre una sábana arrugada.'}]}
+],q:[
+ {q:'¿Dónde va la línea del cuello de la barba?',o:['En la mandíbula','Uno o dos dedos arriba de la manzana de Adán','En la clavícula','Donde termine el pelo'],a:1,e:'De ahí sube en curva hasta detrás del lóbulo de la oreja.'},
+ {q:'¿Para qué sirve la toalla caliente?',o:['Secar','Abrir poros y suavizar el pelo','Pintar la barba','Nada'],a:1,e:'El pelo suave se corta con menos irritación.'},
+ {q:'Ángulo aproximado de la navaja:',o:['90°','30°','0°','60°'],a:1,e:'Cerca de 30° es el ángulo de trabajo.'},
+ {q:'¿Primera pasada en qué dirección?',o:['Contra el pelo','A favor del pelo','En círculos','No importa'],a:1,e:'A favor del pelo primero para no irritar.'}]},
+
+{id:'texturas',lv:4,t:'Texturas y diseños',s:'Point cut, entresacado, diseños y cortes con nombre.',min:15,sec:[
+ {h:'Texturizado',b:[
+  {t:'cards',x:[
+   {h:'Point cut',d:'Tijera de punta hacia el pelo, cortes verticales. Rompe la línea y da movimiento.'},
+   {h:'Slide cut',d:'La tijera entreabierta se desliza por el mechón. Quita peso sin escalones.'},
+   {h:'Entresacar',d:'Tijera de dientes para quitar volumen. Nunca en la raíz de pelo fino.'},
+   {h:'Navaja',d:'Puntas suaves y desfiladas. Ideal en pelo ondulado y medio largo.'}]}]},
+ {h:'Diseños (hair tattoo)',b:[
+  {t:'steps',x:[
+   {h:'Idea y tamaño',d:'Dibujala antes en papel o en el celular con el cliente.'},
+   {h:'Base corta',d:'El diseño se ve mejor sobre #1 o menos.'},
+   {h:'Línea guía',d:'Trazá primero la línea principal con la trimmer, muy suave.'},
+   {h:'Completar',d:'Seguí la forma; repasá para que el ancho sea parejo.'},
+   {h:'Limpiar',d:'Shaver o navaja para bordes nítidos.'}]},
+  {t:'tip',x:'Un diseño dura una a dos semanas. Ofrecé el retoque como servicio aparte.'}]},
+ {h:'Cortes con nombre',b:[
+  {t:'cards',x:[
+   {h:'Crop texturizado',d:'Fleco corto con textura y fade. Muy pedido por jóvenes.'},
+   {h:'Pompadour',d:'Volumen hacia atrás arriba, lados cortos. Clásico de los 50.'},
+   {h:'Quiff',d:'Volumen al frente hacia arriba, más desordenado que el pompadour.'},
+   {h:'Side part',d:'Raya al lado marcada. Ejecutivo y formal.'},
+   {h:'Buzz cut',d:'Todo a un número. Rápido y limpio.'},
+   {h:'Mullet moderno',d:'Corto adelante y a los lados, largo atrás, con fade.'}]}]}
+],q:[
+ {q:'¿Qué técnica rompe la línea con cortes verticales?',o:['Slide cut','Point cut','Buzz','Taper'],a:1,e:'El point cut corta con la punta en vertical.'},
+ {q:'¿Sobre qué largo se ven mejor los diseños?',o:['#1 o menos','#6','Pelo largo','Da igual'],a:0,e:'Sobre una base corta el contraste es mayor.'},
+ {q:'Volumen hacia atrás, lados cortos, clásico de los 50:',o:['Buzz cut','Pompadour','Mullet','Crop'],a:1,e:'El pompadour lleva el volumen arriba y hacia atrás.'},
+ {q:'¿Dónde NO usás tijera de entresacar en pelo fino?',o:['En las puntas','En la raíz','Arriba','En ningún lado'],a:1,e:'En la raíz crea pelos cortos que se paran y se ve más ralo.'}]},
+
+{id:'negocio',lv:4,t:'El negocio del barbero',s:'Precios, fotos y clientes que regresan.',min:15,sec:[
+ {h:'Ponerle precio a tu trabajo',b:[
+  {t:'p',x:'Tu precio no se adivina: se calcula. Poné tus números y mirá cuánto deberías cobrar.'},
+  {t:'vis',v:'calc'},
+  {t:'tip',x:'Si tu precio calculado sale mayor que lo que cobrás, no lo subas de golpe: subí la experiencia primero y el precio en pasos.'}]},
+ {h:'Fotos que venden',b:[
+  {t:'list',x:['Luz de frente: ventana o aro de luz, nunca luz desde arriba','Fondo limpio y oscuro','Cuatro ángulos: frente, dos lados y atrás','Antes y después en la misma luz','Un video corto mostrando el fade de cerca']}]},
+ {h:'Clientes que regresan',b:[
+  {t:'list',x:['Agenda con citas: el cliente sabe que su tiempo se respeta','Recordatorio por WhatsApp un día antes','Tarjeta de fidelización o membresía','Ficha del cliente con los números que usaste','La misma calidad cada vez: la consistencia es la marca']}]}
+],q:[
+ {q:'¿Cuál es la base de un precio bien calculado?',o:['Lo que cobra la barbería de enfrente','Tus costos, tu tiempo y tu meta por hora','Lo que el cliente quiera pagar','Un número al azar'],a:1,e:'Costos + tiempo + meta te dan un piso real.'},
+ {q:'Mejor luz para fotos de cortes:',o:['Desde arriba','De frente, suave','En la oscuridad','Flash directo'],a:1,e:'La luz de frente muestra el degradado sin sombras duras.'},
+ {q:'¿Qué hace que un cliente regrese?',o:['Descuentos siempre','La consistencia y el trato','Música alta','Ninguna'],a:1,e:'Saber que siempre sale igual de bien es lo que fideliza.'},
+ {q:'Tu precio calculado es mucho mayor que el actual. Lo mejor:',o:['Subirlo de golpe','Mejorar la experiencia y subir en pasos','No hacer nada','Bajarlo'],a:1,e:'Subir en pasos con más valor retiene a los clientes.'}]}
+];
+
+const GLOSS=[
+['Fade / degradado','Transición de corto a largo en los lados y atrás.'],
+['Taper','Degradado sólo en los bordes: patillas y nuca.'],
+['Skin fade','Degradado que empieza en piel, con shaver o navaja.'],
+['Line up','Perfilado de contornos: frente, esquinas, patillas y nuca.'],
+['Peine guía','Accesorio de la máquina que define el largo (#1, #2…).'],
+['Palanca','Control de la máquina que abre o cierra la cuchilla para medios números.'],
+['Trimmer','Máquina detallista para líneas, contornos y diseños.'],
+['Shaver','Afeitadora de lámina para dejar la piel lisa en skin fades.'],
+['Línea parietal','Parte más ancha de la cabeza; referencia para fades altos.'],
+['Occipital','Hueso saliente de la parte de atrás de la cabeza.'],
+['Coronilla','Parte superior trasera; zona común de remolinos.'],
+['Elevación','Ángulo al que se levanta el pelo antes de cortar.'],
+['Peso','Acumulación de largo en una zona que da volumen o forma.'],
+['Tijera sobre peine','Técnica de cortar siguiendo el peine con la tijera.'],
+['Máquina sobre peine','Igual que tijera sobre peine pero con máquina sin guía.'],
+['Point cut','Cortar con la punta de la tijera en vertical para dar textura.'],
+['Slide cut','Deslizar la tijera entreabierta para quitar peso.'],
+['Entresacar','Quitar volumen con tijera de dientes.'],
+['Remolino','Zona donde el pelo crece en espiral.'],
+['Densidad','Cantidad de pelos por área de cuero cabelludo.'],
+['Zero gap','Ajuste de cuchillas casi al ras; corta muy cerca de la piel.'],
+['Pre-afeitado','Aceite o crema que se aplica antes de la espuma.'],
+['Bálsamo','Producto que calma la piel después del afeitado.'],
+['Pompadour','Volumen arriba peinado hacia atrás con lados cortos.'],
+['Crop','Corte con fleco corto texturizado, generalmente con fade.'],
+['Nuca degradada','Terminación de la nuca que se pierde en la piel.'],
+['Barbero-cirujano','Oficio medieval que unía barbería, extracciones y sangrías.'],
+['Tonsor','Nombre del barbero en la antigua Roma.']
+];
+
+/* ============ ESTADO ============ */
+const KEY='meraki-academy-v1';
+let P={done:{},name:'',seen:{}};
+try{const s=JSON.parse(localStorage.getItem(KEY)||'null');if(s)P=Object.assign(P,s)}catch(e){}
+const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(P))}catch(e){}};
+let S={view:'home',mod:null,sec:0};
+const $=(s,r=document)=>r.querySelector(s);
+const $$=(s,r=document)=>[...r.querySelectorAll(s)];
+const modById=id=>MODULES.find(m=>m.id===id);
+const pad=n=>String(n).padStart(2,'0');
+const doneCount=()=>MODULES.filter(m=>(P.done[m.id]||0)>=70).length;
+
+/* ============ ICONOS ============ */
+const IC={
+ home:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>',
+ clase:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="12" rx="1.5"/><path d="M8 20h8M12 16v4"/></svg>',
+ exam:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="9" r="6"/><path d="M9 14l-2 7 5-3 5 3-2-7"/></svg>',
+ gloss:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h11a3 3 0 0 1 3 3v13H7a3 3 0 0 1-3-3z"/><path d="M18 20H7a3 3 0 0 1 0-6h11"/></svg>',
+ theme:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 13A9 9 0 1 1 11 3a7 7 0 0 0 10 10z"/></svg>',
+ full:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>',
+ x:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>'
+};
+
+/* ============ RENDER DE BLOQUES ============ */
+function blocks(list){return list.map(b=>{
+ if(b.t==='p')return `<p>${b.x}</p>`;
+ if(b.t==='list')return `<ul class="ticks">${b.x.map(i=>`<li>${i}</li>`).join('')}</ul>`;
+ if(b.t==='tip')return `<aside class="tip"><span class="lbl">Dato Meraki</span><p>${b.x}</p></aside>`;
+ if(b.t==='warn')return `<aside class="warn"><span class="lbl">Ojo</span><p>${b.x}</p></aside>`;
+ if(b.t==='vis')return `<div class="vis" data-vis="${b.v}"></div>`;
+ if(b.t==='cards')return `<div class="cards">${b.x.map(c=>`<div class="card"><h3>${c.h}</h3><p>${c.d}</p></div>`).join('')}</div>`;
+ if(b.t==='steps')return `<div class="stepwrap"><div class="stepsmeta"><span>Tocá cada paso</span><span class="cnt">0 / ${b.x.length}</span></div><div class="bar"><span></span></div><ol class="steps">${b.x.map(s=>`<li><button type="button" aria-expanded="false">${s.h}<i>+</i></button><div hidden>${s.d}</div></li>`).join('')}</ol></div>`;
+ return '';}).join('');}
+
+function mount(root){
+ $$('[data-vis]',root).forEach(el=>{const f=VIS[el.dataset.vis];if(f)f(el)});
+ $$('.stepwrap',root).forEach(w=>{
+  const lis=$$('ol.steps li',w),cnt=$('.cnt',w),bar=$('.bar span',w);
+  const upd=()=>{const d=lis.filter(l=>l.classList.contains('done')).length;cnt.textContent=d+' / '+lis.length;bar.style.width=(d/lis.length*100)+'%'};
+  lis.forEach(li=>{const b=$('button',li),d=$('div',li);b.onclick=()=>{const open=d.hidden;d.hidden=!open;li.classList.toggle('open',open);b.setAttribute('aria-expanded',open);li.classList.add('done');upd()}});
+ });
+}
+
+/* ============ VISUALES ============ */
+const VIS={};let UID=0;
+// Silueta de perfil compartida (mirando a la izquierda)
+const HEAD_SKIN='M66,112 C60,60 110,26 165,26 C238,26 278,82 274,150 C272,200 256,238 232,262 L236,300 L150,300 L152,262 C138,258 122,256 106,250 C96,246 92,236 92,226 L84,222 C76,220 76,212 82,206 L76,200 C70,196 72,188 78,186 C72,180 66,176 58,174 C50,172 50,164 56,158 L66,140 C64,130 64,120 66,112 Z';
+const HAIR='M70,100 C66,52 112,26 165,26 C238,26 278,82 274,150 C272,200 256,238 232,262 L206,258 C200,232 194,210 186,198 L150,198 L150,150 C138,126 112,106 70,100 Z';
+const EAR='<path d="M162,150 C176,138 196,144 196,168 C196,190 180,204 168,198 C160,194 160,184 166,180 C160,172 156,160 162,150 Z" fill="var(--skin-2)"/><path d="M172,158 C182,156 186,168 182,178" fill="none" stroke="var(--skin)" stroke-width="3" stroke-linecap="round"/>';
+const EYE='<path d="M78,150 q8,-5 16,0" fill="none" stroke="var(--hair-dark)" stroke-width="3" stroke-linecap="round"/>';
+
+VIS.timeline=function(el){
+ const E=[
+  ['c. 3500 a.C.','Egipto','Navajas de cobre, bronce y piedra pulida. Afeitarse era higiene y estatus: sacerdotes y nobles se rapaban. Los barberos atendían a la élite.'],
+  ['Siglo V a.C.','Grecia','La barbería del ágora era el lugar para enterarse de todo. Una barba cuidada era signo de sabiduría, hasta que Alejandro Magno pidió a sus soldados afeitarse para que el enemigo no los agarrara de la barba.'],
+  ['c. 300 a.C.','Roma','Llega el tonsor. Según la tradición, Ticinio Mena trajo barberos desde Sicilia. El primer afeitado de un joven era un rito de paso a la adultez.'],
+  ['Edad Media','Barberos-cirujanos','Además de cortar pelo, sacaban muelas, curaban heridas y hacían sangrías. De aquí nace el poste de barbero.'],
+  ['1540','Inglaterra','Se une oficialmente la Compañía de Barberos y Cirujanos. En 1745 los cirujanos se separan y la barbería queda como oficio propio.'],
+  ['1893','Primera escuela','En Chicago, A. B. Moler abre la que se considera la primera escuela de barbería y publica un manual del oficio.'],
+  ['1900–1920','Máquinas','La rasuradora de seguridad lleva el afeitado a la casa. Leo Wahl funda su empresa en 1919 y populariza la máquina eléctrica de cortar.'],
+  ['1920–1950','Época dorada','La barbería es el club social de los hombres. Cortes clásicos: side part, pompadour, crew cut. Afeitado con navaja cada semana.'],
+  ['1960–1980','Caída','El pelo largo y los salones unisex hacen cerrar muchas barberías.'],
+  ['1990–2000','Cultura urbana','Barberías afroamericanas y latinas en EE.UU. desarrollan el fade moderno, el perfilado y los diseños.'],
+  ['2010–hoy','Renacimiento','Barbería premium, redes sociales, barberos como marca y academias. El corte se vuelve experiencia.']];
+ let i=0;
+ el.innerHTML=`<div class="tl-rail" role="group" aria-label="Épocas">${E.map((e,k)=>`<button type="button" data-k="${k}"><b>${e[0]}</b><span>${e[1]}</span></button>`).join('')}</div>
+ <div class="info"><div class="tl-year"></div><h3></h3><p></p></div>
+ <div class="row"><button class="btn ghost sm" data-d="-1" type="button">← Anterior</button><button class="btn sm" data-d="1" type="button">Siguiente época →</button></div>`;
+ const show=k=>{i=(k+E.length)%E.length;$$('.tl-rail button',el).forEach((b,j)=>b.setAttribute('aria-pressed',j===i));$('.tl-year',el).textContent=E[i][0];$('.info h3',el).textContent=E[i][1];$('.info p',el).textContent=E[i][2];const b=$$('.tl-rail button',el)[i];b.scrollIntoView({block:'nearest',inline:'center',behavior:'smooth'})};
+ $$('.tl-rail button',el).forEach(b=>b.onclick=()=>show(+b.dataset.k));
+ $$('[data-d]',el).forEach(b=>b.onclick=()=>show(i+ +b.dataset.d));
+ i=0;$$('.tl-rail button',el).forEach((b,j)=>b.setAttribute('aria-pressed',j===0));$('.tl-year',el).textContent=E[0][0];$('.info h3',el).textContent=E[0][1];$('.info p',el).textContent=E[0][2];
+};
+
+VIS.pole=function(el){const u='p'+(++UID);
+ const C={red:['Rojo','La sangre. Los barberos-cirujanos hacían sangrías y el rojo anunciaba ese servicio.'],white:['Blanco','Las vendas. Se dice que las vendas lavadas se colgaban afuera y el viento las enrollaba en un palo.'],blue:['Azul','Se agregó sobre todo en Estados Unidos. La explicación más común es que combina con la bandera; en Europa muchos postes son sólo rojo y blanco.']};
+ let polys='';const W=60,P=22,cols=['red','white','blue','white'];
+ for(let k=-14;k<12;k++){const y=k*P;const c=cols[((k%4)+4)%4];polys+=`<polygon points="0,${y} ${W},${y-34} ${W},${y-34+P} 0,${y+P}" fill="var(--${c==='white'?'pole-white':c})" data-c="${c}"/>`;}
+ el.innerHTML=`<div class="split"><svg viewBox="0 0 140 300" role="img" aria-label="Poste de barbero">
+  <defs><clipPath id="${u}c"><rect x="40" y="40" width="60" height="220" rx="6"/></clipPath><linearGradient id="${u}g" x1="0" x2="1"><stop offset="0" stop-color="#000" stop-opacity=".35"/><stop offset=".35" stop-color="#fff" stop-opacity=".25"/><stop offset=".6" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".4"/></linearGradient></defs>
+  <rect x="34" y="20" width="72" height="22" rx="11" fill="var(--brass)"/><rect x="34" y="258" width="72" height="22" rx="11" fill="var(--brass)"/>
+  <g clip-path="url(#${u}c)"><g transform="translate(40,40)"><g class="spin">${polys}</g></g><rect x="40" y="40" width="60" height="220" fill="url(#${u}g)"/></g>
+ </svg><div style="display:grid;gap:10px"><div class="seg">${Object.keys(C).map(k=>`<button type="button" data-k="${k}">${C[k][0]}</button>`).join('')}</div><div class="info"><h3>Tocá un color</h3><p>Cada color del poste cuenta una parte de la historia.</p></div></div></div>`;
+ const st=document.createElement('style');st.textContent='.spin{animation:sp 2.2s linear infinite}@keyframes sp{to{transform:translateY(88px)}}';el.appendChild(st);
+ $$('.seg button',el).forEach(b=>b.onclick=()=>{$$('.seg button',el).forEach(x=>x.setAttribute('aria-pressed',x===b));const c=C[b.dataset.k];$('.info h3',el).textContent=c[0];$('.info p',el).textContent=c[1];
+  $$('polygon',el).forEach(p=>p.style.opacity=(p.dataset.c===b.dataset.k)?1:.25)});
+};
+
+VIS.guards=function(el){
+ const G=[['Sin peine','0.5',' Palanca cerrada. Contornos, fades en la base y nucas.'],['#½','1.5','Primer paso del difuminado sobre la piel.'],['#1','3','Lados muy cortos. Base de diseños.'],['#1½','4.5','El número de en medio para borrar la línea del #1.'],['#2','6','Lados cortos clásicos y buzz cut.'],['#3','10','Lados con algo de cuerpo; arriba en buzz cut.'],['#4','13','Largo corto para arriba o lados conservadores.'],['#5','16','Arriba corto con algo de movimiento.'],['#6','19','Cortes conservadores, ejecutivos.'],['#7','22','Casi una pulgada; poco usado, para quitar volumen.'],['#8','25','Una pulgada. El más largo del set estándar.']];
+ el.innerHTML=`<div class="row" style="justify-content:space-between;align-items:end"><div><div class="lbl">Peine</div><div class="big-num" id="gn">#2</div></div><div style="text-align:right"><div class="lbl">Largo</div><div class="big-num"><span id="gm">6</span><small style="font-size:20px"> mm</small></div></div></div>
+ <svg viewBox="0 0 320 150" aria-hidden="true"><g id="gs"></g>
+  <rect x="0" y="120" width="320" height="30" fill="var(--skin)"/><rect x="0" y="120" width="320" height="4" fill="var(--skin-2)"/>
+  <g font-family="var(--mono)" font-size="9" fill="var(--muted)">${[0,5,10,15,20,25].map(m=>`<line x1="300" x2="312" y1="${120-m*4}" y2="${120-m*4}" stroke="var(--muted)"/><text x="296" y="${123-m*4}" text-anchor="end">${m}</text>`).join('')}</g></svg>
+ <input type="range" min="0" max="${G.length-1}" value="4" id="gr" aria-label="Número de peine">
+ <div class="info"><p id="gt"></p></div><p class="cap">Medidas aproximadas del estándar de Wahl y Andis. Cada marca varía un poco: medí las tuyas.</p>`;
+ const r=$('#gr',el);
+ const upd=()=>{const g=G[r.value],mm=parseFloat(g[1]);$('#gn',el).textContent=g[0];$('#gm',el).textContent=g[1];$('#gt',el).textContent=g[2];
+  let s='';for(let x=8;x<288;x+=7){const jit=((x*37)%11)/11;const h=Math.max(1.5,mm*4*(0.94+jit*.12));const lean=(jit-.5)*Math.min(mm,10)*.6;s+=`<path d="M${x},121 q${lean*.4},${-h/2} ${lean},${-h}" stroke="var(--hair)" stroke-width="2.2" fill="none" stroke-linecap="round"/>`;}
+  $('#gs',el).innerHTML=s;};
+ r.oninput=upd;upd();
+};
+
+VIS.tools=function(el){
+ const sv={
+  clipper:'<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round"><rect x="20" y="16" width="24" height="42" rx="9"/><path d="M18 10h28v8H18z"/><path d="M21 10V6M26 10V6M31 10V6M36 10V6M41 10V6"/><path d="M27 30h10"/></svg>',
+  trimmer:'<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round"><rect x="24" y="14" width="16" height="44" rx="7"/><path d="M22 9h20v5H22z"/><path d="M25 9V6M30 9V6M34 9V6M39 9V6"/></svg>',
+  shaver:'<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round"><path d="M22 26h20v30a4 4 0 0 1-4 4H26a4 4 0 0 1-4-4z"/><path d="M18 12h28v14H18z"/><path d="M22 16h20M22 20h20"/></svg>',
+  scissors:'<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="18" cy="48" r="7"/><circle cx="34" cy="52" r="7"/><path d="M23 43L54 8M29 46L50 12"/><circle cx="31" cy="34" r="1.5" fill="currentColor"/></svg>',
+  razor:'<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round"><path d="M8 28h34l8 6H8z"/><path d="M42 28l14-10 2 4-12 10"/><circle cx="45" cy="29" r="1.5" fill="currentColor"/></svg>',
+  comb:'<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M6 24h52v8H6z"/><path d="M10 32v14M15 32v14M20 32v14M25 32v14M30 32v10M35 32v10M40 32v10M45 32v10M50 32v10M55 32v10"/></svg>',
+  brush:'<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round"><path d="M24 34h16l-2 24H26z"/><path d="M22 34c-4-10 0-24 10-26 10 2 14 16 10 26z"/></svg>',
+  spray:'<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round"><path d="M22 26h20v30a4 4 0 0 1-4 4H26a4 4 0 0 1-4-4z"/><path d="M26 26v-8h12v8M38 18h8l4 6"/><path d="M52 12l4-2M54 18h5M52 24l4 2" stroke-linecap="round"/></svg>'
+ };
+ const T=[['clipper','Máquina (clipper)','Corta volumen y marca la base de los fades con peines guía. Motor potente.','Tip: dejala trabajar sola, no la empujes contra la cabeza.'],
+  ['trimmer','Detallista (trimmer)','Cuchilla fina para contornos, líneas, patillas y diseños.','Tip: apoyá el meñique en la cabeza del cliente para pulso firme.'],
+  ['shaver','Shaver de lámina','Deja la piel lisa en skin fades y nucas.','Tip: piel estirada y movimientos cortos en círculo.'],
+  ['scissors','Tijera','Cortar arriba, tijera sobre peine y texturizar. Ideal 5.5 a 6.5 pulgadas.','Tip: sólo se mueve el pulgar; la hoja de abajo queda fija.'],
+  ['razor','Navaja','Afeitado, perfilado y acabados con hoja desechable.','Tip: ángulo cercano a 30° y piel estirada.'],
+  ['comb','Peines','Peine de corte (dientes finos y anchos) y peine de máquina para levantar.','Tip: limpios y desinfectados entre clientes.'],
+  ['brush','Brochas','Brocha de espuma y cepillo de talco o de quitar pelo.','Tip: secala colgando para que no se pudra la base.'],
+  ['spray','Atomizador y desinfectante','Agua para humedecer y spray para cuchillas.','Tip: nunca mezclés el atomizador de agua con el del desinfectante.']];
+ el.innerHTML=`<div class="toolgrid">${T.map(t=>`<button type="button" class="tool" aria-expanded="false">${sv[t[0]]}<b>${t[1]}</b><span class="more">${t[2]}</span><span class="more" hidden style="color:var(--brass)">${t[3]}</span></button>`).join('')}</div>`;
+ $$('.tool',el).forEach(b=>b.onclick=()=>{const o=b.getAttribute('aria-expanded')!=='true';b.setAttribute('aria-expanded',o);b.querySelectorAll('.more')[1].hidden=!o});
+};
+
+VIS.head=function(el){const u='h'+(++UID);
+ const Z={
+  frontal:['Frontal / fleco','M40,0 L150,0 L135,108 L40,125 Z','La parte de adelante. Define el fleco y el contorno de la frente.'],
+  superior:['Superior','M150,0 L232,0 L212,92 L135,108 Z','La parte de arriba. Aquí se deja el largo y el estilo del corte.'],
+  coronilla:['Coronilla','M232,0 L320,0 L320,118 L212,92 Z','Arriba atrás. Zona del remolino; cuidado con cortarla muy corta.'],
+  lateral:['Lateral / sienes','M135,108 L212,92 L222,150 L200,150 L150,150 L150,140 C134,134 110,124 64,118 Z','Los lados sobre la oreja. Aquí vive el fade.'],
+  occipital:['Occipital','M212,92 L320,118 L320,200 L222,196 L222,150 Z','El bulto de atrás. Se deja peso si la cabeza es plana.'],
+  nuca:['Nuca','M222,196 L320,200 L320,300 L196,300 L196,200 Z','La parte baja de atrás. Se termina redonda, cuadrada o degradada.'],
+  patilla:['Patilla','M150,150 L162,150 L166,200 L150,200 Z','Frente a la oreja. Se emparejan los dos lados con referencias.']};
+ el.innerHTML=`<div class="split"><svg viewBox="40 16 250 290" role="img" aria-label="Zonas de la cabeza">
+  <defs><clipPath id="${u}"><path d="${HAIR}"/></clipPath></defs>
+  <path d="${HEAD_SKIN}" fill="var(--skin)"/>
+  <g clip-path="url(#${u})">${Object.keys(Z).map(k=>`<path d="${Z[k][1]}" data-z="${k}" fill="var(--hair)" stroke="var(--bg)" stroke-width="2.5" style="cursor:pointer"/>`).join('')}</g>
+  ${EAR}${EYE}
+  <path d="M96,104 C150,82 230,82 276,128" fill="none" stroke="var(--brass)" stroke-width="2" stroke-dasharray="5 5" pointer-events="none"/>
+  <text x="226" y="80" font-family="var(--mono)" font-size="10" fill="var(--brass)">línea parietal</text>
+ </svg><div style="display:grid;gap:10px"><div class="seg">${Object.keys(Z).map(k=>`<button type="button" data-z="${k}">${Z[k][0]}</button>`).join('')}</div><div class="info"><h3>Tocá una zona</h3><p>En el dibujo o en los botones.</p></div></div></div>`;
+ const sel=k=>{$$('path[data-z]',el).forEach(p=>p.setAttribute('fill',p.dataset.z===k?'var(--brass)':'var(--hair)'));$$('.seg button',el).forEach(b=>b.setAttribute('aria-pressed',b.dataset.z===k));$('.info h3',el).textContent=Z[k][0];$('.info p',el).textContent=Z[k][2]};
+ $$('[data-z]',el).forEach(n=>n.addEventListener('click',()=>sel(n.dataset.z)));
+};
+
+VIS.faces=function(el){
+ const F={
+  oval:['Ovalado','M100,20 C150,20 170,70 168,120 C166,175 135,220 100,220 C65,220 34,175 32,120 C30,70 50,20 100,20 Z','Proporciones equilibradas: casi todo le queda.','Prácticamente cualquier corte: fades, pompadour, crop, side part.','Cubrir la frente con fleco pesado si no lo necesita.'],
+  redondo:['Redondo','M100,30 C160,30 180,80 180,125 C180,180 145,215 100,215 C55,215 20,180 20,125 C20,80 40,30 100,30 Z','Ancho y largo parecidos, mandíbula suave.','Altura arriba, lados cortos (high o mid fade), quiff, pompadour. Barba más larga en la barbilla.','Volumen a los lados y flecos rectos.'],
+  cuadrado:['Cuadrado','M38,30 L162,30 C170,30 172,40 172,50 L172,178 C172,205 150,215 130,215 L70,215 C50,215 28,205 28,178 L28,50 C28,40 30,30 38,30 Z','Frente y mandíbula anchas, ángulos marcados.','Casi todo: buzz cut, crew cut, side part. Resalta la mandíbula con fades.','Cortes muy redondeados que borran la fuerza de la mandíbula.'],
+  alargado:['Alargado','M100,8 C145,8 158,40 158,75 L158,170 C158,210 130,232 100,232 C70,232 42,210 42,170 L42,75 C42,40 55,8 100,8 Z','Más largo que ancho.','Altura baja o media, algo de volumen a los lados, fleco. Fade bajo.','Mucha altura arriba y lados rapados a piel.'],
+  triangular:['Triangular','M100,30 C130,30 140,40 142,60 C150,110 172,160 168,190 C164,212 135,220 100,220 C65,220 36,212 32,190 C28,160 50,110 58,60 C60,40 70,30 100,30 Z','Mandíbula más ancha que la frente.','Volumen arriba y a los lados de arriba, textura. Barba corta y pareja.','Lados largos que ensanchen la parte baja.'],
+  diamante:['Diamante','M100,18 C120,18 132,40 148,80 C166,112 172,120 160,150 C146,190 122,222 100,222 C78,222 54,190 40,150 C28,120 34,112 52,80 C68,40 80,18 100,18 Z','Pómulos anchos, frente y barbilla estrechas.','Fleco o textura al frente, volumen moderado arriba, barba que llene la barbilla.','Lados rapados muy altos que marquen más los pómulos.'],
+  corazon:['Corazón','M100,26 C150,26 172,50 172,90 C172,140 140,200 100,222 C60,200 28,140 28,90 C28,50 50,26 100,26 Z','Frente ancha, barbilla fina.','Fleco texturizado, largo medio, barba completa para dar volumen abajo.','Mucho volumen arriba y lados muy cortos.']};
+ el.innerHTML=`<div class="seg">${Object.keys(F).map(k=>`<button type="button" data-f="${k}">${F[k][0]}</button>`).join('')}</div>
+ <div class="split"><svg viewBox="0 0 200 240" role="img" aria-label="Forma de rostro"><g stroke="var(--muted)" stroke-dasharray="3 4" stroke-width="1"><line x1="0" x2="200" y1="62" y2="62"/><line x1="0" x2="200" y1="120" y2="120"/><line x1="0" x2="200" y1="185" y2="185"/></g>
+  <g font-family="var(--mono)" font-size="9" fill="var(--muted)"><text x="2" y="58">frente</text><text x="2" y="116">pómulos</text><text x="2" y="181">mandíbula</text></g>
+  <path id="fp" fill="var(--brass-soft)" stroke="var(--brass)" stroke-width="3" style="transition:d .4s"/></svg>
+ <div class="info"><h3 id="fh"></h3><p id="fd"></p><div class="lbl" style="color:var(--ok);margin-top:6px">Le favorece</div><p id="fy"></p><div class="lbl" style="color:var(--bad);margin-top:6px">Evitá</div><p id="fn"></p></div></div>`;
+ const sel=k=>{const f=F[k];$('#fp',el).setAttribute('d',f[1]);$('#fh',el).textContent=f[0];$('#fd',el).textContent=f[2];$('#fy',el).textContent=f[3];$('#fn',el).textContent=f[4];$$('.seg button',el).forEach(b=>b.setAttribute('aria-pressed',b.dataset.f===k))};
+ $$('.seg button',el).forEach(b=>b.onclick=()=>sel(b.dataset.f));sel('oval');
+};
+
+VIS.elevation=function(el){
+ el.innerHTML=`<div class="row" style="justify-content:space-between;align-items:end"><div><div class="lbl">Elevación</div><div class="big-num"><span id="ea">90</span>°</div></div><div class="seg">${[0,45,90,180].map(a=>`<button type="button" data-a="${a}">${a}°</button>`).join('')}</div></div>
+ <svg viewBox="0 0 320 240" aria-hidden="true">
+  <path d="M60,0 C120,40 130,200 60,240 L0,240 L0,0 Z" fill="var(--skin)"/>
+  <g stroke="var(--muted)" stroke-dasharray="3 4"><line x1="113" y1="120" x2="113" y2="225"/><line x1="113" y1="120" x2="225" y2="120"/><line x1="113" y1="120" x2="113" y2="15"/></g>
+  <g font-family="var(--mono)" font-size="10" fill="var(--muted)"><text x="118" y="222">0°</text><text x="228" y="124">90°</text><text x="118" y="22">180°</text></g>
+  <path id="earc" fill="none" stroke="var(--brass)" stroke-width="2"/>
+  <line id="es" x1="113" y1="120" stroke="var(--hair)" stroke-width="7" stroke-linecap="round"/>
+  <line id="ec" stroke="var(--brass)" stroke-width="3" stroke-linecap="round"/>
+  <circle cx="113" cy="120" r="5" fill="var(--hair-dark)"/>
+ </svg>
+ <input type="range" min="0" max="180" value="90" id="er" aria-label="Ángulo de elevación">
+ <div class="info"><h3 id="eh"></h3><p id="ed"></p></div>`;
+ const r=$('#er',el);
+ const txt=a=>a<20?['0° — Línea sólida','Todo el pelo cae a la misma línea. Peso máximo en el borde. Cortes tipo bob y bases pesadas.']:a<70?['45° — Graduación','El pelo de abajo queda más corto que el de arriba. Crea peso y forma redondeada: la base del corte clásico de caballero.']:a<120?['90° — Capas uniformes','Perpendicular a la cabeza: todo el pelo queda del mismo largo. Sigue la forma del cráneo.']:['180° — Capas largas','Se levanta todo hacia arriba y se corta en un punto. El pelo de abajo queda más largo: mucho movimiento, poco peso.'];
+ const upd=()=>{const a=+r.value,rad=a*Math.PI/180,L=95;const x=113+L*Math.sin(rad),y=120+L*Math.cos(rad);
+  const s=$('#es',el);s.setAttribute('x2',x);s.setAttribute('y2',y);
+  const nx=Math.cos(rad)*10,ny=-Math.sin(rad)*10;const c=$('#ec',el);c.setAttribute('x1',x-nx);c.setAttribute('y1',y-ny);c.setAttribute('x2',x+nx);c.setAttribute('y2',y+ny);
+  const ar=30,ex=113+ar*Math.sin(rad),ey=120+ar*Math.cos(rad);$('#earc',el).setAttribute('d',`M113,150 A30,30 0 0 0 ${ex.toFixed(1)},${ey.toFixed(1)}`);
+  $('#ea',el).textContent=a;const t=txt(a);$('#eh',el).textContent=t[0];$('#ed',el).textContent=t[1];
+  $$('.seg button',el).forEach(b=>b.setAttribute('aria-pressed',+b.dataset.a===a))};
+ r.oninput=upd;$$('.seg button',el).forEach(b=>b.onclick=()=>{r.value=b.dataset.a;upd()});upd();
+};
+
+VIS.fade=function(el){const u='f'+(++UID);
+ // y0 = abajo (más corto), y1 = arriba (pelo completo). Rango de la silueta: nuca 262, parietal ~110
+ const F={
+  low:['Low fade','Empieza muy cerca de la línea del pelo y termina más o menos a la altura de la parte baja de la oreja. Discreto, ideal para trabajo.',262,205,['0','½','1','1½','2','3']],
+  mid:['Mid fade','La transición llega a la mitad de la cabeza, a la altura de las sienes. El más pedido: balance entre limpio y versátil.',262,165,['0','½','1','1½','2','3']],
+  high:['High fade','Sube hasta cerca de la línea parietal. Mucho contraste, se ve muy limpio y moderno.',262,120,['0','½','1','1½','2','3','4']],
+  skin:['Skin fade','Como un mid o high, pero la base es piel: shaver o navaja abajo. Máximo contraste, crece rápido.',262,150,['piel','0','½','1','1½','2','3']],
+  taper:['Taper','Sólo se degradan los bordes: nuca y patilla. Se ve natural y crece muy bien. Bueno para clientes conservadores.',262,238,['0','1','2','3']]};
+ let mode='suave',cur='mid';
+ el.innerHTML=`<div class="seg" id="ft">${Object.keys(F).map(k=>`<button type="button" data-k="${k}">${F[k][0]}</button>`).join('')}</div>
+ <div class="split"><svg viewBox="40 16 260 290" role="img" aria-label="Vista lateral del degradado">
+  <defs><clipPath id="${u}c"><path d="${HAIR}"/></clipPath><linearGradient id="${u}g" data-g="1" gradientUnits="userSpaceOnUse" x1="0" x2="0"><stop offset="0" data-s0="1"/><stop offset="1" stop-color="var(--hair)"/></linearGradient></defs>
+  <path d="${HEAD_SKIN}" fill="var(--skin)"/>
+  <g clip-path="url(#${u}c)"><rect x="0" y="0" width="320" height="320" fill="var(--hair)"/><g id="fz"></g></g>
+  ${EAR}${EYE}<g id="fl"></g>
+ </svg><div class="info"><h3 id="fh"></h3><p id="fd"></p><div class="lbl" style="margin-top:6px">Secuencia de peines</div><p class="mono" id="fq" style="color:var(--fg)"></p></div></div>
+ <div class="seg" id="fm"><button type="button" data-m="suave">Vista suave</button><button type="button" data-m="peines">Vista por peines</button></div>`;
+ const mix=(t)=>`color-mix(in srgb, var(--hair) ${Math.round(t*100)}%, var(--skin))`;
+ const draw=()=>{const f=F[cur],y0=f[2],y1=f[3];const z=$('#fz',el),lab=$('#fl',el);let s='',l='';
+  const base=cur==='skin'?0:.28;
+  if(mode==='suave'){
+   const g=$('[data-g]',el);g.setAttribute('y1',y0);g.setAttribute('y2',y1);$('[data-s0]',el).setAttribute('stop-color',mix(base));
+   s=`<rect x="0" y="${y1}" width="320" height="${y0-y1+60}" fill="url(#${u}g)"/><rect x="0" y="${y0}" width="320" height="60" fill="${mix(base)}"/>`;
+   if(cur==='taper')s=`<rect x="0" y="${y1}" width="320" height="${y0-y1+60}" fill="url(#${u}g)"/><rect x="0" y="${y0}" width="320" height="60" fill="${mix(base)}"/><rect x="146" y="176" width="22" height="26" fill="${mix(.55)}"/>`;
+  }else{
+   const n=f[4].length,h=(y0-y1)/(n-1);
+   f[4].forEach((g,i)=>{const yb=y0-i*h,yt=i===n-1?0:yb-h;const t=n===1?1:base+(1-base)*(i/(n-1));s+=`<rect x="0" y="${yt}" width="320" height="${yb-yt+(i===0?60:0)}" fill="${mix(t)}"/>`;
+    const ly=i===n-1?y1-8:yb-h/2+4;l+=`<text x="284" y="${ly}" font-family="var(--mono)" font-size="10" fill="var(--brass)" text-anchor="end">${g==='piel'?'piel':'#'+g}</text>`;});
+  }
+  z.innerHTML=s;lab.innerHTML=l+`<line x1="40" x2="300" y1="${y1}" y2="${y1}" stroke="var(--brass)" stroke-dasharray="4 4"/>`;
+  $('#fh',el).textContent=f[0];$('#fd',el).textContent=f[1];$('#fq',el).textContent=f[4].map(g=>g==='piel'?'piel':'#'+g).join('  →  ')+'  →  arriba';
+  $$('#ft button',el).forEach(b=>b.setAttribute('aria-pressed',b.dataset.k===cur));$$('#fm button',el).forEach(b=>b.setAttribute('aria-pressed',b.dataset.m===mode));};
+ $$('#ft button',el).forEach(b=>b.onclick=()=>{cur=b.dataset.k;draw()});$$('#fm button',el).forEach(b=>b.onclick=()=>{mode=b.dataset.m;draw()});draw();
+};
+
+VIS.beard=function(el){
+ const L={cuello:['Línea del cuello','Imaginá una línea uno o dos dedos arriba de la manzana de Adán. De ahí sube en curva hasta detrás del lóbulo de la oreja. Todo lo que queda debajo se afeita.'],pomulo:['Línea del pómulo','Una línea natural del borde de la patilla hacia la comisura de la boca. Limpiala sin bajarla mucho: una línea muy baja hace ver la cara más ancha.'],bigote:['Bigote','Que no tape el labio. Recortá con tijera sobre peine y emparejá desde el centro hacia los lados.']};
+ el.innerHTML=`<div class="split"><svg viewBox="30 90 260 230" role="img" aria-label="Líneas de la barba">
+  <path d="${HEAD_SKIN}" fill="var(--skin)"/>
+  <path d="M152,200 L166,200 C176,226 180,240 206,258 L236,300 L190,300 C170,276 148,262 120,256 C104,252 94,240 92,226 L100,214 C116,220 130,214 140,204 Z" fill="var(--hair)" opacity=".92"/>
+  <path d="${HAIR}" fill="var(--hair)"/>${EAR}${EYE}
+  <path d="M82,206 C90,203 98,203 104,206" fill="none" stroke="var(--hair)" stroke-width="5" stroke-linecap="round" data-l="bigote"/>
+  <path d="M140,236 C150,262 180,282 206,262" fill="none" stroke="var(--brass)" stroke-width="3" stroke-dasharray="6 5" data-l="cuello"/>
+  <circle cx="140" cy="236" r="5" fill="var(--brass)"/>
+  <path d="M152,200 C136,204 116,206 102,214" fill="none" stroke="var(--brass)" stroke-width="3" stroke-dasharray="6 5" data-l="pomulo"/>
+  <text x="62" y="250" font-family="var(--mono)" font-size="10" fill="var(--brass)">1–2 dedos</text>
+ </svg><div style="display:grid;gap:10px"><div class="seg">${Object.keys(L).map(k=>`<button type="button" data-k="${k}">${L[k][0]}</button>`).join('')}</div><div class="info"><h3>${L.cuello[0]}</h3><p>${L.cuello[1]}</p></div></div></div>`;
+ $$('.seg button',el).forEach(b=>b.onclick=()=>{$$('.seg button',el).forEach(x=>x.setAttribute('aria-pressed',x===b));$('.info h3',el).textContent=L[b.dataset.k][0];$('.info p',el).textContent=L[b.dataset.k][1];$$('[data-l]',el).forEach(p=>p.style.opacity=p.dataset.l===b.dataset.k?1:.3)});
+ $('.seg button',el).setAttribute('aria-pressed','true');
+};
+
+VIS.calc=function(el){
+ el.innerHTML=`<div class="calc">
+  <label>Ganancia que querés por hora ($)<input id="c1" type="number" min="0" step="1" value="15" inputmode="decimal"></label>
+  <label>Minutos por corte<input id="c2" type="number" min="5" step="5" value="45" inputmode="numeric"></label>
+  <label>Costo por servicio ($)<input id="c3" type="number" min="0" step="0.25" value="1.5" inputmode="decimal"><span style="font-weight:400;font-size:12px">productos, hoja, cuello</span></label>
+  <label>Gastos fijos al mes ($)<input id="c4" type="number" min="0" step="10" value="350" inputmode="decimal"><span style="font-weight:400;font-size:12px">local, luz, agua, internet</span></label>
+  <label>Cortes al mes<input id="c5" type="number" min="1" step="1" value="160" inputmode="numeric"></label></div>
+ <div class="result"><div><span>Precio sugerido</span><b id="r1">$0</b></div><div><span>Gasto fijo por corte</span><b id="r2">$0</b></div><div><span>Ganás al mes</span><b id="r3">$0</b></div></div>
+ <p class="cap">Ejemplo con números de muestra. Cambiá los valores por los tuyos.</p>`;
+ const v=id=>Math.max(0,parseFloat($('#'+id,el).value)||0);
+ const f=n=>'$'+n.toFixed(2);
+ const upd=()=>{const hr=v('c1'),mins=Math.max(5,v('c2')),cost=v('c3'),fix=v('c4'),n=Math.max(1,v('c5'));
+  const fixPer=fix/n,price=hr*mins/60+cost+fixPer,profit=(price-cost-fixPer)*n;
+  $('#r1',el).textContent=f(Math.ceil(price*2)/2);$('#r2',el).textContent=f(fixPer);$('#r3',el).textContent=f(profit)};
+ $$('input',el).forEach(i=>i.oninput=upd);upd();
+};
+
+/* ============ QUIZ ============ */
+function quiz(el,qs,onEnd){
+ let i=0,ok=0;
+ const L='ABCD';
+ const q=()=>{const Q=qs[i];
+  el.innerHTML=`<div class="quiz"><div class="row" style="justify-content:space-between"><span class="qn">Pregunta ${i+1} / ${qs.length}</span><span class="qn">${ok} correctas</span></div><h3>${Q.q}</h3><div class="opts">${Q.o.map((o,k)=>`<button type="button" class="opt" data-l="${L[k]}" data-k="${k}">${o}</button>`).join('')}</div><div id="qx"></div></div>`;
+  $$('.opt',el).forEach(b=>b.onclick=()=>{const k=+b.dataset.k;$$('.opt',el).forEach(x=>{x.disabled=true;if(+x.dataset.k===Q.a)x.classList.add('right')});if(k===Q.a)ok++;else b.classList.add('wrong');
+   $('#qx',el).innerHTML=`<p class="expl"><b style="color:${k===Q.a?'var(--ok)':'var(--bad)'}">${k===Q.a?'¡Correcto!':'No exactamente.'}</b> ${Q.e}</p><div class="row" style="margin-top:12px;justify-content:flex-end"><button class="btn" type="button" id="qn">${i<qs.length-1?'Siguiente':'Ver resultado'}</button></div>`;
+   $('#qn',el).onclick=()=>{i++;i<qs.length?q():end()};$('#qn',el).focus()});};
+ const end=()=>{const pc=Math.round(ok/qs.length*100);onEnd&&onEnd(pc);
+  el.innerHTML=`<div class="quiz badge"><span class="lbl">Resultado</span><div class="score">${pc}%</div><p>${ok} de ${qs.length} correctas. ${pc>=70?'Módulo aprobado. Así se trabaja.':'Te falta poco. Repasá y volvé a intentar: necesitás 70%.'}</p><div class="row" style="justify-content:center"><button class="btn ghost" type="button" id="qr">Repetir</button>${pc>=70?'<button class="btn" type="button" id="qh">Volver al inicio</button>':''}</div></div>`;
+  $('#qr',el).onclick=()=>{i=0;ok=0;q()};const h=$('#qh',el);if(h)h.onclick=()=>go('home');};
+ q();
+}
+
+/* ============ VISTAS ============ */
+function ring(pc){const r=34,c=2*Math.PI*r;return `<svg class="ring" viewBox="0 0 84 84"><circle cx="42" cy="42" r="${r}" fill="none" stroke="var(--surface-2)" stroke-width="8"/><circle cx="42" cy="42" r="${r}" fill="none" stroke="var(--brass)" stroke-width="8" stroke-linecap="round" stroke-dasharray="${c}" stroke-dashoffset="${c*(1-pc/100)}" transform="rotate(-90 42 42)"/><text x="42" y="49" text-anchor="middle">${pc}%</text></svg>`}
+
+function modRow(m){const i=MODULES.indexOf(m)+1,sc=P.done[m.id];const st=sc>=70?`<span class="pill ok">${sc}%</span>`:(P.seen[m.id]?`<span class="pill go">En curso</span>`:`<span class="pill">${m.min} min</span>`);
+ return `<button type="button" class="mod" data-open="${m.id}"><span class="n">${pad(i)}</span><span><h3>${m.t}</h3><small>${m.s}</small></span>${st}</button>`}
+
+const V={
+home(){const d=doneCount(),pc=Math.round(d/MODULES.length*100);const next=MODULES.find(m=>!(P.done[m.id]>=70))||MODULES[0];
+ return `<section class="hero"><div class="pole" aria-hidden="true"></div><span class="lbl">Barbería · del origen a la maestría</span><h1>Meraki <em>Academy</em></h1><p class="lead">13 módulos para aprender el oficio con método: historia, técnica, degradados, navaja y negocio.</p>
+ <div class="progress-card">${ring(pc)}<div style="display:grid;gap:10px;min-width:0"><div><b>${P.name?'Hola, '+P.name:'Tu progreso'}</b><div class="muted" style="font-size:14px">${d} de ${MODULES.length} módulos aprobados</div></div>
+  ${P.name?'':`<div class="namebox"><input id="nm" placeholder="Tu nombre" aria-label="Tu nombre" maxlength="30"><button class="btn sm" id="nmb" type="button">Guardar</button></div>`}
+  <div class="row"><button class="btn" type="button" data-open="${next.id}">${d? 'Continuar':'Empezar'}: ${next.t}</button></div></div></div>
+ <div class="shortcuts"><button type="button" class="shortcut" data-go="clase"><b>Modo clase</b><span>Presentá un módulo en pantalla grande</span></button><button type="button" class="shortcut" data-go="exam"><b>Examen</b><span>12 preguntas de todo el curso</span></button><button type="button" class="shortcut" data-go="gloss"><b>Glosario</b><span>${GLOSS.length} términos del oficio</span></button></div></section>
+ ${LEVELS.map(L=>`<section class="level"><div class="level-head"><span class="level-num">${L.n}</span><h2>${L.t}</h2><p>${L.d}</p></div><div class="mods">${MODULES.filter(m=>m.lv===L.n).map(modRow).join('')}</div></section>`).join('')}
+ <div class="install" id="inst"><b>Instalala en tu celular</b><span>En Chrome de Android abrí el menú ⋮ y tocá <b>Agregar a la pantalla principal</b>. Queda con su ícono como una app. Tu progreso se guarda en tu propio teléfono.</span></div>`},
+module(){const m=modById(S.mod),i=MODULES.indexOf(m)+1,n=m.sec.length,isQ=S.sec>=n;
+ P.seen[m.id]=1;save();
+ const dots=[...m.sec.map((s,k)=>`<button type="button" data-sec="${k}" class="${k===S.sec?'on':''}" aria-label="${s.h}">${k+1}</button>`),`<button type="button" data-sec="${n}" class="${isQ?'on':''}" aria-label="Quiz">Quiz</button>`].join('');
+ const body=isQ?`<div class="section"><h2>Quiz del módulo</h2><p class="muted">Necesitás 70% para aprobar. ${P.done[m.id]?'Tu mejor resultado: '+P.done[m.id]+'%':''}</p><div id="qz"></div></div>`:`<div class="section"><h2>${m.sec[S.sec].h}</h2>${blocks(m.sec[S.sec].b)}</div>`;
+ return `<header class="modhead"><button class="back" type="button" data-go="home">← Módulos</button><span class="lbl">Módulo ${pad(i)} · Nivel ${m.lv} · ${LEVELS[m.lv-1].t}</span><h1>${m.t}</h1><div class="dots">${dots}</div></header>${body}
+ <nav class="modnav"><button class="btn ghost" type="button" data-sec="${S.sec-1}" ${S.sec===0?'disabled style="visibility:hidden"':''}>← Anterior</button>${isQ?`<button class="btn ghost" type="button" data-stage="${m.id}">Presentar en clase</button>`:`<button class="btn" type="button" data-sec="${S.sec+1}">${S.sec===n-1?'Hacer el quiz →':'Siguiente →'}</button>`}</nav>`},
+clase(){return `<header class="modhead"><span class="lbl">Para el instructor</span><h1>Modo clase</h1><p class="muted">Elegí un módulo para presentarlo en pantalla completa. Pasá con las flechas, deslizando o con los botones. Al final vienen las preguntas para la clase con respuesta oculta.</p></header><div class="mods">${MODULES.map(m=>`<button type="button" class="mod" data-stage="${m.id}"><span class="n">${pad(MODULES.indexOf(m)+1)}</span><span><h3>${m.t}</h3><small>${m.sec.length} láminas + ${m.q.length} preguntas</small></span><span class="pill go">Presentar</span></button>`).join('')}</div>`},
+exam(){return `<header class="modhead"><span class="lbl">Evaluación general</span><h1>Examen Meraki</h1><p class="muted">12 preguntas al azar de todos los módulos. Con 80% o más ganás la insignia de barbero Meraki.${P.exam?' Tu mejor resultado: '+P.exam+'%':''}</p></header><div id="ex"></div>`},
+gloss(){return `<header class="modhead"><span class="lbl">Referencia rápida</span><h1>Glosario</h1></header><input class="search" id="gq" type="search" placeholder="Buscar término…" aria-label="Buscar término"><div class="gloss" id="gl"></div>`}
+};
+
+function go(view,mod,sec){S.view=view;if(mod!==undefined)S.mod=mod;S.sec=sec||0;render();window.scrollTo({top:0})}
+
+function render(){
+ const app=$('#app');
+ app.innerHTML=`<div class="top"><span class="brand">Meraki <span>Academy</span></span><span class="sp"></span><button class="iconbtn" id="th" type="button" aria-label="Cambiar tema">${IC.theme}</button></div>`+V[S.view]();
+ mount(app);
+ // tabs
+ const T=[['home','Inicio'],['clase','Clase'],['exam','Examen'],['gloss','Glosario']];
+ $('#tabs').innerHTML=T.map(t=>`<button type="button" data-go="${t[0]}" ${(S.view===t[0]||(S.view==='module'&&t[0]==='home'))?'aria-current="page"':''}>${IC[t[0]]}${t[1]}</button>`).join('');
+ // vista específica
+ if(S.view==='module'&&S.sec>=modById(S.mod).sec.length){const m=modById(S.mod);quiz($('#qz'),m.q,pc=>{P.done[m.id]=Math.max(P.done[m.id]||0,pc);save()})}
+ if(S.view==='exam'){const all=MODULES.flatMap(m=>m.q);const pick=all.map(q=>[Math.random(),q]).sort((a,b)=>a[0]-b[0]).slice(0,12).map(x=>x[1]);
+  quiz($('#ex'),pick,pc=>{P.exam=Math.max(P.exam||0,pc);save();setTimeout(()=>{if(pc>=80){const b=$('#ex .badge');if(b)b.insertAdjacentHTML('afterbegin',`<svg viewBox="0 0 120 120" width="110" aria-hidden="true"><circle cx="60" cy="60" r="54" fill="var(--brass-soft)" stroke="var(--brass)" stroke-width="3"/><circle cx="60" cy="60" r="44" fill="none" stroke="var(--brass)" stroke-dasharray="2 4"/><text x="60" y="56" text-anchor="middle" font-family="var(--display)" font-weight="900" font-size="22" fill="var(--brass)">MERAKI</text><text x="60" y="76" text-anchor="middle" font-family="var(--mono)" font-size="9" fill="var(--fg)">BARBERO ${P.name?P.name.toUpperCase().slice(0,14):'CERTIFICADO'}</text></svg>`)}},0)})}
+ if(S.view==='gloss'){const draw=t=>{t=(t||'').toLowerCase();$('#gl').innerHTML=GLOSS.filter(g=>(g[0]+g[1]).toLowerCase().includes(t)).map(g=>`<div><b>${g[0]}</b><span>${g[1]}</span></div>`).join('')||'<p class="muted" style="padding:12px 0">No encontré ese término. Probá con otra palabra.</p>'};$('#gq').oninput=e=>draw(e.target.value);draw('')}
+ const nmb=$('#nmb');if(nmb)nmb.onclick=()=>{const v=$('#nm').value.trim();if(v){P.name=v;save();render()}};
+}
+
+/* ============ MODO CLASE ============ */
+let ST={m:null,i:0,slides:[]};
+function openStage(id){const m=modById(id);ST={m,i:0,slides:[{cover:1},...m.sec.map(s=>({s})),...m.q.map(q=>({q}))]};$('#stage').hidden=false;document.body.style.overflow='hidden';drawStage()}
+function closeStage(){$('#stage').hidden=true;document.body.style.overflow='';try{if(document.fullscreenElement)document.exitFullscreen()}catch(e){}}
+function drawStage(){const st=$('#stage'),sl=ST.slides[ST.i],m=ST.m,i=MODULES.indexOf(m)+1;let body='';
+ if(sl.cover)body=`<div class="slide" style="align-content:center;min-height:60vh"><div class="pole"></div><span class="lbl">Meraki Academy · Módulo ${pad(i)}</span><h2>${m.t}</h2><p class="muted" style="font-size:clamp(18px,2.4vw,26px)">${m.s}</p></div>`;
+ else if(sl.s)body=`<div class="slide"><span class="lbl">Módulo ${pad(i)} · ${m.t}</span><h2>${sl.s.h}</h2>${blocks(sl.s.b)}</div>`;
+ else{const q=sl.q;body=`<div class="slide classq"><span class="lbl">Pregunta para la clase</span><h3>${q.q}</h3><div class="opts">${q.o.map((o,k)=>`<div class="opt" data-l="${'ABCD'[k]}" data-k="${k}">${o}</div>`).join('')}</div><div class="row"><button class="btn" id="rv" type="button">Revelar respuesta</button></div><p class="expl" id="rx" hidden>${q.e}</p></div>`}
+ st.innerHTML=`<div class="sh"><span class="t">${m.t}</span><span class="count">${ST.i+1} / ${ST.slides.length}</span><button class="iconbtn" id="fs" type="button" aria-label="Pantalla completa">${IC.full}</button><button class="iconbtn" id="cx" type="button" aria-label="Cerrar">${IC.x}</button></div><div class="body">${body}</div><div class="sf"><button class="btn ghost" id="pv" type="button" ${ST.i===0?'disabled':''}>←</button><div class="pole" style="opacity:.8"></div><button class="btn" id="nx" type="button">${ST.i===ST.slides.length-1?'Terminar':'→'}</button></div>`;
+ mount(st);
+ $('#cx',st).onclick=closeStage;$('#pv',st).onclick=()=>step(-1);$('#nx',st).onclick=()=>ST.i===ST.slides.length-1?closeStage():step(1);
+ $('#fs',st).onclick=()=>{try{const p=document.fullscreenElement?document.exitFullscreen():st.requestFullscreen();if(p&&p.catch)p.catch(()=>{})}catch(e){}};
+ const rv=$('#rv',st);if(rv)rv.onclick=()=>{$$('.opt',st).forEach(o=>{if(+o.dataset.k===sl.q.a)o.classList.add('right')});$('#rx',st).hidden=false;rv.hidden=true};
+}
+function step(d){const n=ST.i+d;if(n<0||n>=ST.slides.length)return;ST.i=n;drawStage();$('#stage .body').scrollTop=0}
+document.addEventListener('keydown',e=>{if($('#stage').hidden)return;if(e.target.tagName==='INPUT')return;if(e.key==='ArrowRight'||e.key===' '){e.preventDefault();step(1)}else if(e.key==='ArrowLeft')step(-1);else if(e.key==='Escape')closeStage()});
+let tx=null,ty=null;
+$('#stage').addEventListener('touchstart',e=>{if(e.target.closest('input,.vis'))return tx=null;tx=e.touches[0].clientX;ty=e.touches[0].clientY},{passive:true});
+$('#stage').addEventListener('touchend',e=>{if(tx===null)return;const dx=e.changedTouches[0].clientX-tx,dy=e.changedTouches[0].clientY-ty;if(Math.abs(dx)>60&&Math.abs(dx)>Math.abs(dy)*1.5)step(dx<0?1:-1);tx=null},{passive:true});
+
+/* ============ NAVEGACIÓN GLOBAL ============ */
+document.addEventListener('click',e=>{
+ const g=e.target.closest('[data-go]');if(g){go(g.dataset.go);return}
+ const o=e.target.closest('[data-open]');if(o){go('module',o.dataset.open,0);return}
+ const s=e.target.closest('[data-sec]');if(s&&S.view==='module'&&!s.closest('#stage')){const v=+s.dataset.sec;if(v>=0)go('module',S.mod,v);return}
+ const st=e.target.closest('[data-stage]');if(st){openStage(st.dataset.stage);return}
+ if(e.target.closest('#th')){const r=document.documentElement,cur=r.dataset.theme||(matchMedia('(prefers-color-scheme: light)').matches?'light':'dark');r.dataset.theme=cur==='dark'?'light':'dark';try{localStorage.setItem(KEY+'-theme',r.dataset.theme)}catch(e){}}
+});
+try{const t=localStorage.getItem(KEY+'-theme');if(t)document.documentElement.dataset.theme=t}catch(e){}
+render();
+</script>
+
+<script>
+if(matchMedia('(display-mode: standalone)').matches){const s=document.createElement('style');s.textContent='#inst{display:none}';document.head.appendChild(s)}
+if('serviceWorker' in navigator){addEventListener('load',()=>navigator.serviceWorker.register('sw.js',{scope:'./'}).catch(()=>{}))}
+</script>
+</body>
+</html>
