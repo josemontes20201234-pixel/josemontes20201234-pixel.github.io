@@ -82,6 +82,7 @@ p{margin:0}
 .progress-card{display:grid;grid-template-columns:auto 1fr;gap:16px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:16px}
 .ring{width:84px;height:84px}
 .ring text{font:800 20px var(--mono);fill:var(--fg)}
+.progress-card .full{grid-column:1/-1}
 .namebox{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .namebox input{flex:1;min-width:0;background:var(--surface-2);border:1px solid var(--line);color:var(--fg);border-radius:10px;padding:9px 12px;font:inherit}
 .btn{border:0;border-radius:12px;padding:12px 18px;font-weight:800;background:var(--brass);color:var(--brass-ink);display:inline-flex;align-items:center;gap:8px;justify-content:center}
@@ -826,9 +827,9 @@ function modRow(m){const i=MODULES.indexOf(m)+1,sc=P.done[m.id];const st=sc>=70?
 const V={
 home(){const d=doneCount(),pc=Math.round(d/MODULES.length*100);const next=MODULES.find(m=>!(P.done[m.id]>=70))||MODULES[0];
  return `<section class="hero"><div class="pole" aria-hidden="true"></div><span class="lbl">Barbería · del origen a la maestría</span><h1>Meraki <em>Academy</em></h1><p class="lead">13 módulos para aprender el oficio con método: historia, técnica, degradados, navaja y negocio.</p>
- <div class="progress-card">${ring(pc)}<div style="display:grid;gap:10px;min-width:0"><div><b>${P.name?'Hola, '+P.name:'Tu progreso'}</b><div class="muted" style="font-size:14px">${d} de ${MODULES.length} módulos aprobados</div></div>
-  ${P.name?'':`<div class="namebox"><input id="nm" placeholder="Tu nombre" aria-label="Tu nombre" maxlength="30"><button class="btn sm" id="nmb" type="button">Guardar</button></div>`}
-  <div class="row"><button class="btn" type="button" data-open="${next.id}">${d? 'Continuar':'Empezar'}: ${next.t}</button></div></div></div>
+ <div class="progress-card">${ring(pc)}<div style="min-width:0"><b>${P.name?'Hola, '+P.name:'Tu progreso'}</b><div class="muted" style="font-size:14px">${d} de ${MODULES.length} módulos aprobados</div></div>
+  ${P.name?'':`<div class="namebox full"><input id="nm" placeholder="Tu nombre" aria-label="Tu nombre" maxlength="30"><button class="btn sm" id="nmb" type="button">Guardar</button></div>`}
+  <button class="btn full" type="button" data-open="${next.id}">${d? 'Continuar':'Empezar'}: ${next.t}</button></div>
  <div class="shortcuts"><button type="button" class="shortcut" data-go="clase"><b>Modo clase</b><span>Presentá un módulo en pantalla grande</span></button><button type="button" class="shortcut" data-go="exam"><b>Examen</b><span>12 preguntas de todo el curso</span></button><button type="button" class="shortcut" data-go="gloss"><b>Glosario</b><span>${GLOSS.length} términos del oficio</span></button></div></section>
  ${LEVELS.map(L=>`<section class="level"><div class="level-head"><span class="level-num">${L.n}</span><h2>${L.t}</h2><p>${L.d}</p></div><div class="mods">${MODULES.filter(m=>m.lv===L.n).map(modRow).join('')}</div></section>`).join('')}
  <div class="install" id="inst"><b>Instalala en tu celular</b><span>En Chrome de Android abrí el menú ⋮ y tocá <b>Agregar a la pantalla principal</b>. Queda con su ícono como una app. Tu progreso se guarda en tu propio teléfono.</span></div>`},
