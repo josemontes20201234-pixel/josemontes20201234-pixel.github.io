@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Proyector · Visor</title>
+<meta name="theme-color" content="#000000">
+<link rel="icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&family=Bebas+Neue&family=Cinzel:wght@400;700&family=Lato:wght@400;700&family=Merriweather:wght@400;700&family=Montserrat:wght@400;700&family=Oswald:wght@400;700&family=Playfair+Display:wght@400;700&family=Quicksand:wght@400;700&family=Raleway:wght@400;700&family=Roboto+Slab:wght@400;700&display=swap">
+<style>
+  html,body{margin:0;height:100%;background:#000;overflow:hidden;cursor:none}
+  #pantalla{position:fixed;inset:0}
+  .aviso{position:fixed;left:50%;bottom:4vh;transform:translateX(-50%);z-index:5;font:600 clamp(13px,1.6vw,20px)/1.4 system-ui,sans-serif;color:#fff;background:rgba(0,0,0,.6);padding:.7em 1.2em;border-radius:99px;text-align:center;max-width:90vw;transition:opacity .6s;cursor:default}
+  .aviso.off{opacity:0;pointer-events:none}
+  .inicio{position:fixed;inset:0;z-index:4;display:grid;place-items:center;text-align:center;color:#d1a957;font:800 clamp(22px,4vw,54px)/1.1 system-ui,sans-serif;letter-spacing:.06em;text-transform:uppercase;transition:opacity .8s}
+  .inicio small{display:block;margin-top:.6em;color:#9a948a;font:500 clamp(12px,1.5vw,18px)/1.4 system-ui,sans-serif;letter-spacing:0;text-transform:none}
+  .inicio.off{opacity:0;pointer-events:none}
+</style>
+<style id="escena-css"></style>
+</head>
+<body>
+<div id="pantalla"></div>
+<div class="inicio" id="inicio"><div>Proyector listo<small>Esperando lo que mandés desde el cel</small></div></div>
+<div class="aviso" id="aviso">Tocá la pantalla para ponerla completa</div>
+<script type="module" src="visor.js"></script>
+</body>
+</html>
