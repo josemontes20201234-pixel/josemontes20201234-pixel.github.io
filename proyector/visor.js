@@ -38,9 +38,11 @@ const app = initializeApp(firebaseConfig, "visor");
 const db = getFirestore(app);
 onSnapshot(doc(db, "proyector", "en_vivo"), s => { if (s.exists()) aplicar(s.data(), "red"); },
   e => {
-    if ((e.code || "").includes("permission")) mostrarAviso("Falta un permiso en Firebase para el visor. Revisá la regla de lectura de \"proyector\".");
-    else mostrarAviso("Sin conexión. Reintentando…");
+    const sub = inicio.querySelector("small");
+    if ((e.code || "").includes("permission")) { errorFijo = true; sub.textContent = "Falta el permiso en Firebase: agregá la regla de \"proyector\" y recargá esta página."; sub.style.color = "#ff7a6b"; }
+    else { sub.textContent = "Sin conexión a internet. Reintentando…"; }
   });
+let errorFijo = false;
 
 // Pantalla completa y que no se apague
 let lock = null;
