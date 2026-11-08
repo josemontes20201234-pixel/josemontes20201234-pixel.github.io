@@ -1,5 +1,5 @@
 // Proyector: guarda la app y las Biblias para que abran rápido y sin señal.
-const CACHE = "proyector-v1";
+const CACHE = "proyector-v2";
 const SHELL = ["./", "./index.html", "./visor.html", "./app.js", "./visor.js", "./shared.js", "./manifest.json", "./icon-192.png", "../config.js", "./biblia/rv1909.json"];
 self.addEventListener("install", e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting())); });
 self.addEventListener("activate", e => { e.waitUntil(caches.keys().then(k => Promise.all(k.filter(x => x.startsWith("proyector-") && x !== CACHE).map(x => caches.delete(x)))).then(() => self.clients.claim())); });

@@ -52,6 +52,7 @@ function fondoImgActual() { const f = LIVE.fondo; if (!f || !f.img) return null;
 function enviar(cambio, lento) {
   LIVE = Object.assign({}, LIVE, cambio, { ts: Date.now() });
   pintar(escena, LIVE, fondoImgActual());
+  if (TELE) pintar(TELE, LIVE, fondoImgActual());
   actualizarLive();
   try { bc && bc.postMessage({ tipo: "estado", estado: LIVE, fondoImg: fondoImgActual() }); } catch { }
   clearTimeout(tGuardar);
@@ -310,11 +311,53 @@ function paso(d) {
 }
 function hojaVisor() {
   const url = new URL("visor.html", location.href).href;
-  abrirHoja("Conectar la tele", `<p>En la tele, el proyector o la laptop, abrí este link en el navegador. Lo que mandés desde aquí aparece allá al instante.</p>
+  abrirHoja("Conectar la tele", `<div class="link" style="gap:10px"><b style="font-size:16px">Duplicar la pantalla del cel</b><p class="muted" style="font-size:14px">Conectá el cel a la tele con Screen Share, Smart View o "Transmitir pantalla". Después abrí el Modo tele: tu cel muestra sólo lo que estás proyectando.</p><button class="btn" type="button" id="abrirTele">Abrir Modo tele</button></div>
+    <span class="lbl" style="margin-top:4px">O con el navegador de la tele</span>
+    <p>En la tele, el proyector o la laptop, abrí este link en el navegador. Lo que mandés desde aquí aparece allá al instante.</p>
     <div class="link"><code id="vurl">${esc(url)}</code><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn sm" type="button" id="copiar">Copiar link</button><a class="btn ghost sm" href="${esc(url)}" target="_blank" rel="noopener" style="text-decoration:none">Abrir aquí</a></div></div>
     <ol style="margin:0;padding-left:20px;display:grid;gap:6px;color:var(--muted);font-size:14.5px"><li>En la tele, tocá o hacé clic una vez para ponerla en pantalla completa.</li><li>La tele no necesita tu cuenta: sólo lee lo que mandás.</li><li>Si la tele tiene teclado, la tecla F también la pone completa.</li></ol>`, s => {
+    $("#abrirTele", s).onclick = () => { cerrarHoja(); modoTele(); };
     $("#copiar", s).onclick = async () => { try { await navigator.clipboard.writeText(url); toast("Link copiado.") } catch { const r = document.createRange(); r.selectNodeContents($("#vurl", s)); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); toast("Mantené presionado para copiar.") } };
   });
+}
+
+/* ---------- Modo tele (duplicar pantalla) ---------- */
+let TELE = null;
+function modoTele() {
+  if ($("#modotele")) return;
+  const ov = document.createElement("div"); ov.id = "modotele";
+  ov.innerHTML = `<div class="mt-esc"></div>
+    <div class="mt-ayuda">Tocá a la derecha para seguir · a la izquierda para regresar · en medio para opciones</div>
+    <div class="mt-bar" hidden><button type="button" data-mt="prev">${IC.prev}Atrás</button><button type="button" data-mt="negro">${IC.negro}Negro</button><button type="button" data-mt="ocultar">${IC.ocultar}Ocultar</button><button type="button" data-mt="next">${IC.next}Sigue</button><button type="button" data-mt="salir" class="mt-salir">${IC.x}Salir</button></div>`;
+  document.body.appendChild(ov);
+  TELE = crearEscena(ov.querySelector(".mt-esc"));
+  const repintar = () => { if (!TELE) return; TELE.key = null; TELE.fondoKey = null; pintar(TELE, Object.assign({}, LIVE, { estilo: Object.assign({}, LIVE.estilo, { trans: "ninguna" }) }), fondoImgActual()); };
+  requestAnimationFrame(repintar);
+  try { const p = ov.requestFullscreen && ov.requestFullscreen({ navigationUI: "hide" }); if (p && p.then) p.then(() => { try { screen.orientation.lock("landscape").catch(() => { }) } catch { } setTimeout(repintar, 300) }).catch(() => { }); } catch { }
+  try { navigator.wakeLock && navigator.wakeLock.request("screen").then(l => ov._lock = l).catch(() => { }); } catch { }
+  setTimeout(() => ov.querySelector(".mt-ayuda")?.classList.add("off"), 3500);
+  const bar = ov.querySelector(".mt-bar"); let tb;
+  const mostrarBar = () => { bar.hidden = false; clearTimeout(tb); tb = setTimeout(() => bar.hidden = true, 4000); };
+  let x0 = null, y0 = null, swiped = false;
+  ov.addEventListener("touchstart", e => { x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; swiped = false; }, { passive: true });
+  ov.addEventListener("touchend", e => { if (x0 === null) return; const dx = e.changedTouches[0].clientX - x0, dy = e.changedTouches[0].clientY - y0; if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.4) { swiped = true; paso(dx < 0 ? 1 : -1); } x0 = null; }, { passive: true });
+  ov.addEventListener("click", e => {
+    const b = e.target.closest("[data-mt]");
+    if (b) { const a = b.dataset.mt; if (a === "prev") paso(-1); else if (a === "next") paso(1); else if (a === "negro") enviar({ negro: !LIVE.negro }); else if (a === "ocultar") enviar({ oculto: !LIVE.oculto }); else if (a === "salir") salirTele(); if (a !== "salir") mostrarBar(); return; }
+    if (swiped) { swiped = false; return; }
+    const w = innerWidth, x = e.clientX;
+    if (x > w * .68) paso(1); else if (x < w * .32) paso(-1); else mostrarBar();
+  });
+  ov._resize = () => setTimeout(repintar, 120); addEventListener("resize", ov._resize);
+  ov._fs = () => { if (!document.fullscreenElement) salirTele(); }; document.addEventListener("fullscreenchange", ov._fs);
+}
+function salirTele() {
+  const ov = $("#modotele"); if (!ov) return;
+  document.removeEventListener("fullscreenchange", ov._fs); removeEventListener("resize", ov._resize);
+  try { ov._lock && ov._lock.release(); } catch { }
+  try { screen.orientation.unlock(); } catch { }
+  try { if (document.fullscreenElement) document.exitFullscreen().catch(() => { }); } catch { }
+  ov.remove(); TELE = null;
 }
 
 /* ---------- hojas ---------- */
@@ -409,7 +452,7 @@ document.addEventListener("click", e => {
 });
 document.addEventListener("keydown", e => {
   if (/INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName || "")) return;
-  if (e.key === "Escape") return cerrarHoja();
+  if (e.key === "Escape") { if (TELE) return salirTele(); return cerrarHoja(); }
   if ($("#sheet .scrim")) return;
   if (e.key === "ArrowRight" || e.key === "ArrowDown" || e.key === "PageDown") { e.preventDefault(); paso(1) }
   else if (e.key === "ArrowLeft" || e.key === "ArrowUp" || e.key === "PageUp") { e.preventDefault(); paso(-1) }

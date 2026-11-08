@@ -119,10 +119,14 @@ function ajustar(item, maxPx) {
   const H = item.clientHeight, W = item.clientWidth;
   if (!H || !W) return;
   let lo = 6, hi = Math.max(8, maxPx), best = lo;
+  const cs = getComputedStyle(item);
+  const altoUtil = H - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
+  const gap = parseFloat(cs.rowGap) || 0;
+  const cabe = () => (t.offsetHeight + (r ? r.offsetHeight + gap : 0)) <= altoUtil + 1 && t.scrollWidth <= t.clientWidth + 1;
   const set = px => { t.style.fontSize = px + "px"; if (r) r.style.fontSize = Math.max(8, Math.min(px * .5, maxPx * .5)) + "px"; };
   for (let k = 0; k < 18; k++) {
     const mid = (lo + hi) / 2; set(mid);
-    if (item.scrollHeight <= H + 1 && t.scrollWidth <= t.clientWidth + 1) { best = mid; lo = mid } else hi = mid;
+    if (cabe()) { best = mid; lo = mid } else hi = mid;
     if (hi - lo < .5) break;
   }
   set(best);
