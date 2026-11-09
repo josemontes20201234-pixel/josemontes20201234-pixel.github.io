@@ -134,7 +134,7 @@ public class MainActivity extends Activity {
     static final String[][] CAJON_ESTILOS = {{"cuadricula", "Cuadrícula"}, {"lista", "Lista"}};
     static final String[][] CAJON_ORDEN = {{"alfa", "Alfabético"}, {"uso", "Las que más usás primero"}};
     static final String[][] ACCIONES = {{"cajon", "Abrir todas las apps"}, {"notificaciones", "Bajar notificaciones"}, {"buscar", "Buscar"},
-            {"google", "Abrir Google"}, {"ajustes", "Ajustes del launcher"}, {"app", "Abrir una app…"}, {"nada", "No hacer nada"}};
+            {"google", "Abrir Google"}, {"ajustes", "Ajustes del launcher"}, {"bloquear", "Apagar la pantalla"}, {"app", "Abrir una app…"}, {"nada", "No hacer nada"}};
     static final String[][] GESTOS = {{"g_arriba", "Deslizar hacia arriba", "cajon"}, {"g_abajo", "Deslizar hacia abajo", "notificaciones"},
             {"g_doble", "Doble toque", "ajustes"}, {"g_derecha", "Deslizar a la derecha", "nada"}, {"g_izquierda", "Deslizar a la izquierda", "nada"}};
     static final String[][] COLUMNAS = {{"4", "4 columnas"}, {"5", "5 columnas"}};
@@ -533,13 +533,33 @@ public class MainActivity extends Activity {
         }
     }
 
+    ComponentName adminCn() { return new ComponentName(this, Admin.class); }
+
+    boolean puedeApagar() {
+        android.app.admin.DevicePolicyManager dpm = (android.app.admin.DevicePolicyManager) getSystemService(Context.DEVICE_POLICY_SERVICE);
+        return dpm != null && dpm.isAdminActive(adminCn());
+    }
+
     void apagarPantalla() {
-        if (Build.VERSION.SDK_INT < 28) { toast("Tu Android no permite apagar la pantalla desde un launcher."); return; }
-        if (Bloqueo.apagar()) return;
-        dialogo().setTitle("Apagar la pantalla con un gesto")
-                .setMessage("Para que el launcher pueda apagar la pantalla, activá \"Meraki Launcher · apagar pantalla\" en Accesibilidad.\n\nSi Android te dice que es un ajuste restringido: andá a Ajustes > Aplicaciones > Meraki Launcher, tocá los tres puntitos (⋮) arriba y elegí \"Permitir ajustes restringidos\". Luego volvé a intentarlo.\n\nNo lee nada de tu pantalla: sólo la apaga.")
-                .setPositiveButton("Abrir Accesibilidad", (d, w) -> abrir(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS), "No pude abrir Accesibilidad."))
-                .setNegativeButton("Ahora no", null).show();
+        android.app.admin.DevicePolicyManager dpm = (android.app.admin.DevicePolicyManager) getSystemService(Context.DEVICE_POLICY_SERVICE);
+        if (dpm != null && dpm.isAdminActive(adminCn())) {
+            try { dpm.lockNow(); } catch (Exception e) { toast("No se pudo apagar la pantalla."); }
+            return;
+        }
+        pedirPermisoApagar();
+    }
+
+    void pedirPermisoApagar() {
+        Intent i = new Intent(android.app.admin.DevicePolicyManager.ACTION_ADD_DEVICE_ADMIN);
+        i.putExtra(android.app.admin.DevicePolicyManager.EXTRA_DEVICE_ADMIN, adminCn());
+        i.putExtra(android.app.admin.DevicePolicyManager.EXTRA_ADD_EXPLANATION, "Sólo para apagar la pantalla con tu gesto. Ojo: al desbloquear quizás te pida el PIN en vez de la huella.");
+        try { startActivity(i); } catch (Exception e) { toast("Tu teléfono no permite este permiso."); }
+    }
+
+    void quitarPermisoApagar() {
+        android.app.admin.DevicePolicyManager dpm = (android.app.admin.DevicePolicyManager) getSystemService(Context.DEVICE_POLICY_SERVICE);
+        try { if (dpm != null) dpm.removeActiveAdmin(adminCn()); toast("Listo, permiso quitado."); } catch (Exception e) { }
+        ui.postDelayed(this::construirAjustes, 600);
     }
 
     void elegirGesto(String clave, String titulo) {
@@ -557,6 +577,7 @@ public class MainActivity extends Activity {
                 elegirApp("¿Qué app abrir?", ap -> guardar(clave, "app:" + ap.key()));
                 return;
             }
+            if ("bloquear".equals(op) && !puedeApagar()) pedirPermisoApagar();
             guardar(clave, op);
         }).setNegativeButton("Cancelar", null).show();
     }
@@ -1605,6 +1626,8 @@ public class MainActivity extends Activity {
 
         seccion(l, "Gestos");
         for (String[] g : GESTOS) opcion(l, g[1], nombreGesto(g[0]), () -> elegirGesto(g[0], g[1]));
+        if (puedeApagar()) opcion(l, "Quitar permiso de apagar pantalla", "Hacelo antes de desinstalar el launcher", this::quitarPermisoApagar);
+        else opcion(l, "Permitir apagar la pantalla", "Para usar «Apagar la pantalla» en un gesto", this::pedirPermisoApagar);
 
         seccion(l, "Fondo");
         opcion(l, "Fondo", nombre(FONDOS, fondo), () -> elegir("Fondo", FONDOS, "fondo", fondo));
