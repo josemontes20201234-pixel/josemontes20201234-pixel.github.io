@@ -4,6 +4,13 @@ import android.Manifest;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.SearchManager;
+import android.appwidget.AppWidgetHost;
+import android.appwidget.AppWidgetHostView;
+import android.appwidget.AppWidgetManager;
+import android.appwidget.AppWidgetProviderInfo;
+import android.content.pm.LauncherApps;
+import android.content.pm.ShortcutInfo;
+import android.os.Process;
 import android.content.ActivityNotFoundException;
 import android.content.BroadcastReceiver;
 import android.content.ComponentName;
@@ -75,12 +82,14 @@ import android.widget.TextClock;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
@@ -121,6 +130,13 @@ public class MainActivity extends Activity {
     static final String[][] TEMAS = {{"oscuro", "Oscuro"}, {"claro", "Claro"}};
     static final String[][] TAMANOS = {{"0", "Pequeños"}, {"1", "Normales"}, {"2", "Grandes"}};
     static final String[][] FONDOS = {{"meraki", "Meraki (según el tema oscuro o claro)"}, {"foto", "Una foto de mi galería"}, {"sistema", "El fondo de pantalla del teléfono"}};
+    static final String[][] INSIGNIAS = {{"punto", "Puntito"}, {"numero", "Número"}, {"no", "No mostrar"}};
+    static final String[][] CAJON_ESTILOS = {{"cuadricula", "Cuadrícula"}, {"lista", "Lista"}};
+    static final String[][] CAJON_ORDEN = {{"alfa", "Alfabético"}, {"uso", "Las que más usás primero"}};
+    static final String[][] ACCIONES = {{"cajon", "Abrir todas las apps"}, {"notificaciones", "Bajar notificaciones"}, {"buscar", "Buscar"},
+            {"google", "Abrir Google"}, {"ajustes", "Ajustes del launcher"}, {"bloquear", "Apagar la pantalla"}, {"app", "Abrir una app…"}, {"nada", "No hacer nada"}};
+    static final String[][] GESTOS = {{"g_arriba", "Deslizar hacia arriba", "cajon"}, {"g_abajo", "Deslizar hacia abajo", "notificaciones"},
+            {"g_doble", "Doble toque", "ajustes"}, {"g_derecha", "Deslizar a la derecha", "nada"}, {"g_izquierda", "Deslizar a la izquierda", "nada"}};
     static final String[][] COLUMNAS = {{"4", "4 columnas"}, {"5", "5 columnas"}};
 
     static class App {
@@ -132,7 +148,16 @@ public class MainActivity extends Activity {
     SharedPreferences prefs;
     // configuración actual
     String estilo, iconos, letra, nombre;
-    String fondo;
+    String fondo, insignias, cajonEstilo, cajonOrden, paqueteNombre;
+    boolean verNombres, verSugeridas;
+    AppWidgetManager awm;
+    Anfitrion host;
+    LinearLayout widgetBox;
+    ScrollView scrollMedio;
+    PaqueteIconos paquete;
+    LinearLayout sugeridasBox;
+    float bajoX, bajoY;
+    static final int REQ_BIND = 41, REQ_CONFIG = 42, REQ_GUARDAR = 43, REQ_ABRIR = 44;
     boolean claro, fondoMeraki, verClima, verBateria, verAgenda, verBusqueda;
     int acento, tamIcono, columnas;
     int FG, MUTED, CARD, LINEA, CAJON;
@@ -236,6 +261,12 @@ public class MainActivity extends Activity {
         verBateria = prefs.getBoolean("ver_bateria", true);
         verAgenda = prefs.getBoolean("ver_agenda", true);
         verBusqueda = prefs.getBoolean("ver_busqueda", true);
+        verNombres = prefs.getBoolean("ver_nombres", true);
+        verSugeridas = prefs.getBoolean("ver_sugeridas", true);
+        insignias = prefs.getString("insignias", "punto");
+        cajonEstilo = prefs.getString("cajon_estilo", "cuadricula");
+        cajonOrden = prefs.getString("cajon_orden", "alfa");
+        paqueteNombre = prefs.getString("paquete_iconos", "");
         try { acento = 0xFF000000 | Integer.parseInt(prefs.getString("acento", "D9B55C"), 16); } catch (Exception e) { acento = 0xFFD9B55C; }
         tamIcono = Integer.parseInt(prefs.getString("tam_icono", "1"));
         columnas = Integer.parseInt(prefs.getString("columnas", "4"));
@@ -259,7 +290,9 @@ public class MainActivity extends Activity {
         estilizarCajon();
         construirInicio();
         adapter.notifyDataSetChanged();
-        grid.setNumColumns(columnas);
+        grid.setNumColumns("lista".equals(cajonEstilo) ? 1 : columnas);
+        grid.setVerticalSpacing("lista".equals(cajonEstilo) ? 0 : dp(14));
+        filtrar();
         if (ajustes.getVisibility() == View.VISIBLE) construirAjustes();
     }
 
@@ -271,11 +304,27 @@ public class MainActivity extends Activity {
         super.onCreate(b);
         prefs = getSharedPreferences("meraki", MODE_PRIVATE);
         leerConfig();
+        awm = AppWidgetManager.getInstance(this);
+        host = new Anfitrion(this, 1024);
+        Insignias.alCambiar = () -> { adapter.notifyDataSetChanged(); pintarFavoritos(); pintarSugeridas(); };
         construir();
         aplicarFondo();
         estilizarCajon();
         construirInicio();
         cargarApps();
+        cargarPaquete();
+    }
+
+    @Override
+    protected void onStart() {
+        super.onStart();
+        try { host.startListening(); } catch (Exception e) { }
+    }
+
+    @Override
+    protected void onStop() {
+        super.onStop();
+        try { host.stopListening(); } catch (Exception e) { }
     }
 
     @Override
@@ -376,8 +425,17 @@ public class MainActivity extends Activity {
         buscarWeb.setOnClickListener(v -> buscarEnGoogle(buscar.getText().toString()));
         drawer.addView(buscarWeb);
 
+        LinearLayout sug = columnaBase();
+        sug.addView(etiqueta("Las que más usás", MUTED), lp(-2, -2, 0));
+        sugeridasBox = new LinearLayout(this);
+        sug.addView(sugeridasBox, lp(-1, -2, 10));
+        View raya = new View(this); raya.setBackgroundColor(0x22888888);
+        sug.addView(raya, lp(-1, 1, 12));
+        sug.setVisibility(View.GONE);
+        drawer.addView(sug, lp(-1, -2, 12));
+
         grid = new GridView(this);
-        grid.setNumColumns(columnas);
+        grid.setNumColumns("lista".equals(cajonEstilo) ? 1 : columnas);
         grid.setVerticalSpacing(dp(14));
         grid.setSelector(new ColorDrawable(Color.TRANSPARENT));
         grid.setVerticalScrollBarEnabled(false);
@@ -405,24 +463,28 @@ public class MainActivity extends Activity {
             return ins.consumeSystemWindowInsets();
         });
 
-        // Gestos: arriba abre el cajón; abajo baja notificaciones o cierra el cajón
+        // Gestos configurables (arriba, abajo, doble toque, izquierda, derecha)
         gestos = new GestureDetector(this, new GestureDetector.SimpleOnGestureListener() {
             @Override
             public boolean onFling(MotionEvent a, MotionEvent b, float vx, float vy) {
                 if (a == null || b == null || ajustes.getVisibility() == View.VISIBLE) return false;
                 float dy = b.getY() - a.getY(), dx = b.getX() - a.getX();
-                if (Math.abs(dy) < dp(60) || Math.abs(dy) < Math.abs(dx) * 1.3f) return false;
                 if (drawer.getVisibility() == View.VISIBLE) {
-                    if (dy > 0 && !grid.canScrollVertically(-1)) { cerrarCajon(); return true; }
+                    if (dy > dp(60) && Math.abs(dy) > Math.abs(dx) * 1.3f && !grid.canScrollVertically(-1)) { cerrarCajon(); return true; }
                     return false;
                 }
-                if (dy < 0) abrirCajon(); else bajarNotificaciones();
-                return true;
+                if (Math.abs(dy) > dp(60) && Math.abs(dy) > Math.abs(dx) * 1.3f) {
+                    // Si el dedo empezó sobre la zona que se desplaza y todavía puede moverse, dejá que se desplace
+                    if (enScrollMedio() && scrollMedio.canScrollVertically(dy < 0 ? 1 : -1)) return false;
+                    return accion(dy < 0 ? "g_arriba" : "g_abajo");
+                }
+                if (Math.abs(dx) > dp(80) && Math.abs(dx) > Math.abs(dy) * 1.5f) return accion(dx > 0 ? "g_derecha" : "g_izquierda");
+                return false;
             }
             @Override
             public boolean onDoubleTap(MotionEvent e) {
                 if (drawer.getVisibility() == View.VISIBLE || ajustes.getVisibility() == View.VISIBLE) return false;
-                abrirAjustes(); return true;
+                return accion("g_doble");
             }
         });
         gestos.setIsLongpressEnabled(false);
@@ -430,6 +492,7 @@ public class MainActivity extends Activity {
 
     @Override
     public boolean dispatchTouchEvent(MotionEvent ev) {
+        if (ev.getActionMasked() == MotionEvent.ACTION_DOWN) { bajoX = ev.getRawX(); bajoY = ev.getRawY(); }
         if (gestos != null && gestos.onTouchEvent(ev)) {
             MotionEvent cancel = MotionEvent.obtain(ev);
             cancel.setAction(MotionEvent.ACTION_CANCEL);
@@ -438,6 +501,80 @@ public class MainActivity extends Activity {
             return true;
         }
         return super.dispatchTouchEvent(ev);
+    }
+
+    boolean enScrollMedio() {
+        if (scrollMedio == null || !scrollMedio.isShown()) return false;
+        int[] xy = new int[2]; scrollMedio.getLocationOnScreen(xy);
+        return bajoX >= xy[0] && bajoX <= xy[0] + scrollMedio.getWidth() && bajoY >= xy[1] && bajoY <= xy[1] + scrollMedio.getHeight();
+    }
+
+    String accionDe(String gesto) {
+        for (String[] g : GESTOS) if (g[0].equals(gesto)) return prefs.getString(gesto, g[2]);
+        return "nada";
+    }
+
+    /** Ejecuta lo que Jose eligió para ese gesto. Devuelve false si no hace nada. */
+    boolean accion(String gesto) {
+        String a = accionDe(gesto);
+        if (a.startsWith("app:")) {
+            App ap = porKey.get(a.substring(4));
+            if (ap != null) lanzar(ap); else toast("Esa app ya no está instalada. Cambiá el gesto en Ajustes.");
+            return true;
+        }
+        switch (a) {
+            case "cajon": abrirCajon(); return true;
+            case "notificaciones": bajarNotificaciones(); return true;
+            case "buscar": abrirCajon(); buscar.requestFocus(); mostrarTeclado(); return true;
+            case "google": abrirGoogle(); return true;
+            case "ajustes": abrirAjustes(); return true;
+            case "bloquear": apagarPantalla(); return true;
+            default: return false;
+        }
+    }
+
+    void apagarPantalla() {
+        if (Build.VERSION.SDK_INT < 28) { toast("Tu Android no permite apagar la pantalla desde un launcher."); return; }
+        if (Bloqueo.apagar()) return;
+        dialogo().setTitle("Apagar la pantalla con un gesto")
+                .setMessage("Para que el launcher pueda apagar la pantalla, activá \"Meraki Launcher · apagar pantalla\" en Accesibilidad.\n\nSi Android te dice que es un ajuste restringido: andá a Ajustes > Aplicaciones > Meraki Launcher, tocá los tres puntitos (⋮) arriba y elegí \"Permitir ajustes restringidos\". Luego volvé a intentarlo.\n\nNo lee nada de tu pantalla: sólo la apaga.")
+                .setPositiveButton("Abrir Accesibilidad", (d, w) -> abrir(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS), "No pude abrir Accesibilidad."))
+                .setNegativeButton("Ahora no", null).show();
+    }
+
+    void elegirGesto(String clave, String titulo) {
+        String actual = accionDe(clave);
+        String[] nombres = new String[ACCIONES.length];
+        int sel = -1;
+        for (int i = 0; i < ACCIONES.length; i++) {
+            nombres[i] = ACCIONES[i][1];
+            if (ACCIONES[i][0].equals(actual) || (actual.startsWith("app:") && "app".equals(ACCIONES[i][0]))) sel = i;
+        }
+        dialogo().setTitle(titulo).setSingleChoiceItems(nombres, sel, (d, w) -> {
+            d.dismiss();
+            String op = ACCIONES[w][0];
+            if ("app".equals(op)) {
+                elegirApp("¿Qué app abrir?", ap -> guardar(clave, "app:" + ap.key()));
+                return;
+            }
+            if ("bloquear".equals(op) && Bloqueo.activo == null) apagarPantalla();
+            guardar(clave, op);
+        }).setNegativeButton("Cancelar", null).show();
+    }
+
+    String nombreGesto(String clave) {
+        String a = accionDe(clave);
+        if (a.startsWith("app:")) { App ap = porKey.get(a.substring(4)); return "Abrir " + (ap != null ? ap.label : "una app"); }
+        return nombre(ACCIONES, a);
+    }
+
+    interface AlElegirApp { void elegida(App a); }
+
+    void elegirApp(String titulo, AlElegirApp cb) {
+        String[] nombres = new String[todas.size()];
+        for (int i = 0; i < todas.size(); i++) nombres[i] = todas.get(i).label;
+        List<App> copia = new ArrayList<>(todas);
+        dialogo().setTitle(titulo).setItems(nombres, (d, w) -> cb.elegida(copia.get(w))).setNegativeButton("Cancelar", null).show();
     }
 
     void estilizarCajon() {
@@ -459,7 +596,7 @@ public class MainActivity extends Activity {
     void construirInicio() {
         homeBox.removeAllViews();
         infoViews.clear(); diales.clear();
-        agendaLista = null; agendaCaja = null; agendaTitulo = null;
+        agendaLista = null; agendaCaja = null; agendaTitulo = null; widgetBox = null; scrollMedio = null;
         diaConstruido = hoyClave();
         View v;
         switch (estilo) {
@@ -471,8 +608,24 @@ public class MainActivity extends Activity {
         v.setPadding(dp(22), insetArriba + dp(24), dp(22), insetAbajo + dp(14));
         homeBox.addView(v, new FrameLayout.LayoutParams(-1, -1));
         pintarFavoritos();
+        pintarWidgets();
         actualizarInfo();
         cargarAgenda();
+    }
+
+    /** Zona central que se puede desplazar: agenda + widgets. */
+    ScrollView zonaMedia(boolean conAgenda, boolean agendaCompacta) {
+        ScrollView sv = new ScrollView(this);
+        sv.setVerticalScrollBarEnabled(false);
+        sv.setOverScrollMode(View.OVER_SCROLL_NEVER);
+        sv.setFillViewport(true);
+        LinearLayout c = columnaBase();
+        if (conAgenda && verAgenda) c.addView(tarjetaAgenda(agendaCompacta), lp(-1, -2, 0));
+        widgetBox = columnaBase();
+        c.addView(widgetBox, lp(-1, -2, 0));
+        sv.addView(c);
+        scrollMedio = sv;
+        return sv;
     }
 
     LinearLayout columnaBase() {
@@ -562,8 +715,8 @@ public class MainActivity extends Activity {
         h.addView(fecha, lp(-2, -2, 6));
         h.addView(info(13, MUTED), lp(-1, -2, 8));
         h.addView(poste(132));
-        if (verAgenda) h.addView(tarjetaAgenda(false), lp(-1, -2, 22));
-        espacio(h);
+        LinearLayout.LayoutParams pm = new LinearLayout.LayoutParams(-1, 0, 1f); pm.topMargin = dp(22); pm.bottomMargin = dp(12);
+        h.addView(zonaMedia(true, false), pm);
         if (verBusqueda) h.addView(barraBusqueda(), lp(-1, -2, 0));
         else {
             TextView pista = texto("︿\nDeslizá hacia arriba para ver todas tus apps", 11, MUTED, tf(false));
@@ -608,16 +761,14 @@ public class MainActivity extends Activity {
         TextView inf = info(13, MUTED);
         inf.setMaxWidth(dp(300));
         h.addView(inf, lp(-1, -2, 6));
-        if (verAgenda) h.addView(tarjetaAgenda(true), lp(-1, -2, 18));
-
+        ScrollView sv = zonaMedia(true, true);
+        LinearLayout cont = (LinearLayout) sv.getChildAt(0);
         TextView mis = etiqueta("Mis apps", acento);
-        h.addView(mis, lp(-2, -2, 22));
-        ScrollView sv = new ScrollView(this);
-        sv.setVerticalScrollBarEnabled(false);
+        cont.addView(mis, lp(-2, -2, 22));
         LinearLayout lista = columnaBase();
-        sv.addView(lista);
+        cont.addView(lista, lp(-1, -2, 8));
         favBox = lista; favModo = "lista";
-        LinearLayout.LayoutParams ps = new LinearLayout.LayoutParams(-1, 0, 1f); ps.topMargin = dp(8);
+        LinearLayout.LayoutParams ps = new LinearLayout.LayoutParams(-1, 0, 1f); ps.topMargin = dp(18);
         h.addView(sv, ps);
         if (verBusqueda) h.addView(barraBusqueda(), lp(-1, -2, 10));
         return h;
@@ -638,11 +789,8 @@ public class MainActivity extends Activity {
         TextView inf = info(12.5f, MUTED);
         inf.setGravity(Gravity.CENTER);
         h.addView(inf, lp(-1, -2, 8));
-        if (verAgenda) {
-            View a = tarjetaAgenda(false);
-            h.addView(a, lp(-1, -2, 20));
-        }
-        espacio(h);
+        LinearLayout.LayoutParams pm = new LinearLayout.LayoutParams(-1, 0, 1.4f); pm.topMargin = dp(20); pm.bottomMargin = dp(12);
+        h.addView(zonaMedia(true, false), pm);
         if (verBusqueda) h.addView(barraBusqueda(), lp(-1, -2, 0));
         LinearLayout fila = new LinearLayout(this);
         fila.setGravity(Gravity.CENTER);
@@ -657,7 +805,6 @@ public class MainActivity extends Activity {
         h.setOrientation(LinearLayout.HORIZONTAL);
 
         LinearLayout izq = columnaBase();
-        espacio(izq);
         Typeface fino = "moderna".equals(letra) ? Typeface.create("sans-serif-thin", Typeface.NORMAL) : tf(false);
         izq.addView(reloj(64, fino, acento, "hh", "HH"));
         izq.addView(reloj(64, fino, acento, "mm", "mm"), lp(-2, -2, 0));
@@ -686,7 +833,10 @@ public class MainActivity extends Activity {
         derCaja.addView(der);
         LinearLayout.LayoutParams pd = new LinearLayout.LayoutParams(-2, -1); pd.leftMargin = dp(14);
         h.addView(derCaja, pd);
-        return h;
+        LinearLayout todo = columnaBase();
+        todo.addView(zonaMedia(false, false), new LinearLayout.LayoutParams(-1, 0, 1f));
+        todo.addView(h, new LinearLayout.LayoutParams(-1, -2));
+        return todo;
     }
 
     String saludo() {
@@ -917,6 +1067,27 @@ public class MainActivity extends Activity {
     @Override
     protected void onActivityResult(int rc, int res, Intent data) {
         super.onActivityResult(rc, res, data);
+        if (rc == REQ_BIND) {
+            if (res == RESULT_OK && widgetPendiente >= 0 && infoPendiente != null) configurarWidget(widgetPendiente, infoPendiente);
+            else if (widgetPendiente >= 0) { host.deleteAppWidgetId(widgetPendiente); toast("No se agregó el widget."); }
+            return;
+        }
+        if (rc == REQ_CONFIG) {
+            if (res == RESULT_OK && widgetPendiente >= 0) {
+                AppWidgetProviderInfo info = infoPendiente != null ? infoPendiente : awm.getAppWidgetInfo(widgetPendiente);
+                if (info != null) widgetListo(widgetPendiente, info);
+            } else if (widgetPendiente >= 0) host.deleteAppWidgetId(widgetPendiente);
+            return;
+        }
+        if (rc == REQ_GUARDAR) { if (res == RESULT_OK && data != null && data.getData() != null) escribirRespaldo(data.getData()); return; }
+        if (rc == REQ_ABRIR) {
+            if (res == RESULT_OK && data != null && data.getData() != null) {
+                final Uri u = data.getData();
+                dialogo().setTitle("¿Restaurar esta copia?").setMessage("Se reemplaza tu configuración actual del launcher (estilo, apps fijadas, carpetas, gestos…).")
+                        .setPositiveButton("Restaurar", (d, w) -> leerRespaldo(u)).setNegativeButton("Cancelar", null).show();
+            }
+            return;
+        }
         if (rc != ELEGIR_FOTO || res != RESULT_OK || data == null || data.getData() == null) return;
         final Uri u = data.getData();
         toast("Poniendo tu foto de fondo…");
@@ -984,7 +1155,9 @@ public class MainActivity extends Activity {
     int tamIconoPx() { return dp(tamIcono == 0 ? 44 : tamIcono == 2 ? 62 : 52); }
 
     Drawable icono(App a, int s) {
-        if ("original".equals(iconos) || a.icon == null) return a.icon;
+        Drawable base = a.icon;
+        if (paquete != null) { Drawable pk = paquete.icono(a.pkg, a.cls); if (pk != null) base = pk; }
+        if ("original".equals(iconos) || base == null) return base;
         String k = a.key() + "@" + s;
         Drawable hecho = cacheIconos.get(k);
         if (hecho != null) return hecho;
@@ -1002,7 +1175,7 @@ public class MainActivity extends Activity {
             c.drawCircle(s / 2f, s / 2f, s / 2f - dp(1.5f), p);
             p.setStyle(Paint.Style.FILL);
         }
-        Drawable mono = monocromo(a.icon);
+        Drawable mono = monocromo(base);
         if (mono != null) {
             // Ícono temático de Android 13+: sólo el dibujo, pintado del color elegido
             int big = Math.round(g * 1.5f), o = off - (big - g) / 2;
@@ -1011,7 +1184,7 @@ public class MainActivity extends Activity {
             c.save(); c.clipRect(off, off, off + g, off + g); mono.draw(c); c.restore();
         } else {
             // Sin ícono temático: el ícono original en escala de grises (teñido si toca)
-            Drawable d = a.icon.getConstantState() != null ? a.icon.getConstantState().newDrawable(getResources()).mutate() : a.icon;
+            Drawable d = base.getConstantState() != null ? base.getConstantState().newDrawable(getResources()).mutate() : base;
             int in = circulo ? Math.round(g * 0.02f) : Math.round(s * 0.04f);
             ColorMatrix cm = new ColorMatrix(); cm.setSaturation(0);
             ColorMatrix contraste = new ColorMatrix(new float[]{1.25f, 0, 0, 0, -20, 0, 1.25f, 0, 0, -20, 0, 0, 1.25f, 0, -20, 0, 0, 0, 1, 0});
@@ -1081,7 +1254,12 @@ public class MainActivity extends Activity {
             if (q.isEmpty() && oc.contains(a.key())) continue; // las ocultas sólo salen si las buscás
             if (q.isEmpty() || a.busqueda.contains(q)) filtradas.add(a);
         }
+        if (q.isEmpty() && "uso".equals(cajonOrden)) {
+            JSONObject u = usos();
+            Collections.sort(filtradas, (x, y) -> Integer.compare(u.optInt(y.key(), 0), u.optInt(x.key(), 0)));
+        }
         if (!q.isEmpty()) Collections.sort(filtradas, (x, y) -> Boolean.compare(!x.busqueda.startsWith(q), !y.busqueda.startsWith(q)));
+        pintarSugeridas();
         String raw = buscar.getText().toString().trim();
         buscarWeb.setVisibility(raw.isEmpty() ? View.GONE : View.VISIBLE);
         buscarWeb.setText("Buscar «" + raw + "» en Google  →");
@@ -1114,14 +1292,25 @@ public class MainActivity extends Activity {
 
     void guardarFavs(List<String> l) { prefs.edit().putString("favs", TextUtils.join("|", l)).apply(); }
 
+    boolean existe(String k) {
+        if (k.startsWith("carpeta:")) return carpetas().has(k.substring(8));
+        return porKey.containsKey(k);
+    }
+
+    View vistaFav(String k, String modo, int s, boolean conNombre) {
+        if (k.startsWith("carpeta:")) return vistaCarpeta(k.substring(8), "lista".equals(modo), conNombre, s);
+        App a = porKey.get(k);
+        return "lista".equals(modo) ? filaLista(a) : celdaApp(a, true, conNombre, s);
+    }
+
     void pintarFavoritos() {
         if (favBox == null) return;
         favBox.removeAllViews();
-        List<App> apps = new ArrayList<>();
-        for (String k : favoritos()) { App a = porKey.get(k); if (a != null) apps.add(a); }
+        List<String> keys = new ArrayList<>();
+        for (String k : favoritos()) if (existe(k)) keys.add(k);
         int max = maxFavs();
-        if (apps.size() > max) apps = apps.subList(0, max);
-        if (apps.isEmpty() && !todas.isEmpty()) {
+        if (keys.size() > max) keys = keys.subList(0, max);
+        if (keys.isEmpty() && !todas.isEmpty()) {
             TextView t = texto("Mantené presionada una app en la lista de todas tus apps para fijarla aquí.", 12, MUTED, tf(false));
             t.setPadding(dp(8), dp(6), dp(8), dp(10));
             if (favBox instanceof GridLayout) {
@@ -1134,30 +1323,25 @@ public class MainActivity extends Activity {
         int s = tamIconoPx();
         switch (favModo) {
             case "lista":
-                for (App a : apps) favBox.addView(filaLista(a), lp(-1, -2, 2));
+                for (String k : keys) favBox.addView(vistaFav(k, "lista", s, true), lp(-1, -2, 2));
                 break;
             case "fila":
-                for (App a : apps) {
-                    View v = celdaApp(a, true, false, Math.round(s * 0.92f));
-                    favBox.addView(v, new LinearLayout.LayoutParams(0, -2, 1f));
-                }
+                for (String k : keys) favBox.addView(vistaFav(k, "fila", Math.round(s * 0.92f), false), new LinearLayout.LayoutParams(0, -2, 1f));
                 break;
             case "dos":
                 int sd = Math.round(s * 0.82f);
-                for (App a : apps) {
-                    View v = celdaApp(a, true, false, sd);
+                for (String k : keys) {
                     GridLayout.LayoutParams p = new GridLayout.LayoutParams();
                     p.width = sd + dp(16); p.bottomMargin = dp(14);
-                    favBox.addView(v, p);
+                    favBox.addView(vistaFav(k, "dos", sd, false), p);
                 }
                 break;
             default:
                 int ancho = (getResources().getDisplayMetrics().widthPixels - dp(44) - dp(12)) / 4;
-                for (App a : apps) {
-                    View v = celdaApp(a, true, true, s);
+                for (String k : keys) {
                     GridLayout.LayoutParams p = new GridLayout.LayoutParams();
                     p.width = ancho; p.bottomMargin = dp(8);
-                    favBox.addView(v, p);
+                    favBox.addView(vistaFav(k, "grid", s, verNombres), p);
                 }
         }
     }
@@ -1166,10 +1350,8 @@ public class MainActivity extends Activity {
         LinearLayout f = new LinearLayout(this);
         f.setGravity(Gravity.CENTER_VERTICAL);
         f.setPadding(0, dp(7), 0, dp(7));
-        ImageView iv = new ImageView(this);
         int s = Math.round(tamIconoPx() * 0.6f);
-        iv.setImageDrawable(icono(a, s));
-        f.addView(iv, new LinearLayout.LayoutParams(s, s));
+        f.addView(conInsignia(icono(a, s), s, Insignias.de(a.pkg)), new LinearLayout.LayoutParams(s, s));
         TextView t = texto(a.label, 15, FG, tf(false));
         t.setSingleLine(true); t.setEllipsize(TextUtils.TruncateAt.END);
         LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(0, -2, 1f); p.leftMargin = dp(14);
@@ -1184,9 +1366,7 @@ public class MainActivity extends Activity {
         c.setOrientation(LinearLayout.VERTICAL);
         c.setGravity(Gravity.CENTER_HORIZONTAL);
         c.setPadding(dp(2), dp(2), dp(2), dp(2));
-        ImageView iv = new ImageView(this);
-        iv.setImageDrawable(icono(a, s));
-        c.addView(iv, new LinearLayout.LayoutParams(s, s));
+        c.addView(conInsignia(icono(a, s), s, Insignias.de(a.pkg)), new LinearLayout.LayoutParams(s, s));
         if (conNombre) {
             TextView t = texto(a.label, 11.5f, FG, tf(false));
             t.setSingleLine(true); t.setEllipsize(TextUtils.TruncateAt.END); t.setGravity(Gravity.CENTER);
@@ -1205,6 +1385,7 @@ public class MainActivity extends Activity {
         public Object getItem(int i) { return filtradas.get(i); }
         public long getItemId(int i) { return i; }
         public View getView(int i, View v, ViewGroup p) {
+            if ("lista".equals(cajonEstilo)) { View f = filaLista(filtradas.get(i)); f.setOnClickListener(null); f.setOnLongClickListener(null); f.setClickable(false); f.setLongClickable(false); return f; }
             int s = tamIconoPx(); if (columnas == 5) s = Math.round(s * 0.86f);
             return celdaApp(filtradas.get(i), false, true, s);
         }
@@ -1215,6 +1396,7 @@ public class MainActivity extends Activity {
             Intent i = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
                     .setComponent(a.cn()).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED);
             startActivity(i);
+            sumarUso(a.key());
             ui.postDelayed(this::cerrarCajon, 400);
         } catch (Exception e) {
             toast("No se pudo abrir " + a.label);
@@ -1227,18 +1409,40 @@ public class MainActivity extends Activity {
         boolean fijada = favs.contains(a.key());
         boolean oculta = ocultas().contains(a.key());
         List<String> ops = new ArrayList<>();
+        List<ShortcutInfo> ats = atajos(a);
+        for (ShortcutInfo si : ats) ops.add("⚡ " + (si.getShortLabel() != null ? si.getShortLabel() : "Atajo"));
+        JSONObject cs = carpetas();
+        List<String> idsCarpetas = new ArrayList<>();
+        java.util.Iterator<String> itc = cs.keys(); while (itc.hasNext()) idsCarpetas.add(itc.next());
         if (fijada) {
             ops.add("Quitar de inicio");
             if (favs.indexOf(a.key()) > 0) ops.add("Mover antes");
             if (favs.indexOf(a.key()) < favs.size() - 1) ops.add("Mover después");
         } else ops.add("Fijar en inicio");
+        ops.add("Crear carpeta con esta app");
+        if (!idsCarpetas.isEmpty()) ops.add("Meter en una carpeta…");
         ops.add(oculta ? "Mostrar en la lista de apps" : "Ocultar de la lista de apps");
         ops.add("Información de la app");
         ops.add("Desinstalar");
         dialogo().setTitle(a.label).setItems(ops.toArray(new String[0]), (d, w) -> {
             String op = ops.get(w);
+            if (w < ats.size()) { abrirAtajo(ats.get(w)); ui.postDelayed(this::cerrarCajon, 400); return; }
             int idx = favs.indexOf(a.key());
             switch (op) {
+                case "Crear carpeta con esta app": crearCarpeta(a); break;
+                case "Meter en una carpeta…": {
+                    String[] n = new String[idsCarpetas.size()];
+                    for (int i = 0; i < n.length; i++) n[i] = nombreCarpeta(idsCarpetas.get(i));
+                    dialogo().setTitle("¿En cuál carpeta?").setItems(n, (d2, w2) -> {
+                        String id = idsCarpetas.get(w2);
+                        List<String> keys = new ArrayList<>(); for (App b : appsCarpeta(id)) keys.add(b.key());
+                        if (!keys.contains(a.key())) keys.add(a.key());
+                        guardarAppsCarpeta(id, keys);
+                        List<String> f2 = favoritos(); f2.remove(a.key()); guardarFavs(f2);
+                        pintarFavoritos(); toast(a.label + " está en «" + n[w2] + "»");
+                    }).show();
+                    break;
+                }
                 case "Fijar en inicio":
                     if (favs.size() >= 12) { toast("Ya tenés 12 apps fijadas. Quitá una primero."); return; }
                     favs.add(a.key()); guardarFavs(favs); pintarFavoritos();
@@ -1265,9 +1469,10 @@ public class MainActivity extends Activity {
     }
 
     void menuInicio() {
-        String[] ops = {"Ajustes del launcher", "Cambiar estilo de inicio", "Cambiar íconos", "Poner una foto de fondo", "Ajustes del teléfono"};
+        String[] ops = {"Ajustes del launcher", "Cambiar estilo de inicio", "Cambiar íconos", "Poner una foto de fondo", "Ajustes del teléfono", "Agregar widget"};
         dialogo().setTitle("Meraki Launcher").setItems(ops, (d, w) -> {
-            if (w == 0) abrirAjustes();
+            if (w == 5) agregarWidget();
+            else if (w == 0) abrirAjustes();
             else if (w == 1) elegir("Estilo de inicio", ESTILOS, "estilo", estilo);
             else if (w == 2) elegir("Íconos", ICONOS, "iconos", iconos);
             else if (w == 3) elegirFoto();
@@ -1382,11 +1587,26 @@ public class MainActivity extends Activity {
         opcion(l, "Letra", nombre(LETRAS, letra), () -> elegir("Letra", LETRAS, "letra", letra));
         opcion(l, "Tu nombre (para el saludo)", nombre.isEmpty() ? "Sin nombre" : nombre, this::editarNombre);
 
-        seccion(l, "Íconos y apps");
+        seccion(l, "Widgets y carpetas");
+        opcion(l, "Agregar widget", listaWidgets().size() + " en tu inicio · mantené presionado uno para cambiarlo", this::agregarWidget);
+        opcion(l, "Carpetas", carpetas().length() + " carpeta" + (carpetas().length() == 1 ? "" : "s") + " · para crear una, mantené presionada una app", () -> { abrirCajon(); toast("Mantené presionada una app y elegí «Crear carpeta»."); });
+
+        seccion(l, "Íconos");
+        opcion(l, "Paquete de íconos", paquete != null || !paqueteNombre.isEmpty() ? PaqueteIconos.instalados(getPackageManager()).getOrDefault(paqueteNombre, "Ninguno") : "Ninguno", this::elegirPaquete);
         opcion(l, "Estilo de íconos", nombre(ICONOS, iconos), () -> elegir("Íconos", ICONOS, "iconos", iconos));
         opcion(l, "Tamaño de íconos", nombre(TAMANOS, String.valueOf(tamIcono)), () -> elegir("Tamaño de íconos", TAMANOS, "tam_icono", String.valueOf(tamIcono)));
-        opcion(l, "Lista de todas las apps", nombre(COLUMNAS, String.valueOf(columnas)), () -> elegir("Columnas", COLUMNAS, "columnas", String.valueOf(columnas)));
+        opcion(l, "Puntitos de notificación", nombre(INSIGNIAS, insignias) + ("no".equals(insignias) || permisoNotificaciones() ? "" : " · falta activar el permiso"), this::configurarInsignias);
+        interruptor(l, "Nombres debajo de los íconos del inicio", verNombres, v -> guardar("ver_nombres", v));
+
+        seccion(l, "Lista de todas las apps");
+        opcion(l, "Forma", nombre(CAJON_ESTILOS, cajonEstilo), () -> elegir("Forma de la lista", CAJON_ESTILOS, "cajon_estilo", cajonEstilo));
+        opcion(l, "Orden", nombre(CAJON_ORDEN, cajonOrden), () -> elegir("Orden", CAJON_ORDEN, "cajon_orden", cajonOrden));
+        opcion(l, "Columnas", nombre(COLUMNAS, String.valueOf(columnas)), () -> elegir("Columnas", COLUMNAS, "columnas", String.valueOf(columnas)));
+        interruptor(l, "Mostrar «Las que más usás» arriba", verSugeridas, v -> guardar("ver_sugeridas", v));
         opcion(l, "Apps ocultas", ocultas().size() + " oculta" + (ocultas().size() == 1 ? "" : "s"), this::gestionarOcultas);
+
+        seccion(l, "Gestos");
+        for (String[] g : GESTOS) opcion(l, g[1], nombreGesto(g[0]), () -> elegirGesto(g[0], g[1]));
 
         seccion(l, "Fondo");
         opcion(l, "Fondo", nombre(FONDOS, fondo), () -> elegir("Fondo", FONDOS, "fondo", fondo));
@@ -1399,13 +1619,17 @@ public class MainActivity extends Activity {
         interruptor(l, "Agenda de hoy", verAgenda, v -> guardar("ver_agenda", v));
         interruptor(l, "Barra de búsqueda", verBusqueda, v -> guardar("ver_busqueda", v));
 
+        seccion(l, "Copia de seguridad");
+        opcion(l, "Guardar copia de mi configuración", "Un archivo con tu estilo, apps fijadas, carpetas y gestos", this::guardarRespaldo);
+        opcion(l, "Restaurar una copia", "Por si cambiás de cel o reinstalás", this::abrirRespaldo);
+
         seccion(l, "Teléfono");
         opcion(l, "Pantalla de inicio predeterminada", "Elegir Meraki u otro launcher", () -> abrir(new Intent(Settings.ACTION_HOME_SETTINGS), "Buscalo en Ajustes > Aplicaciones > Aplicaciones predeterminadas."));
         opcion(l, "Ajustes del teléfono", "", () -> abrir(new Intent(Settings.ACTION_SETTINGS), "No se pudieron abrir los ajustes."));
 
         String ver = "";
         try { PackageInfo pi = getPackageManager().getPackageInfo(getPackageName(), 0); ver = pi.versionName; } catch (Exception e) { }
-        TextView pie = texto("Meraki Launcher " + ver + "\nTip: tocá dos veces el inicio para abrir estos ajustes.", 12, MUTED, tf(false));
+        TextView pie = texto("Meraki Launcher " + ver + "\nTip: mantené presionado un espacio vacío del inicio para el menú rápido.", 12, MUTED, tf(false));
         pie.setLineSpacing(dp(3), 1f);
         l.addView(pie, lp(-1, -2, 28));
     }
@@ -1559,6 +1783,546 @@ public class MainActivity extends Activity {
             abrirCajon(); buscar.requestFocus();
         }
         return super.onKeyDown(code, ev);
+    }
+
+
+    // =====================================================================
+    // WIDGETS
+    // =====================================================================
+    /** Anfitrión de widgets que detecta el toque largo para mostrar el menú del widget. */
+    class Anfitrion extends AppWidgetHost {
+        Anfitrion(Context c, int id) { super(c, id); }
+        @Override protected AppWidgetHostView onCreateView(Context c, int id, AppWidgetProviderInfo info) { return new VistaWidget(c); }
+    }
+
+    class VistaWidget extends AppWidgetHostView {
+        Runnable largo; float x0, y0; boolean disparado;
+        VistaWidget(Context c) { super(c); }
+        @Override public boolean onInterceptTouchEvent(MotionEvent e) {
+            switch (e.getActionMasked()) {
+                case MotionEvent.ACTION_DOWN:
+                    x0 = e.getX(); y0 = e.getY(); disparado = false;
+                    final int id = getAppWidgetId();
+                    largo = () -> { disparado = true; performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS); menuWidget(id); };
+                    postDelayed(largo, android.view.ViewConfiguration.getLongPressTimeout());
+                    break;
+                case MotionEvent.ACTION_MOVE:
+                    if (Math.abs(e.getX() - x0) > dp(10) || Math.abs(e.getY() - y0) > dp(10)) removeCallbacks(largo);
+                    break;
+                case MotionEvent.ACTION_UP: case MotionEvent.ACTION_CANCEL:
+                    removeCallbacks(largo);
+                    break;
+            }
+            return disparado;
+        }
+    }
+
+    /** Widgets guardados como "id:alto|id:alto" (alto en dp). */
+    List<int[]> listaWidgets() {
+        List<int[]> out = new ArrayList<>();
+        for (String w : prefs.getString("widgets", "").split("\\|")) {
+            if (w.isEmpty()) continue;
+            String[] p = w.split(":");
+            try { out.add(new int[]{Integer.parseInt(p[0]), p.length > 1 ? Integer.parseInt(p[1]) : 180}); } catch (Exception e) { }
+        }
+        return out;
+    }
+
+    void guardarWidgets(List<int[]> l) {
+        List<String> s = new ArrayList<>();
+        for (int[] w : l) s.add(w[0] + ":" + w[1]);
+        prefs.edit().putString("widgets", TextUtils.join("|", s)).apply();
+    }
+
+    void pintarWidgets() {
+        if (widgetBox == null) return;
+        widgetBox.removeAllViews();
+        List<int[]> l = listaWidgets();
+        boolean limpiar = false;
+        for (int[] w : l) {
+            AppWidgetProviderInfo info = awm.getAppWidgetInfo(w[0]);
+            if (info == null) { limpiar = true; continue; }
+            AppWidgetHostView hv = host.createView(getApplicationContext(), w[0], info);
+            hv.setPadding(0, 0, 0, 0);
+            int ancho = Math.round((getResources().getDisplayMetrics().widthPixels - dp(44)) / getResources().getDisplayMetrics().density);
+            try { hv.updateAppWidgetSize(null, ancho, w[1], ancho, w[1]); } catch (Exception e) { }
+            widgetBox.addView(hv, lp(-1, dp(w[1]), 14));
+        }
+        if (limpiar) {
+            List<int[]> ok = new ArrayList<>();
+            for (int[] w : l) if (awm.getAppWidgetInfo(w[0]) != null) ok.add(w);
+            guardarWidgets(ok);
+        }
+    }
+
+    void agregarWidget() {
+        List<AppWidgetProviderInfo> ps = new ArrayList<>(awm.getInstalledProviders());
+        if (ps.isEmpty()) { toast("No encontré widgets instalados."); return; }
+        PackageManager pm = getPackageManager();
+        Map<AppWidgetProviderInfo, String> nombres = new HashMap<>();
+        for (AppWidgetProviderInfo i : ps) {
+            String app;
+            try { app = String.valueOf(pm.getApplicationLabel(pm.getApplicationInfo(i.provider.getPackageName(), 0))); } catch (Exception e) { app = i.provider.getPackageName(); }
+            String w = i.loadLabel(pm);
+            int dw = Math.round(i.minWidth / getResources().getDisplayMetrics().density), dh = Math.round(i.minHeight / getResources().getDisplayMetrics().density);
+            nombres.put(i, app + " · " + w + "  (" + Math.max(1, (dw + 30) / 70) + "×" + Math.max(1, (dh + 30) / 70) + ")");
+        }
+        Collections.sort(ps, (a, b) -> sinAcentos(nombres.get(a)).compareTo(sinAcentos(nombres.get(b))));
+        String[] items = new String[ps.size()];
+        for (int i = 0; i < ps.size(); i++) items[i] = nombres.get(ps.get(i));
+        dialogo().setTitle("Elegí un widget").setItems(items, (d, w) -> {
+            AppWidgetProviderInfo info = ps.get(w);
+            int id = host.allocateAppWidgetId();
+            widgetPendiente = id; infoPendiente = info;
+            if (awm.bindAppWidgetIdIfAllowed(id, info.provider)) configurarWidget(id, info);
+            else {
+                Intent i = new Intent(AppWidgetManager.ACTION_APPWIDGET_BIND);
+                i.putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, id);
+                i.putExtra(AppWidgetManager.EXTRA_APPWIDGET_PROVIDER, info.provider);
+                try { startActivityForResult(i, REQ_BIND); } catch (Exception e) { host.deleteAppWidgetId(id); toast("Tu teléfono no dejó agregar ese widget."); }
+            }
+        }).setNegativeButton("Cancelar", null).show();
+    }
+
+    int widgetPendiente = -1; AppWidgetProviderInfo infoPendiente;
+
+    void configurarWidget(int id, AppWidgetProviderInfo info) {
+        if (info.configure != null) {
+            try { host.startAppWidgetConfigureActivityForResult(this, id, 0, REQ_CONFIG, null); return; }
+            catch (Exception e) { /* si falla, se agrega sin configurar */ }
+        }
+        widgetListo(id, info);
+    }
+
+    void widgetListo(int id, AppWidgetProviderInfo info) {
+        int alto = Math.round(info.minHeight / getResources().getDisplayMetrics().density);
+        alto = Math.max(90, Math.min(alto + 20, 320));
+        List<int[]> l = listaWidgets();
+        l.add(new int[]{id, alto});
+        guardarWidgets(l);
+        pintarWidgets();
+        toast("Widget agregado. Mantenelo presionado para cambiarle el tamaño o quitarlo.");
+        if (scrollMedio != null) ui.postDelayed(() -> scrollMedio.fullScroll(View.FOCUS_DOWN), 300);
+    }
+
+    void menuWidget(int id) {
+        List<int[]> l = listaWidgets();
+        int idx = -1;
+        for (int i = 0; i < l.size(); i++) if (l.get(i)[0] == id) idx = i;
+        if (idx < 0) return;
+        final int pos = idx;
+        List<String> ops = new ArrayList<>(Arrays.asList("Más alto", "Más bajo"));
+        if (pos > 0) ops.add("Subir");
+        if (pos < l.size() - 1) ops.add("Bajar");
+        ops.add("Quitar widget");
+        dialogo().setTitle("Widget").setItems(ops.toArray(new String[0]), (d, w) -> {
+            String op = ops.get(w);
+            int[] it = l.get(pos);
+            switch (op) {
+                case "Más alto": it[1] = Math.min(it[1] + 40, 600); break;
+                case "Más bajo": it[1] = Math.max(it[1] - 40, 60); break;
+                case "Subir": Collections.swap(l, pos, pos - 1); break;
+                case "Bajar": Collections.swap(l, pos, pos + 1); break;
+                case "Quitar widget": l.remove(pos); host.deleteAppWidgetId(id); break;
+            }
+            guardarWidgets(l); pintarWidgets();
+            if (op.startsWith("Más")) ui.post(() -> menuWidget(id));
+        }).show();
+    }
+
+    // =====================================================================
+    // CARPETAS
+    // =====================================================================
+    JSONObject carpetas() {
+        try { return new JSONObject(prefs.getString("carpetas", "{}")); } catch (Exception e) { return new JSONObject(); }
+    }
+
+    void guardarCarpetas(JSONObject j) { prefs.edit().putString("carpetas", j.toString()).apply(); }
+
+    String nombreCarpeta(String id) { JSONObject c = carpetas().optJSONObject(id); return c == null ? "Carpeta" : c.optString("n", "Carpeta"); }
+
+    List<App> appsCarpeta(String id) {
+        List<App> out = new ArrayList<>();
+        JSONObject c = carpetas().optJSONObject(id);
+        if (c == null) return out;
+        JSONArray a = c.optJSONArray("a");
+        if (a != null) for (int i = 0; i < a.length(); i++) { App ap = porKey.get(a.optString(i)); if (ap != null) out.add(ap); }
+        return out;
+    }
+
+    void guardarAppsCarpeta(String id, List<String> keys) {
+        JSONObject j = carpetas();
+        try {
+            JSONObject c = j.optJSONObject(id); if (c == null) { c = new JSONObject(); c.put("n", "Carpeta"); }
+            c.put("a", new JSONArray(keys)); j.put(id, c);
+        } catch (Exception e) { }
+        guardarCarpetas(j);
+    }
+
+    void crearCarpeta(App primera) {
+        EditText e = new EditText(this);
+        e.setHint("Ej: Trabajo, Redes, Iglesia");
+        e.setSingleLine(true); e.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
+        FrameLayout f = new FrameLayout(this); f.setPadding(dp(22), dp(8), dp(22), 0); f.addView(e);
+        dialogo().setTitle("Nombre de la carpeta").setView(f).setPositiveButton("Crear", (d, w) -> {
+            String nom = e.getText().toString().trim(); if (nom.isEmpty()) nom = "Carpeta";
+            String id = "c" + System.currentTimeMillis();
+            JSONObject j = carpetas();
+            try { JSONObject c = new JSONObject(); c.put("n", nom); c.put("a", new JSONArray(Collections.singletonList(primera.key()))); j.put(id, c); } catch (Exception ex) { }
+            guardarCarpetas(j);
+            List<String> favs = favoritos();
+            int pos = favs.indexOf(primera.key());
+            if (pos >= 0) favs.set(pos, "carpeta:" + id); else favs.add("carpeta:" + id);
+            guardarFavs(favs); pintarFavoritos();
+            editarAppsCarpeta(id);
+        }).setNegativeButton("Cancelar", null).show();
+    }
+
+    void editarAppsCarpeta(String id) {
+        List<App> dentro = appsCarpeta(id);
+        Set<String> sel = new HashSet<>(); for (App a : dentro) sel.add(a.key());
+        List<App> l = new ArrayList<>(todas);
+        String[] n = new String[l.size()]; boolean[] m = new boolean[l.size()];
+        for (int i = 0; i < l.size(); i++) { n[i] = l.get(i).label; m[i] = sel.contains(l.get(i).key()); }
+        dialogo().setTitle("Apps en «" + nombreCarpeta(id) + "»").setMultiChoiceItems(n, m, (d, w, v) -> m[w] = v)
+                .setPositiveButton("Listo", (d, w) -> {
+                    List<String> keys = new ArrayList<>();
+                    for (App a : dentro) { int i = l.indexOf(a); if (i >= 0 && m[i]) keys.add(a.key()); } // conserva el orden
+                    for (int i = 0; i < l.size(); i++) if (m[i] && !keys.contains(l.get(i).key())) keys.add(l.get(i).key());
+                    guardarAppsCarpeta(id, keys);
+                    // Si estaban sueltas en el inicio, ya quedan dentro de la carpeta
+                    List<String> favs = favoritos(); favs.removeAll(keys); guardarFavs(favs);
+                    pintarFavoritos();
+                }).setNegativeButton("Cancelar", null).show();
+    }
+
+    void abrirCarpeta(String id) {
+        List<App> apps = appsCarpeta(id);
+        GridLayout g = new GridLayout(this);
+        g.setColumnCount(4);
+        g.setPadding(dp(14), dp(14), dp(14), dp(6));
+        int s = Math.round(tamIconoPx() * 0.92f);
+        int ancho = Math.min(getResources().getDisplayMetrics().widthPixels - dp(80), dp(340)) / 4;
+        final AlertDialog[] dlg = new AlertDialog[1];
+        for (App a : apps) {
+            View v = celdaApp(a, false, true, s);
+            v.setOnClickListener(x -> { if (dlg[0] != null) dlg[0].dismiss(); lanzar(a); });
+            v.setOnLongClickListener(x -> {
+                dialogo().setTitle(a.label).setItems(new String[]{"Sacar de la carpeta", "Opciones de la app"}, (d, w) -> {
+                    if (dlg[0] != null) dlg[0].dismiss();
+                    if (w == 0) {
+                        List<String> keys = new ArrayList<>(); for (App b : appsCarpeta(id)) if (!b.key().equals(a.key())) keys.add(b.key());
+                        guardarAppsCarpeta(id, keys); pintarFavoritos();
+                    } else opcionesApp(a);
+                }).show();
+                return true;
+            });
+            GridLayout.LayoutParams p = new GridLayout.LayoutParams(); p.width = ancho; p.bottomMargin = dp(12);
+            g.addView(v, p);
+        }
+        if (apps.isEmpty()) g.addView(texto("Carpeta vacía. Tocá «Editar» para agregar apps.", 13, MUTED, tf(false)));
+        ScrollView sv = new ScrollView(this); sv.addView(g);
+        dlg[0] = dialogo().setTitle(nombreCarpeta(id)).setView(sv)
+                .setPositiveButton("Editar", (d, w) -> opcionesCarpeta(id)).setNegativeButton("Cerrar", null).create();
+        dlg[0].show();
+    }
+
+    void opcionesCarpeta(String id) {
+        List<String> favs = favoritos();
+        String k = "carpeta:" + id; int idx = favs.indexOf(k);
+        List<String> ops = new ArrayList<>(Arrays.asList("Agregar o quitar apps", "Cambiar nombre"));
+        if (idx > 0) ops.add("Mover antes");
+        if (idx >= 0 && idx < favs.size() - 1) ops.add("Mover después");
+        ops.add("Deshacer carpeta");
+        dialogo().setTitle(nombreCarpeta(id)).setItems(ops.toArray(new String[0]), (d, w) -> {
+            switch (ops.get(w)) {
+                case "Agregar o quitar apps": editarAppsCarpeta(id); break;
+                case "Cambiar nombre": {
+                    EditText e = new EditText(this); e.setText(nombreCarpeta(id)); e.setSingleLine(true);
+                    FrameLayout f = new FrameLayout(this); f.setPadding(dp(22), dp(8), dp(22), 0); f.addView(e);
+                    dialogo().setTitle("Nombre").setView(f).setPositiveButton("Guardar", (d2, w2) -> {
+                        JSONObject j = carpetas();
+                        try { j.getJSONObject(id).put("n", e.getText().toString().trim().isEmpty() ? "Carpeta" : e.getText().toString().trim()); } catch (Exception ex) { }
+                        guardarCarpetas(j); pintarFavoritos();
+                    }).setNegativeButton("Cancelar", null).show();
+                    break;
+                }
+                case "Mover antes": Collections.swap(favs, idx, idx - 1); guardarFavs(favs); pintarFavoritos(); break;
+                case "Mover después": Collections.swap(favs, idx, idx + 1); guardarFavs(favs); pintarFavoritos(); break;
+                case "Deshacer carpeta": {
+                    List<String> nuevo = new ArrayList<>(favs);
+                    int pos = nuevo.indexOf(k); if (pos < 0) pos = nuevo.size(); else nuevo.remove(pos);
+                    for (App a : appsCarpeta(id)) if (!nuevo.contains(a.key())) nuevo.add(Math.min(pos++, nuevo.size()), a.key());
+                    guardarFavs(nuevo);
+                    JSONObject j = carpetas(); j.remove(id); guardarCarpetas(j);
+                    pintarFavoritos(); break;
+                }
+            }
+        }).show();
+    }
+
+    /** Ícono de carpeta: hasta 4 mini íconos dentro de un cuadro redondeado. */
+    Drawable iconoCarpeta(String id, int s) {
+        List<App> apps = appsCarpeta(id);
+        Bitmap bm = Bitmap.createBitmap(s, s, Bitmap.Config.ARGB_8888);
+        Canvas c = new Canvas(bm);
+        Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
+        p.setColor(claro ? 0xCCFFFFFF : 0xCC1C1A16);
+        RectF r = new RectF(dp(1), dp(1), s - dp(1), s - dp(1));
+        c.drawRoundRect(r, s * 0.28f, s * 0.28f, p);
+        p.setStyle(Paint.Style.STROKE); p.setStrokeWidth(dp(1)); p.setColor(conAlpha(acento, 0x99));
+        c.drawRoundRect(r, s * 0.28f, s * 0.28f, p);
+        int m = Math.round(s * 0.36f), gap = Math.round(s * 0.08f), x0 = (s - m * 2 - gap) / 2;
+        for (int i = 0; i < Math.min(4, apps.size()); i++) {
+            Drawable d = icono(apps.get(i), m);
+            if (d == null) continue;
+            int x = x0 + (i % 2) * (m + gap), y = x0 + (i / 2) * (m + gap);
+            d = d.getConstantState() != null ? d.getConstantState().newDrawable(getResources()).mutate() : d;
+            d.setBounds(x, y, x + m, y + m); d.draw(c);
+        }
+        return new BitmapDrawable(getResources(), bm);
+    }
+
+    View vistaCarpeta(String id, boolean fila, boolean conNombre, int s) {
+        int notis = 0; for (App a : appsCarpeta(id)) notis += Insignias.de(a.pkg);
+        View v;
+        if (fila) {
+            LinearLayout f = new LinearLayout(this);
+            f.setGravity(Gravity.CENTER_VERTICAL);
+            f.setPadding(0, dp(7), 0, dp(7));
+            int si = Math.round(tamIconoPx() * 0.6f);
+            f.addView(conInsignia(iconoCarpeta(id, si), si, notis), new LinearLayout.LayoutParams(si, si));
+            TextView t = texto(nombreCarpeta(id) + "  ›", 15, FG, tf(false));
+            LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(0, -2, 1f); p.leftMargin = dp(14);
+            f.addView(t, p);
+            v = f;
+        } else {
+            LinearLayout c = columnaBase();
+            c.setGravity(Gravity.CENTER_HORIZONTAL);
+            c.setPadding(dp(2), dp(2), dp(2), dp(2));
+            c.addView(conInsignia(iconoCarpeta(id, s), s, notis), new LinearLayout.LayoutParams(s, s));
+            if (conNombre) {
+                TextView t = texto(nombreCarpeta(id), 11.5f, FG, tf(false));
+                t.setSingleLine(true); t.setEllipsize(TextUtils.TruncateAt.END); t.setGravity(Gravity.CENTER);
+                if (!claro) t.setShadowLayer(dp(3), 0, dp(1), 0xCC000000);
+                c.addView(t, lp(-1, -2, 6));
+            }
+            v = c;
+        }
+        v.setOnClickListener(x -> abrirCarpeta(id));
+        v.setOnLongClickListener(x -> { opcionesCarpeta(id); return true; });
+        return v;
+    }
+
+    // =====================================================================
+    // PUNTITOS DE NOTIFICACIÓN
+    // =====================================================================
+    boolean permisoNotificaciones() {
+        String s = Settings.Secure.getString(getContentResolver(), "enabled_notification_listeners");
+        return s != null && s.contains(getPackageName());
+    }
+
+    View conInsignia(Drawable icono, int s, int n) {
+        FrameLayout f = new FrameLayout(this);
+        ImageView iv = new ImageView(this);
+        iv.setImageDrawable(icono);
+        f.addView(iv, new FrameLayout.LayoutParams(s, s));
+        if (n > 0 && !"no".equals(insignias)) {
+            boolean num = "numero".equals(insignias);
+            TextView b = texto(num ? (n > 99 ? "99+" : String.valueOf(n)) : "", 10, 0xFFFFFFFF, Typeface.create("sans-serif-medium", Typeface.BOLD));
+            b.setGravity(Gravity.CENTER);
+            GradientDrawable g = new GradientDrawable(); g.setColor(0xFFD8443A); g.setCornerRadius(dp(99));
+            g.setStroke(dp(1.5f), claro ? 0xFFF4F1EA : 0xFF0B0A08);
+            b.setBackground(g);
+            int t = num ? dp(18) : dp(11);
+            if (num) b.setPadding(dp(4), 0, dp(4), 0);
+            FrameLayout.LayoutParams p = new FrameLayout.LayoutParams(num ? -2 : t, t, Gravity.TOP | Gravity.END);
+            if (num) b.setMinWidth(t);
+            f.addView(b, p);
+        }
+        return f;
+    }
+
+    void configurarInsignias() {
+        String[] nombres = new String[INSIGNIAS.length]; int sel = 0;
+        for (int i = 0; i < INSIGNIAS.length; i++) { nombres[i] = INSIGNIAS[i][1]; if (INSIGNIAS[i][0].equals(insignias)) sel = i; }
+        dialogo().setTitle("Puntitos de notificación").setSingleChoiceItems(nombres, sel, (d, w) -> {
+            d.dismiss();
+            guardar("insignias", INSIGNIAS[w][0]);
+            if (!"no".equals(INSIGNIAS[w][0]) && !permisoNotificaciones()) {
+                dialogo().setTitle("Falta un permiso").setMessage("Para saber qué apps tienen notificaciones, activá «Meraki Launcher · puntitos» en Acceso a notificaciones. Sólo cuenta cuántas hay; no guarda ni manda nada.\n\nSi Android dice que es un ajuste restringido: Ajustes > Aplicaciones > Meraki Launcher > ⋮ > Permitir ajustes restringidos.")
+                        .setPositiveButton("Activar", (d2, w2) -> abrir(new Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS), "No pude abrir ese ajuste."))
+                        .setNegativeButton("Ahora no", null).show();
+            }
+        }).setNegativeButton("Cancelar", null).show();
+    }
+
+    // =====================================================================
+    // PAQUETES DE ÍCONOS
+    // =====================================================================
+    void cargarPaquete() {
+        final String nom = paqueteNombre;
+        if (nom == null || nom.isEmpty()) { paquete = null; return; }
+        if (paquete != null && paquete.pkg.equals(nom)) return;
+        new Thread(() -> {
+            PaqueteIconos pi = null;
+            try { pi = new PaqueteIconos(getPackageManager(), nom); } catch (Throwable e) { pi = null; }
+            final PaqueteIconos listo = pi;
+            ui.post(() -> {
+                if (!nom.equals(paqueteNombre)) return;
+                paquete = listo;
+                if (listo == null) toast("No pude leer ese paquete de íconos.");
+                cacheIconos.clear(); adapter.notifyDataSetChanged(); pintarFavoritos(); pintarSugeridas();
+            });
+        }).start();
+    }
+
+    void elegirPaquete() {
+        Map<String, String> inst = PaqueteIconos.instalados(getPackageManager());
+        List<String> pkgs = new ArrayList<>(); List<String> noms = new ArrayList<>();
+        pkgs.add(""); noms.add("Ninguno (íconos de cada app)");
+        for (Map.Entry<String, String> e : inst.entrySet()) { pkgs.add(e.getKey()); noms.add(e.getValue()); }
+        noms.add("Buscar paquetes en la Play Store…");
+        int sel = Math.max(0, pkgs.indexOf(paqueteNombre));
+        dialogo().setTitle("Paquete de íconos").setSingleChoiceItems(noms.toArray(new String[0]), sel, (d, w) -> {
+            d.dismiss();
+            if (w == noms.size() - 1) {
+                abrir(new Intent(Intent.ACTION_VIEW, Uri.parse("market://search?q=icon pack nova&c=apps")), "No encontré la Play Store.");
+                return;
+            }
+            paquete = null;
+            guardar("paquete_iconos", pkgs.get(w));
+            cargarPaquete();
+            if (inst.isEmpty()) toast("No tenés paquetes de íconos instalados todavía.");
+        }).setNegativeButton("Cancelar", null).show();
+    }
+
+    // =====================================================================
+    // ATAJOS (ej. "Nuevo chat" en WhatsApp)
+    // =====================================================================
+    List<ShortcutInfo> atajos(App a) {
+        List<ShortcutInfo> out = new ArrayList<>();
+        try {
+            LauncherApps la = (LauncherApps) getSystemService(Context.LAUNCHER_APPS_SERVICE);
+            if (la == null || !la.hasShortcutHostPermission()) return out;
+            LauncherApps.ShortcutQuery q = new LauncherApps.ShortcutQuery();
+            q.setPackage(a.pkg);
+            q.setQueryFlags(LauncherApps.ShortcutQuery.FLAG_MATCH_DYNAMIC | LauncherApps.ShortcutQuery.FLAG_MATCH_MANIFEST);
+            List<ShortcutInfo> l = la.getShortcuts(q, Process.myUserHandle());
+            if (l != null) for (ShortcutInfo si : l) if (si.isEnabled()) out.add(si);
+            Collections.sort(out, (x, y) -> Integer.compare(x.getRank(), y.getRank()));
+            if (out.size() > 5) out = new ArrayList<>(out.subList(0, 5));
+        } catch (Exception e) { }
+        return out;
+    }
+
+    void abrirAtajo(ShortcutInfo si) {
+        try {
+            LauncherApps la = (LauncherApps) getSystemService(Context.LAUNCHER_APPS_SERVICE);
+            la.startShortcut(si, null, null);
+            sumarUso(si.getPackage() + "/" + (si.getActivity() != null ? si.getActivity().getClassName() : ""));
+        } catch (Exception e) { toast("No se pudo abrir ese atajo."); }
+    }
+
+    // =====================================================================
+    // USO (para "más usadas" y sugeridas)
+    // =====================================================================
+    JSONObject usos() { try { return new JSONObject(prefs.getString("usos", "{}")); } catch (Exception e) { return new JSONObject(); } }
+
+    void sumarUso(String key) {
+        JSONObject u = usos();
+        try { u.put(key, u.optInt(key, 0) + 1); } catch (Exception e) { }
+        prefs.edit().putString("usos", u.toString()).apply();
+    }
+
+    List<App> masUsadas(int n) {
+        JSONObject u = usos();
+        List<App> l = new ArrayList<>();
+        for (App a : todas) if (u.optInt(a.key(), 0) > 0) l.add(a);
+        Collections.sort(l, (x, y) -> Integer.compare(u.optInt(y.key(), 0), u.optInt(x.key(), 0)));
+        return l.size() > n ? l.subList(0, n) : l;
+    }
+
+    void pintarSugeridas() {
+        if (sugeridasBox == null) return;
+        sugeridasBox.removeAllViews();
+        boolean ver = verSugeridas && buscar.length() == 0;
+        List<App> l = ver ? masUsadas(columnas) : new ArrayList<>();
+        ((View) sugeridasBox.getParent()).setVisibility(l.isEmpty() ? View.GONE : View.VISIBLE);
+        int s = tamIconoPx(); if (columnas == 5) s = Math.round(s * 0.86f);
+        for (App a : l) {
+            View v = celdaApp(a, true, true, s);
+            sugeridasBox.addView(v, new LinearLayout.LayoutParams(0, -2, 1f));
+        }
+        for (int i = l.size(); i < columnas && !l.isEmpty(); i++) sugeridasBox.addView(new View(this), new LinearLayout.LayoutParams(0, 1, 1f));
+    }
+
+    // =====================================================================
+    // RESPALDO
+    // =====================================================================
+    void guardarRespaldo() {
+        Intent i = new Intent(Intent.ACTION_CREATE_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType("application/json")
+                .putExtra(Intent.EXTRA_TITLE, "meraki-launcher-respaldo-" + hoyClave() + ".json");
+        try { startActivityForResult(i, REQ_GUARDAR); } catch (Exception e) { toast("Tu teléfono no dejó guardar el archivo."); }
+    }
+
+    void abrirRespaldo() {
+        Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType("*/*");
+        try { startActivityForResult(i, REQ_ABRIR); } catch (Exception e) { toast("Tu teléfono no dejó abrir archivos."); }
+    }
+
+    void escribirRespaldo(Uri u) {
+        try {
+            JSONObject j = new JSONObject();
+            j.put("app", "meraki-launcher"); j.put("version", 1);
+            JSONObject d = new JSONObject();
+            for (Map.Entry<String, ?> e : prefs.getAll().entrySet()) {
+                String k = e.getKey(); Object v = e.getValue();
+                if (k.startsWith("clima_") || "widgets".equals(k)) continue; // el clima se vuelve a bajar; los widgets dependen del cel
+                JSONObject x = new JSONObject();
+                if (v instanceof Boolean) { x.put("t", "b"); x.put("v", v); }
+                else if (v instanceof Integer) { x.put("t", "i"); x.put("v", v); }
+                else if (v instanceof Long) { x.put("t", "l"); x.put("v", v); }
+                else if (v instanceof Float) { x.put("t", "f"); x.put("v", ((Float) v).doubleValue()); }
+                else if (v instanceof Set) { x.put("t", "s"); x.put("v", new JSONArray((Set<?>) v)); }
+                else { x.put("t", "str"); x.put("v", String.valueOf(v)); }
+                d.put(k, x);
+            }
+            j.put("datos", d);
+            try (OutputStream out = getContentResolver().openOutputStream(u)) { out.write(j.toString(2).getBytes("UTF-8")); }
+            toast("Copia guardada. Guardala también en tu Drive.");
+        } catch (Exception e) { toast("No pude guardar la copia."); }
+    }
+
+    void leerRespaldo(Uri u) {
+        try {
+            StringBuilder sb = new StringBuilder();
+            try (BufferedReader r = new BufferedReader(new InputStreamReader(getContentResolver().openInputStream(u), "UTF-8"))) {
+                String line; while ((line = r.readLine()) != null) sb.append(line);
+            }
+            JSONObject j = new JSONObject(sb.toString());
+            if (!"meraki-launcher".equals(j.optString("app"))) { toast("Ese archivo no es una copia del Meraki Launcher."); return; }
+            JSONObject d = j.getJSONObject("datos");
+            String widgets = prefs.getString("widgets", "");
+            SharedPreferences.Editor ed = prefs.edit().clear();
+            ed.putString("widgets", widgets);
+            java.util.Iterator<String> it = d.keys();
+            while (it.hasNext()) {
+                String k = it.next(); JSONObject x = d.getJSONObject(k);
+                switch (x.optString("t")) {
+                    case "b": ed.putBoolean(k, x.getBoolean("v")); break;
+                    case "i": ed.putInt(k, x.getInt("v")); break;
+                    case "l": ed.putLong(k, x.getLong("v")); break;
+                    case "f": ed.putFloat(k, (float) x.getDouble("v")); break;
+                    case "s": { Set<String> s = new HashSet<>(); JSONArray a = x.getJSONArray("v"); for (int i = 0; i < a.length(); i++) s.add(a.getString(i)); ed.putStringSet(k, s); break; }
+                    default: ed.putString(k, x.getString("v"));
+                }
+            }
+            ed.apply();
+            paquete = null;
+            aplicarTodo(); cargarPaquete(); cargarClima(true);
+            toast("¡Listo! Tu configuración quedó restaurada.");
+        } catch (Exception e) { toast("No pude leer esa copia."); }
     }
 
     @SuppressWarnings("unused")

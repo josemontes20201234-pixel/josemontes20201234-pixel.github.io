@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="bloqueo_desc">Permite que Meraki Launcher apague la pantalla cuando hacés doble toque en el inicio. No lee ni guarda nada de lo que hay en tu pantalla.</string>
+</resources>
