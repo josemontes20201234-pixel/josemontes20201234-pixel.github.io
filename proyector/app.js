@@ -70,7 +70,7 @@ function proyectarTexto(texto, ref, titulo, ctx) {
 const USFM = ["GEN","EXO","LEV","NUM","DEU","JOS","JDG","RUT","1SA","2SA","1KI","2KI","1CH","2CH","EZR","NEH","EST","JOB","PSA","PRO","ECC","SNG","ISA","JER","LAM","EZK","DAN","HOS","JOL","AMO","OBA","JON","MIC","NAM","HAB","ZEP","HAG","ZEC","MAL","MAT","MRK","LUK","JHN","ACT","ROM","1CO","2CO","GAL","EPH","PHP","COL","1TH","2TH","1TI","2TI","TIT","PHM","HEB","JAS","1PE","2PE","1JN","2JN","3JN","JUD","REV"];
 let YV = { key: "", versiones: [] };
 const esYV = id => String(id).startsWith("yv:");
-const todasVersiones = () => [...VERSIONES, ...YV.versiones.map(v => ({ id: "yv:" + v.id, nombre: v.nombre, corto: v.corto, en: false, yv: v.id }))];
+const todasVersiones = () => { const n = {}; YV.versiones.forEach(v => n[v.corto] = (n[v.corto] || 0) + 1); return [...VERSIONES, ...YV.versiones.map(v => ({ id: "yv:" + v.id, nombre: v.nombre, corto: n[v.corto] > 1 ? `${v.corto} (${v.id})` : v.corto, en: false, yv: v.id }))]; };
 async function yvGet(path) {
   if (!YV.key) throw new Error("Falta la App Key de YouVersion.");
   const r = await fetch("https://api.youversion.com" + path, { headers: { "X-YVP-App-Key": YV.key, "Accept": "application/json" } });
