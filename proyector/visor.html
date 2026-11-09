@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <script>
 /* Si el navegador de la tele no entiende algo, lo mostramos en pantalla para poder arreglarlo */
-window.onerror=function(m,src,l){try{var d=document.getElementById('errtv');if(!d){d=document.createElement('div');d.id='errtv';d.style.cssText='position:fixed;left:0;right:0;bottom:0;z-index:9999;background:#7a1d1d;color:#fff;font:600 18px/1.4 sans-serif;padding:12px 18px';document.documentElement.appendChild(d)}d.textContent='Error del navegador: '+m+' (línea '+l+'). '+navigator.userAgent}catch(e){}};
+window.onerror=function(m,src,l){if(/^Script error/i.test(m||''))return;try{var d=document.getElementById('errtv');if(!d){d=document.createElement('div');d.id='errtv';d.style.cssText='position:fixed;left:0;right:0;bottom:0;z-index:9999;background:#7a1d1d;color:#fff;font:600 18px/1.4 sans-serif;padding:12px 18px';document.documentElement.appendChild(d)}d.textContent='Error del navegador: '+m+' (línea '+l+'). '+navigator.userAgent}catch(e){}};
 </script>
 
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -16,10 +16,10 @@ window.onerror=function(m,src,l){try{var d=document.getElementById('errtv');if(!
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&family=Noto+Serif:wght@400;700&family=Noto+Serif+Hebrew:wght@400;700&family=Bebas+Neue&family=Cinzel:wght@400;700&family=Lato:wght@400;700&family=Merriweather:wght@400;700&family=Montserrat:wght@400;700&family=Oswald:wght@400;700&family=Playfair+Display:wght@400;700&family=Quicksand:wght@400;700&family=Raleway:wght@400;700&family=Roboto+Slab:wght@400;700&display=swap">
 <style>
   html,body{margin:0;height:100%;background:#000;overflow:hidden;cursor:none}
-  #pantalla{position:fixed;inset:0}
+  #pantalla{position:fixed;top:0;left:0;right:0;bottom:0}
   .aviso{position:fixed;left:50%;bottom:4vh;transform:translateX(-50%);z-index:5;font:600 clamp(13px,1.6vw,20px)/1.4 system-ui,sans-serif;color:#fff;background:rgba(0,0,0,.6);padding:.7em 1.2em;border-radius:99px;text-align:center;max-width:90vw;transition:opacity .6s;cursor:default}
   .aviso.off{opacity:0;pointer-events:none}
-  .inicio{position:fixed;inset:0;z-index:4;display:grid;place-items:center;text-align:center;color:#d1a957;font:800 clamp(22px,4vw,54px)/1.1 system-ui,sans-serif;letter-spacing:.06em;text-transform:uppercase;transition:opacity .8s}
+  .inicio{position:fixed;top:0;left:0;right:0;bottom:0;z-index:4;display:grid;place-items:center;text-align:center;color:#d1a957;font:800 clamp(22px,4vw,54px)/1.1 system-ui,sans-serif;letter-spacing:.06em;text-transform:uppercase;transition:opacity .8s}
   .inicio small{display:block;margin-top:.6em;color:#9a948a;font:500 clamp(12px,1.5vw,18px)/1.4 system-ui,sans-serif;letter-spacing:0;text-transform:none}
   .inicio.off{opacity:0;pointer-events:none}
 </style>

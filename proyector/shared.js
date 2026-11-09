@@ -87,16 +87,16 @@ export function crearEscena(root) {
 }
 export const ESCENA_CSS = `
 .esc{position:relative;overflow:hidden;background:#000;container-type:size;color:#fff}
-.esc-bg{position:absolute;inset:-8%;background:#000;background-size:cover;background-position:center;transition:opacity .6s}
+.esc-bg{position:absolute;top:-8%;left:-8%;right:-8%;bottom:-8%;background:#000;background-size:cover;background-position:center;transition:opacity .6s}
 .esc-bg.mov{animation:escMov 40s ease-in-out infinite alternate;background-size:160% 160%}
 @keyframes escMov{0%{transform:scale(1) translate(0,0)}100%{transform:scale(1.08) translate(-2%,-1.5%)}}
-.esc-capa{position:absolute;inset:0}
-.esc-item{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:center;gap:2.2cqh}
+.esc-capa{position:absolute;top:0;left:0;right:0;bottom:0}
+.esc-item{position:absolute;top:0;left:0;right:0;bottom:0;display:flex;flex-direction:column;justify-content:center;gap:2.2cqh}
 .esc-item .t{white-space:pre-line;line-height:1.22;overflow-wrap:break-word}
 .esc-item .r{opacity:.86;line-height:1.2}
 .esc-item.img{padding:0!important}
 .esc-item.img img{width:100%;height:100%;object-fit:contain}
-.esc-negro{position:absolute;inset:0;background:#000;opacity:0;pointer-events:none;transition:opacity .5s}
+.esc-negro{position:absolute;top:0;left:0;right:0;bottom:0;background:#000;opacity:0;pointer-events:none;transition:opacity .5s}
 .esc-negro.on{opacity:1}
 .esc-item.out{animation:escOut .45s ease forwards}
 @keyframes escOut{to{opacity:0}}
