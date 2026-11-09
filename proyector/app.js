@@ -66,34 +66,88 @@ function proyectarTexto(texto, ref, titulo, ctx) {
 }
 
 /* ---------- Biblia ---------- */
+/* YouVersion Platform: la clave y las versiones escogidas se guardan en tu Firebase privado */
+const USFM = ["GEN","EXO","LEV","NUM","DEU","JOS","JDG","RUT","1SA","2SA","1KI","2KI","1CH","2CH","EZR","NEH","EST","JOB","PSA","PRO","ECC","SNG","ISA","JER","LAM","EZK","DAN","HOS","JOL","AMO","OBA","JON","MIC","NAM","HAB","ZEP","HAG","ZEC","MAL","MAT","MRK","LUK","JHN","ACT","ROM","1CO","2CO","GAL","EPH","PHP","COL","1TH","2TH","1TI","2TI","TIT","PHM","HEB","JAS","1PE","2PE","1JN","2JN","3JN","JUD","REV"];
+let YV = { key: "", versiones: [] };
+const esYV = id => String(id).startsWith("yv:");
+const todasVersiones = () => [...VERSIONES, ...YV.versiones.map(v => ({ id: "yv:" + v.id, nombre: v.nombre, corto: v.corto, en: false, yv: v.id }))];
+async function yvGet(path) {
+  if (!YV.key) throw new Error("Falta la App Key de YouVersion.");
+  const r = await fetch("https://api.youversion.com" + path, { headers: { "X-YVP-App-Key": YV.key, "Accept": "application/json" } });
+  const txt = await r.text(); let j = null; try { j = JSON.parse(txt) } catch { }
+  if (!r.ok) { const e = new Error(`YouVersion respondió ${r.status}: ${(j && (j.message || j.error || JSON.stringify(j.detail || j))) || txt.slice(0, 160)}`); e.status = r.status; throw e; }
+  return j ?? txt;
+}
+const QUITAR = /(^|\s)(note|notes|label|heading|headings|s|s1|s2|s3|ms|ms1|mr|r|d|sp|fr|ft|fq|fqa|fk|xo|xt|x|f|cl|qa)(\s|$)/;
+function versosDeHtml(html) {
+  const docu = new DOMParser().parseFromString(`<div>${html}</div>`, "text/html");
+  docu.querySelectorAll("*").forEach(el => { const c = (el.getAttribute("class") || "").toLowerCase(); if (QUITAR.test(c) || el.tagName === "SUP" && /note|fn|f\b/.test(c)) el.remove(); });
+  const porVerso = {};
+  docu.querySelectorAll("[data-usfm]").forEach(el => {
+    const m = String(el.getAttribute("data-usfm")).split("+")[0].match(/\.(\d+)\.(\d+)$/); if (!m) return;
+    if (el.querySelector("[data-usfm]")) return;
+    const v = +m[2]; porVerso[v] = ((porVerso[v] || "") + " " + el.textContent).trim();
+  });
+  const ks = Object.keys(porVerso).map(Number);
+  if (ks.length) { const max = Math.max(...ks); return Array.from({ length: max }, (_, i) => (porVerso[i + 1] || "").replace(/\s+/g, " ").trim()); }
+  return null;
+}
+function versosDeTexto(t) {
+  t = String(t || "").replace(/\r/g, "");
+  const marcas = []; let pos = 0, n = 1;
+  while (n < 200) { const re = new RegExp(`(^|[\\s"“«(\\[])${n}(?=[\\s.)\\]]*[\\p{L}"“«¿¡(])`, "u"); const m = re.exec(t.slice(pos)); if (!m) break; const at = pos + m.index + m[1].length; marcas.push({ at, fin: at + String(n).length }); pos = at + String(n).length; n++; }
+  if (marcas.length < 2) return null;
+  return marcas.map((m, i) => t.slice(m.fin, i + 1 < marcas.length ? marcas[i + 1].at : undefined).replace(/^[\s.)\]]+/, "").replace(/\s+/g, " ").trim());
+}
+async function cargarCapYV(ver, l, c) {
+  const id = ver.slice(3); const ref = `${USFM[l]}.${c}`;
+  let d = await yvGet(`/v1/bibles/${id}/passages/${ref}`);
+  let vs = d && d.content ? versosDeHtml(d.content) : null;
+  if (!vs) { d = await yvGet(`/v1/bibles/${id}/passages/${ref}?format=text`); vs = versosDeTexto(d && (d.content ?? d)); }
+  if (!vs) throw new Error("No pude separar los versículos de este capítulo.");
+  return vs.map(v => v.normalize("NFC"));
+}
+async function asegurarCap(ver, l, c) {
+  if (!esYV(ver)) { await cargarVersion(ver); return BIB[ver][l]?.[c - 1]; }
+  const bib = await cargarVersion(ver);
+  if (!bib[l] || c < 1 || c > bib[l].length) return null;
+  if (!bib[l][c - 1]) bib[l][c - 1] = await cargarCapYV(ver, l, c);
+  return bib[l][c - 1];
+}
 async function cargarVersion(id) {
   if (BIB[id]) return BIB[id];
+  if (esYV(id)) { const base = await cargarVersion("rv1909"); BIB[id] = base.map(lib => lib.map(() => null)); return BIB[id]; }
   const r = await fetch(`biblia/${id}.json`); if (!r.ok) throw new Error("No se pudo cargar la Biblia");
   const d = await r.json();
   BIB[id] = d.map(l => l.map(c => c.map(v => v.normalize("NFC"))));
   return BIB[id];
 }
-const verInfo = id => VERSIONES.find(v => v.id === id) || VERSIONES[0];
+const verInfo = id => todasVersiones().find(v => v.id === id) || VERSIONES[0];
 function citaTexto(ver, l, c, v) { const vi = verInfo(ver); return `${nombreLibro(l, vi.en)} ${c}:${v} · ${vi.corto}`; }
-function proyectarVerso(ver, l, c, v) {
-  const t = BIB[ver]?.[l]?.[c - 1]?.[v - 1]; if (t == null) return;
+async function proyectarVerso(ver, l, c, v) {
+  let t = BIB[ver]?.[l]?.[c - 1]?.[v - 1];
+  if (t == null && esYV(ver)) { try { const cap = await asegurarCap(ver, l, c); t = cap?.[v - 1]; } catch (er) { return toast(er.message); } }
+  if (t == null) return;
   proyectarTexto(t, citaTexto(ver, l, c, v), "", { tipo: "biblia", ver, l, c, v });
   if (TAB === "biblia" && B.vista === "vers" && B.libro === l && B.cap === c) marcarVerso();
 }
-function pasoBiblia(d) {
+async function pasoBiblia(d) {
   const { ver } = CTX; let { l, c, v } = CTX; const bib = BIB[ver];
   v += d;
-  if (v < 1) { c--; if (c < 1) { l--; if (l < 0) return; c = bib[l].length; } v = bib[l][c - 1].length; }
-  else if (v > bib[l][c - 1].length) { v = 1; c++; if (c > bib[l].length) { l++; if (l >= bib.length) return; c = 1; } }
+  try {
+    const actual = await asegurarCap(ver, l, c);
+    if (v < 1) { c--; if (c < 1) { l--; if (l < 0) return; c = bib[l].length; } v = (await asegurarCap(ver, l, c)).length; }
+    else if (v > actual.length) { v = 1; c++; if (c > bib[l].length) { l++; if (l >= bib.length) return; c = 1; } await asegurarCap(ver, l, c); }
+  } catch (er) { return toast(er.message); }
   if (TAB === "biblia" && B.vista === "vers" && (B.libro !== l || B.cap !== c)) { B.libro = l; B.cap = c; proyectarVerso(ver, l, c, v); renderMain(); marcarVerso(true); return; }
-  proyectarVerso(ver, l, c, v); marcarVerso(true);
+  await proyectarVerso(ver, l, c, v); marcarVerso(true);
 }
 function marcarVerso(scroll) {
   $$(".v[data-v]").forEach(el => el.classList.toggle("on", !!CTX && CTX.tipo === "biblia" && CTX.ver === B.ver && CTX.l === B.libro && CTX.c === B.cap && +el.dataset.v === CTX.v));
   const on = $(".v.on"); if (scroll && on) on.scrollIntoView({ block: "center", behavior: "smooth" });
 }
 function buscarBiblia(ver, q, filtro) {
-  const bib = BIB[ver]; if (!bib) return [];
+  const bib = BIB[ver]; if (!bib || esYV(ver)) return [];
   if (!IDX[ver]) { IDX[ver] = []; bib.forEach((lib, l) => lib.forEach((cap, c) => cap.forEach((t, v) => IDX[ver].push([l, c + 1, v + 1, norm(t)])))); }
   const ws = norm(q).split(/\s+/).filter(w => w.length > 1); if (!ws.length) return [];
   const out = [];
@@ -116,7 +170,7 @@ function toggleFav(l, c, v) { FAVS = esFav(l, c, v) ? FAVS.filter(f => !(f.l ===
 
 function vBiblia() {
   const bib = BIB[B.ver];
-  const vers = `<div class="chips" role="group" aria-label="Versión">${VERSIONES.map(v => `<button type="button" data-ver="${v.id}" aria-pressed="${B.ver === v.id}">${v.corto}</button>`).join("")}</div>`;
+  const vers = `<div class="chips" role="group" aria-label="Versión">${todasVersiones().map(v => `<button type="button" data-ver="${v.id}" aria-pressed="${B.ver === v.id}">${esc(v.corto)}</button>`).join("")}<button type="button" data-yvcfg aria-pressed="false">+ YouVersion</button></div>`;
   const modos = `<div class="chips">${[["libros", "Libros"], ["pasajes", "Pasajes del culto" + (PASAJES.length ? " · " + PASAJES.length : "")], ["buscar", "Buscar palabras"], ["favs", "Favoritos" + (FAVS.length ? " · " + FAVS.length : "")]].map(m => `<button type="button" data-bv="${m[0]}" aria-pressed="${B.vista === m[0] || (m[0] === "libros" && (B.vista === "caps" || B.vista === "vers"))}">${m[1]}</button>`).join("")}</div>`;
   if (B.vista === "pasajes") return vPasajes(modos);
   if (!bib) return `<div class="sec">${vers}<div class="empty">Cargando ${esc(verInfo(B.ver).nombre)}…</div></div>`;
@@ -130,17 +184,22 @@ function vBiblia() {
     body = `<div class="crumbs"><button type="button" data-bv="libros">Libros</button><span>›</span>${esc(LIBROS[B.libro][0])}</div>
       <div class="grid-caps">${Array.from({ length: n }, (_, i) => `<button type="button" data-cap="${i + 1}">${i + 1}</button>`).join("")}</div>`;
   } else if (B.vista === "vers") {
+    if (esYV(B.ver) && !bib[B.libro][B.cap - 1]) {
+      asegurarCap(B.ver, B.libro, B.cap).then(() => { if (TAB === "biblia" && B.vista === "vers") renderMain() }).catch(er => { toast(er.message); const el = $("#yvload"); if (el) el.textContent = er.message; });
+      return `<div class="sec">${vers}${ir}${modos}<div class="crumbs"><button type="button" data-bv="libros">Libros</button><span>›</span><button type="button" data-libro="${B.libro}">${esc(LIBROS[B.libro][0])}</button><span>›</span>Capítulo ${B.cap}</div><div class="empty" id="yvload">Cargando ${esc(verInfo(B.ver).corto)} desde YouVersion…</div></div>`;
+    }
     const cap = bib[B.libro][B.cap - 1] || [];
     body = `<div class="crumbs"><button type="button" data-bv="libros">Libros</button><span>›</span><button type="button" data-libro="${B.libro}">${esc(LIBROS[B.libro][0])}</button><span>›</span>Capítulo ${B.cap}</div>
       <div class="vlist">${cap.map((t, i) => t ? `<div class="v" data-v="${i + 1}" role="button" tabindex="0"><span class="n">${i + 1}</span><span class="x">${esc(t)}</span><button type="button" class="star ${esFav(B.libro, B.cap, i + 1) ? "on" : ""}" data-fav="${i + 1}" aria-label="Favorito">★</button></div>` : "").join("")}</div>
       <div class="row" style="display:flex;gap:8px;justify-content:space-between"><button type="button" class="btn ghost sm" data-capd="-1" ${B.libro === 0 && B.cap === 1 ? "disabled" : ""}>← Cap. anterior</button><button type="button" class="btn ghost sm" data-capd="1">Cap. siguiente →</button></div>`;
   } else if (B.vista === "buscar") {
+    if (esYV(B.ver)) return `<div class="sec">${vers}${ir}${modos}<div class="empty">La búsqueda por palabras funciona con las versiones RV1909, RV1865 y KJV. Para ${esc(verInfo(B.ver).corto)}, usá "Ir a…" o Libros.</div></div>`;
     const res = B.q.trim().length > 1 ? buscarBiblia(B.ver, B.q, B.filtro) : null;
     body = `<input class="input" id="bq" type="search" placeholder="Palabras a buscar: caridad sufrida" value="${esc(B.q)}" aria-label="Buscar en la Biblia">
       <div class="chips">${[["todo", "Toda la Biblia"], ["at", "A.T."], ["nt", "N.T."]].map(f => `<button type="button" data-bf="${f[0]}" aria-pressed="${B.filtro === f[0]}">${f[1]}</button>`).join("")}</div>
       ${res === null ? '<p class="muted" style="font-size:14px">Escribí dos letras o más.</p>' : res.length ? `<span class="lbl">${res.length >= 150 ? "Primeros 150 resultados" : res.length === 1 ? "1 resultado" : res.length + " resultados"}</span><div class="vlist">${res.map(r => `<div class="v" role="button" tabindex="0" data-go="${r.l},${r.c},${r.v}"><span class="n">${esc(LIBROS[r.l][1])}<br>${r.c}:${r.v}</span><span class="x">${resaltar(r.t, B.q)}</span><span></span></div>`).join("")}</div>` : '<div class="empty">No encontré esas palabras.</div>'}`;
   } else if (B.vista === "favs") {
-    body = FAVS.length ? `<div class="vlist">${FAVS.map(f => { const t = bib[f.l]?.[f.c - 1]?.[f.v - 1] || ""; return `<div class="v" role="button" tabindex="0" data-go="${f.l},${f.c},${f.v}"><span class="n">${esc(LIBROS[f.l][1])}<br>${f.c}:${f.v}</span><span class="x">${esc(t)}</span><button type="button" class="star on" data-unfav="${f.l},${f.c},${f.v}" aria-label="Quitar de favoritos">★</button></div>` }).join("")}</div>`
+    body = FAVS.length ? `<div class="vlist">${FAVS.map(f => { const t = bib[f.l]?.[f.c - 1]?.[f.v - 1] || (esYV(B.ver) ? "Tocá para cargar el texto" : ""); return `<div class="v" role="button" tabindex="0" data-go="${f.l},${f.c},${f.v}"><span class="n">${esc(LIBROS[f.l][1])}<br>${f.c}:${f.v}</span><span class="x">${esc(t)}</span><button type="button" class="star on" data-unfav="${f.l},${f.c},${f.v}" aria-label="Quitar de favoritos">★</button></div>` }).join("")}</div>`
       : '<div class="empty">Marcá versículos con la estrella ★ para tenerlos a mano en el culto.</div>';
   }
   return `<div class="sec">${vers}${ir}${modos}${body}</div>`;
@@ -252,6 +311,37 @@ function formPasaje(ps) {
       } catch (er) { toast("No se pudo guardar: " + (er.code || er.message)) }
     };
     const d = $("#p_del", s); if (d) d.onclick = async () => { try { await deleteDoc(doc(db, "proyector_pasajes", ps.id)); cerrarHoja(); toast("Pasaje borrado.") } catch (er) { toast("No se pudo borrar: " + (er.code || er.message)) } };
+  });
+}
+
+/* ---------- configurar YouVersion ---------- */
+async function guardarYV() { await setDoc(doc(db, "proyector_cfg", "youversion"), { key: YV.key, versiones: YV.versiones }); }
+function hojaYouVersion() {
+  abrirHoja("Versiones de YouVersion", `<p class="muted" style="font-size:14px">Con tu App Key de YouVersion Platform podés agregar versiones con licencia, como la RVR1960, si YouVersion las tiene habilitadas para tu app. El texto se trae de YouVersion cada vez y no se guarda.</p>
+    <form class="form" id="yvf"><label>App Key<input id="yv_key" autocomplete="off" placeholder="Pegá aquí tu App Key" value="${YV.key ? "•".repeat(12) + YV.key.slice(-4) : ""}"></label>
+    <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn sm" type="submit">Guardar clave</button><button class="btn ghost sm" type="button" id="yv_buscar">Buscar versiones en español</button></div></form>
+    <div id="yv_out"></div>
+    ${YV.versiones.length ? `<span class="lbl">Agregadas</span><div class="list">${YV.versiones.map(v => `<div class="row-item"><span style="min-width:0"><b>${esc(v.corto)}</b><small>${esc(v.nombre)} · id ${esc(v.id)}</small></span><button class="btn danger sm" type="button" data-yvdel="${esc(v.id)}">Quitar</button></div>`).join("")}</div>` : ""}`, s => {
+    $("#yvf", s).onsubmit = async e => { e.preventDefault(); const k = $("#yv_key", s).value.trim(); if (!k || k.startsWith("•")) return toast("Pegá la App Key completa."); YV.key = k; try { await guardarYV(); toast("Clave guardada en tu Firebase."); $("#yv_key", s).value = "•".repeat(12) + k.slice(-4); } catch (er) { toast("No se pudo guardar: " + (er.code || er.message)) } };
+    $("#yv_buscar", s).onclick = async () => {
+      const out = $("#yv_out", s); out.innerHTML = '<p class="muted">Buscando…</p>';
+      try {
+        const [hab, todas] = await Promise.all([yvGet("/v1/bibles?language_ranges[]=spa").catch(() => null), yvGet("/v1/bibles?language_ranges[]=spa&all_available=true")]);
+        const lista = (todas && (todas.data || todas.bibles || todas)) || [];
+        const habIds = new Set(((hab && (hab.data || hab.bibles || hab)) || []).map(b => String(b.id)));
+        if (!Array.isArray(lista) || !lista.length) { out.innerHTML = `<div class="empty">YouVersion no devolvió versiones en español.<br><small>${esc(JSON.stringify(todas).slice(0, 300))}</small></div>`; return; }
+        const nombre = b => b.title || b.name || b.local_title || "Versión " + b.id;
+        const corto = b => b.abbreviation || b.local_abbreviation || b.abbr || ("YV" + b.id);
+        lista.sort((a, b) => (String(corto(b)).includes("1960") - String(corto(a)).includes("1960")) || (habIds.has(String(b.id)) - habIds.has(String(a.id))) || nombre(a).localeCompare(nombre(b), "es"));
+        out.innerHTML = `<span class="lbl">${lista.length} versiones en español</span><div class="list">${lista.map(b => { const ya = YV.versiones.some(v => String(v.id) === String(b.id)); return `<div class="row-item"><span style="min-width:0"><b>${esc(corto(b))}</b><small>${esc(nombre(b))} · id ${esc(b.id)}${habIds.size ? (habIds.has(String(b.id)) ? " · habilitada" : " · no habilitada") : ""}</small></span><span style="display:flex;gap:6px"><button class="btn ghost sm" type="button" data-yvtest="${esc(b.id)}">Probar</button><button class="btn sm" type="button" data-yvadd="${esc(b.id)}" data-yvn="${esc(nombre(b))}" data-yvc="${esc(corto(b))}" ${ya ? "disabled" : ""}>${ya ? "Agregada" : "Agregar"}</button></span></div>` }).join("")}</div><div id="yv_test"></div>`;
+      } catch (er) { out.innerHTML = `<div class="confirm"><b>No se pudo conectar</b><span style="font-size:14px">${esc(er.message)}</span></div>`; }
+    };
+    s.addEventListener("click", async e => {
+      const a = e.target.closest("[data-yvadd]"); const t = e.target.closest("[data-yvtest]"); const d = e.target.closest("[data-yvdel]");
+      if (a) { YV.versiones.push({ id: a.dataset.yvadd, nombre: a.dataset.yvn, corto: a.dataset.yvc }); try { await guardarYV(); a.textContent = "Agregada"; a.disabled = true; toast(a.dataset.yvc + " agregada."); renderMain(); } catch (er) { toast("No se pudo guardar: " + (er.code || er.message)) } }
+      if (t) { const box = $("#yv_test", s); box.innerHTML = '<p class="muted">Probando Juan 3…</p>'; try { const vs = await cargarCapYV("yv:" + t.dataset.yvtest, 42, 3); box.innerHTML = `<div class="field"><span>Juan 3:16 · funciona ✅ (${vs.length} versículos)</span><p>${esc(vs[15] || "")}</p></div>`; } catch (er) { box.innerHTML = `<div class="confirm"><b>No funcionó</b><span style="font-size:14px">${esc(er.message)}</span></div>`; } box.scrollIntoView({ block: "nearest" }); }
+      if (d) { YV.versiones = YV.versiones.filter(v => String(v.id) !== d.dataset.yvdel); delete BIB["yv:" + d.dataset.yvdel]; if (B.ver === "yv:" + d.dataset.yvdel) { B.ver = "rv1909"; store.set("pr-ver", B.ver); } try { await guardarYV(); cerrarHoja(); renderMain(); toast("Versión quitada.") } catch (er) { toast("No se pudo guardar: " + (er.code || er.message)) } }
+    });
   });
 }
 
@@ -501,9 +591,9 @@ function renderMain() {
 function bindMain() {
   const ir = $("#irForm"); if (ir) ir.onsubmit = e => {
     e.preventDefault(); const p = parseCita($("#ir").value); const bib = BIB[B.ver];
-    if (!p || !bib[p.libro] || !bib[p.libro][p.cap - 1]) return toast("No encontré esa cita. Probá así: Juan 3:16");
+    if (!p || !bib[p.libro] || p.cap < 1 || p.cap > bib[p.libro].length) return toast("No encontré esa cita. Probá así: Juan 3:16");
     B.libro = p.libro; B.cap = p.cap; B.vista = "vers"; renderMain();
-    if (p.vers && bib[p.libro][p.cap - 1][p.vers - 1] != null) { proyectarVerso(B.ver, p.libro, p.cap, p.vers); marcarVerso(true); }
+    if (p.vers) asegurarCap(B.ver, p.libro, p.cap).then(cap => { if (cap && cap[p.vers - 1] != null) { if (esYV(B.ver)) renderMain(); proyectarVerso(B.ver, p.libro, p.cap, p.vers).then(() => marcarVerso(true)); } else toast("Ese capítulo no tiene el versículo " + p.vers + "."); }).catch(er => toast(er.message));
   };
   const bq = $("#bq"); if (bq) { bq.oninput = () => { B.q = bq.value; clearTimeout(bindMain.t); bindMain.t = setTimeout(() => { const pos = bq.selectionStart; renderMain(); const n = $("#bq"); n.focus(); n.setSelectionRange(pos, pos) }, 250) }; }
   const sq = $("#sq"); if (sq) sq.oninput = () => { S.q = sq.value; const pos = sq.selectionStart; renderMain(); const n = $("#sq"); n.focus(); n.setSelectionRange(pos, pos) };
@@ -538,6 +628,7 @@ document.addEventListener("click", e => {
   let x;
   if ((x = g("[data-tab]"))) { TAB = x.dataset.tab; store.set("pr-tab", TAB); renderMain(); scrollTo({ top: 0 }); return; }
   // Biblia
+  if (g("[data-yvcfg]")) { hojaYouVersion(); return; }
   if ((x = g("[data-ver]"))) { B.ver = x.dataset.ver; store.set("pr-ver", B.ver); renderMain(); cargarVersion(B.ver).then(renderMain).catch(er => toast(er.message)); return; }
   if ((x = g("[data-bv]"))) { B.vista = x.dataset.bv; renderMain(); if (B.vista === "buscar") $("#bq")?.focus(); return; }
   if ((x = g("[data-libro]"))) { B.libro = +x.dataset.libro; B.vista = "caps"; renderMain(); scrollTo({ top: 0 }); return; }
@@ -599,6 +690,8 @@ onAuthStateChanged(auth, async u => {
   if (!esAdmin(u)) { $("#tabs").hidden = true; $("#app").innerHTML = `<div class="hero"><h1>Proyector<span>.</span></h1><p>Esta app es privada. Entraste con ${esc(u.email || "otra cuenta")}.</p><button class="btn" id="lo" type="button">Entrar con otra cuenta</button></div>`; $("#lo").onclick = () => signOut(auth); return; }
   try { const d = await getDoc(doc(db, "proyector", "en_vivo")); if (d.exists()) { const x = d.data(); LIVE = Object.assign({}, LIVE, x, { estilo: Object.assign({}, ESTILO_BASE, x.estilo || {}) }); } } catch { }
   montarShell(); renderMain();
+  try { const c = await getDoc(doc(db, "proyector_cfg", "youversion")); if (c.exists()) YV = Object.assign({ key: "", versiones: [] }, c.data()); } catch { }
+  if (esYV(B.ver) && !todasVersiones().some(v => v.id === B.ver)) B.ver = "rv1909";
   cargarVersion(B.ver).then(() => { if (TAB === "biblia") renderMain() }).catch(er => toast(er.message));
   stopFns.push(onSnapshot(collection(db, "proyector_canciones"), s => { CANCIONES = s.docs.map(d => ({ id: d.id, ...d.data() })); if (TAB === "canciones") renderMain() }, er => toast("Canciones: " + (er.code || er.message))));
   stopFns.push(onSnapshot(collection(db, "proyector_pasajes"), s => { PASAJES = s.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (a.creado || 0) - (b.creado || 0)); if (TAB === "biblia") renderMain() }, er => toast("Pasajes: " + (er.code || er.message))));
