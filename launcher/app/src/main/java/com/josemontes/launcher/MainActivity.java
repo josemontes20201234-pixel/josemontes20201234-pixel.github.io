@@ -134,7 +134,7 @@ public class MainActivity extends Activity {
     static final String[][] CAJON_ESTILOS = {{"cuadricula", "Cuadrícula"}, {"lista", "Lista"}};
     static final String[][] CAJON_ORDEN = {{"alfa", "Alfabético"}, {"uso", "Las que más usás primero"}};
     static final String[][] ACCIONES = {{"cajon", "Abrir todas las apps"}, {"notificaciones", "Bajar notificaciones"}, {"buscar", "Buscar"},
-            {"google", "Abrir Google"}, {"ajustes", "Ajustes del launcher"}, {"bloquear", "Apagar la pantalla"}, {"app", "Abrir una app…"}, {"nada", "No hacer nada"}};
+            {"google", "Abrir Google"}, {"ajustes", "Ajustes del launcher"}, {"bloquear", "Apagar la pantalla"}, {"barra", "Mostrar u ocultar la barra de arriba"}, {"app", "Abrir una app…"}, {"nada", "No hacer nada"}};
     static final String[][] GESTOS = {{"g_arriba", "Deslizar hacia arriba", "cajon"}, {"g_abajo", "Deslizar hacia abajo", "notificaciones"},
             {"g_doble", "Doble toque", "ajustes"}, {"g_derecha", "Deslizar a la derecha", "nada"}, {"g_izquierda", "Deslizar a la izquierda", "nada"}};
     static final String[][] COLUMNAS = {{"4", "4 columnas"}, {"5", "5 columnas"}};
@@ -149,7 +149,7 @@ public class MainActivity extends Activity {
     // configuración actual
     String estilo, iconos, letra, nombre;
     String fondo, insignias, cajonEstilo, cajonOrden, paqueteNombre;
-    boolean verNombres, verSugeridas;
+    boolean verNombres, verSugeridas, pantallaCompleta;
     AppWidgetManager awm;
     Anfitrion host;
     LinearLayout widgetBox;
@@ -262,6 +262,7 @@ public class MainActivity extends Activity {
         verAgenda = prefs.getBoolean("ver_agenda", true);
         verBusqueda = prefs.getBoolean("ver_busqueda", true);
         verNombres = prefs.getBoolean("ver_nombres", true);
+        pantallaCompleta = prefs.getBoolean("pantalla_completa", false);
         verSugeridas = prefs.getBoolean("ver_sugeridas", true);
         insignias = prefs.getString("insignias", "punto");
         cajonEstilo = prefs.getString("cajon_estilo", "cuadricula");
@@ -348,6 +349,12 @@ public class MainActivity extends Activity {
     protected void onPause() {
         super.onPause();
         try { unregisterReceiver(receptor); } catch (Exception e) { }
+    }
+
+    @Override
+    public void onWindowFocusChanged(boolean foco) {
+        super.onWindowFocusChanged(foco);
+        if (foco && pantallaCompleta) estilizarCajon();
     }
 
     @Override
@@ -529,6 +536,7 @@ public class MainActivity extends Activity {
             case "google": abrirGoogle(); return true;
             case "ajustes": abrirAjustes(); return true;
             case "bloquear": apagarPantalla(); return true;
+            case "barra": guardar("pantalla_completa", !pantallaCompleta); toast(pantallaCompleta ? "Pantalla completa" : "Barra de arriba visible"); return true;
             default: return false;
         }
     }
@@ -607,6 +615,8 @@ public class MainActivity extends Activity {
         ajustes.setBackgroundColor(claro ? 0xFFF4F1EA : 0xFF0B0A08);
         int vis = View.SYSTEM_UI_FLAG_LAYOUT_STABLE | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION;
         if (claro) vis |= View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR | View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR;
+        // Pantalla completa: se esconde la barra de notificaciones; deslizando desde arriba aparece un momento
+        if (pantallaCompleta) vis |= View.SYSTEM_UI_FLAG_FULLSCREEN | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY;
         getWindow().getDecorView().setSystemUiVisibility(vis);
     }
 
@@ -1639,6 +1649,7 @@ public class MainActivity extends Activity {
         interruptor(l, "Batería", verBateria, v -> guardar("ver_bateria", v));
         interruptor(l, "Agenda de hoy", verAgenda, v -> guardar("ver_agenda", v));
         interruptor(l, "Barra de búsqueda", verBusqueda, v -> guardar("ver_busqueda", v));
+        interruptor(l, "Pantalla completa (ocultar barra de notificaciones)", pantallaCompleta, v -> guardar("pantalla_completa", v));
 
         seccion(l, "Copia de seguridad");
         opcion(l, "Guardar copia de mi configuración", "Un archivo con tu estilo, apps fijadas, carpetas y gestos", this::guardarRespaldo);
