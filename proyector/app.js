@@ -404,7 +404,7 @@ async function estudiar(l, c, v) {
   box.innerHTML = `${trad ? `<p style="font-size:15px">${esc(trad)} <span class="muted" style="font-size:12px">· ${esc(verInfo(B.ver).corto)}</span></p>` : ""}
     <p class="orig" dir="${nt ? "ltr" : "rtl"}">${esc(original)}</p>
     <span class="lbl">${nt ? "Griego · tocá una palabra" : "Hebreo · se lee de derecha a izquierda · tocá una palabra"}</span>
-    <div class="inter ${nt ? "" : "rtl"}">${ws.map((w, i) => `<button type="button" class="pal" data-pal="${i}"><span class="o" dir="${nt ? "ltr" : "rtl"}">${esc(w[0])}</span><span class="tr">${esc(w[1])}</span><span class="gl">${esc(glosa(w) || "—")}</span><span class="sn">${esc(strongCorto(w[2]))}</span></button>`).join("")}</div>
+    <div class="inter ${nt ? "" : "rtl"}">${ws.map((w, i) => `<button type="button" class="pal" data-pal="${i}"><span class="o" dir="${nt ? "ltr" : "rtl"}">${esc(w[0])}</span><span class="tr">${esc(w[1])}</span><span class="gl">${esc(glosa(w) || "—")}</span>${nt && w[4] && w[5] ? `<span class="tr" style="font-style:normal">${esc(w[5])}</span>` : ""}<span class="sn">${esc(strongCorto(w[2]))}</span></button>`).join("")}</div>
     <div id="det"></div>
     <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn sm" type="button" id="projOrig">Proyectar el ${nt ? "griego" : "hebreo"}</button><a class="btn ghost sm" href="${linkLogos(l, c, v)}" target="_blank" rel="noopener" style="text-decoration:none">Abrir en LogosKLogos</a></div>
     <p class="credit">Texto original, Strong y gramática: STEPBible.org (Tyndale House), licencia CC BY 4.0.${nt ? "" : " Las traducciones palabra por palabra del hebreo están en inglés."}</p>`;
@@ -417,7 +417,7 @@ async function estudiar(l, c, v) {
     const sig = L[2] ? L[2] + " (inglés)" : gl;
     const det = $("#det", box);
     det.innerHTML = `<div class="det"><div class="lem" dir="${nt ? "ltr" : "rtl"}">${esc(lema)}</div><span class="muted" style="font-style:italic">${esc(tr)}</span>
-      <dl><dt>Strong</dt><dd class="mono">${esc(strongCorto(w[2]))}</dd><dt>Significado</dt><dd>${esc(sig)}</dd><dt>En este versículo</dt><dd>${esc(w[0])} · ${esc(glosa(w) || "")}</dd><dt>Gramática</dt><dd style="font-weight:600">${esc(nt ? morfoG(w[3]) : morfoH(w[3]))}</dd></dl>
+      <dl><dt>Strong</dt><dd class="mono">${esc(strongCorto(w[2]))}</dd><dt>Significado</dt><dd>${esc(sig)}</dd><dt>En este versículo</dt><dd>${esc(w[0])} · ${esc(glosa(w) || "")}${nt && w[4] && w[5] ? ` <span class="muted" style="font-weight:500">(inglés: ${esc(w[5])})</span>` : ""}</dd><dt>Gramática</dt><dd style="font-weight:600">${esc(nt ? morfoG(w[3]) : morfoH(w[3]))}</dd></dl>
       ${L[3] ? `<span class="lbl">Definición del diccionario (en inglés)</span><div class="def">${esc(L[3])}</div>` : ""}
       <label style="display:grid;gap:4px;font-size:13px;font-weight:700;color:var(--muted)">Texto para la pantalla<input id="palGl" class="input" value="${esc(gl)}"></label>
       <button class="btn sm" type="button" id="projPal">Proyectar esta palabra</button></div>`;
