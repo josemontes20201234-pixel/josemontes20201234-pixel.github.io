@@ -37,7 +37,7 @@ const HIMNOS = [{ id: "pd-santo", titulo: "¡Santo! ¡Santo! ¡Santo!", autor: "
 /* ---------- estado ---------- */
 let LIVE = { ts: 0, modo: "fondo", texto: "", ref: "", titulo: "", img: null, fondo: { id: "noche" }, estilo: { ...ESTILO_BASE }, negro: false, oculto: false };
 let CTX = null;                          // de dónde vino lo que está en vivo, para Anterior / Siguiente
-let CANCIONES = [], ANUNCIOS = [], FONDOS_IMG = [];
+let CANCIONES = [], ANUNCIOS = [], FONDOS_IMG = [], PASAJES = [];
 const BIB = {}, IDX = {};
 let TAB = store.get("pr-tab", "biblia");
 const B = { ver: store.get("pr-ver", "rv1909"), vista: "libros", libro: 42, cap: 3, q: "", filtro: "todo" };
@@ -117,8 +117,9 @@ function toggleFav(l, c, v) { FAVS = esFav(l, c, v) ? FAVS.filter(f => !(f.l ===
 function vBiblia() {
   const bib = BIB[B.ver];
   const vers = `<div class="chips" role="group" aria-label="Versión">${VERSIONES.map(v => `<button type="button" data-ver="${v.id}" aria-pressed="${B.ver === v.id}">${v.corto}</button>`).join("")}</div>`;
+  const modos = `<div class="chips">${[["libros", "Libros"], ["pasajes", "Pasajes del culto" + (PASAJES.length ? " · " + PASAJES.length : "")], ["buscar", "Buscar palabras"], ["favs", "Favoritos" + (FAVS.length ? " · " + FAVS.length : "")]].map(m => `<button type="button" data-bv="${m[0]}" aria-pressed="${B.vista === m[0] || (m[0] === "libros" && (B.vista === "caps" || B.vista === "vers"))}">${m[1]}</button>`).join("")}</div>`;
+  if (B.vista === "pasajes") return vPasajes(modos);
   if (!bib) return `<div class="sec">${vers}<div class="empty">Cargando ${esc(verInfo(B.ver).nombre)}…</div></div>`;
-  const modos = `<div class="chips">${[["libros", "Libros"], ["buscar", "Buscar palabras"], ["favs", "Favoritos" + (FAVS.length ? " · " + FAVS.length : "")]].map(m => `<button type="button" data-bv="${m[0]}" aria-pressed="${B.vista === m[0] || (m[0] === "libros" && (B.vista === "caps" || B.vista === "vers"))}">${m[1]}</button>`).join("")}</div>`;
   const ir = `<form class="go" id="irForm"><input class="input" id="ir" placeholder="Ir a… Juan 3:16, Sal 23, 1 Co 13:4" autocomplete="off" aria-label="Ir a una cita"><button class="btn" type="submit">Ir</button></form>`;
   let body = "";
   if (B.vista === "libros") {
@@ -143,6 +144,115 @@ function vBiblia() {
       : '<div class="empty">Marcá versículos con la estrella ★ para tenerlos a mano en el culto.</div>';
   }
   return `<div class="sec">${vers}${ir}${modos}${body}</div>`;
+}
+
+
+/* ---------- Pasajes del culto (versiones con derechos: el usuario pega su texto) ---------- */
+const VERS_PASAJE = ["RVR1960", "NVI", "NTV", "LBLA", "NBLA", "DHH", "TLA", "RVC", "RV1995"];
+function limpiarPegado(txt, cita) {
+  let t = String(txt || "").replace(/\r/g, "").replace(/https?:\/\/\S+/g, "").replace(/[¹²³⁰-⁹]+/g, m => " " + m.replace(/[¹]/g, "1").replace(/[²]/g, "2").replace(/[³]/g, "3").replace(/[⁰-⁹]/g, c => String(c.charCodeAt(0) - 0x2070)) + " ");
+  const lineas = t.split("\n");
+  // quita una primera o última línea que sea sólo la cita ("Juan 3:16-18 RVR1960")
+  const esCita = l => { const x = l.trim(); return x && x.length < 50 && /\d+\s*[:.]\s*\d+/.test(x) && parseCita(x.replace(/\b(RVR?\d{2,4}|NVI|NTV|LBLA|NBLA|DHH|TLA|RVC)\b/gi, "").replace(/-\s*\d+/, "").trim()); };
+  while (lineas.length && !lineas[0].trim()) lineas.shift();
+  if (lineas.length > 1 && esCita(lineas[0])) lineas.shift();
+  while (lineas.length && !lineas[lineas.length - 1].trim()) lineas.pop();
+  if (lineas.length > 1 && esCita(lineas[lineas.length - 1])) lineas.pop();
+  return lineas.join("\n").trim();
+}
+function dividirPasaje(texto, cita) {
+  const p = parseCita(String(cita || "").replace(/-\s*\d+.*$/, ""));
+  const t = texto;
+  if (p && p.vers) {
+    const marcas = []; let pos = 0, n = p.vers;
+    while (true) {
+      const re = new RegExp(`(^|[\\s"“«(\\[])${n}(?=[\\s.)\\]]*[\\p{L}"“«¿¡(])`, "u");
+      const m = re.exec(t.slice(pos)); if (!m) break;
+      const at = pos + m.index + m[1].length;
+      marcas.push({ n, at, fin: at + String(n).length }); pos = at + String(n).length; n++;
+      if (n - p.vers > 200) break;
+    }
+    if (marcas.length >= 2 || (marcas.length === 1 && marcas[0].at < 3)) {
+      return marcas.map((m, i) => ({ v: m.n, texto: t.slice(m.fin, i + 1 < marcas.length ? marcas[i + 1].at : undefined).replace(/^[\s.)\]]+/, "").replace(/\s+/g, " ").trim() })).filter(x => x.texto);
+    }
+  }
+  const bloques = t.split(/\n\s*\n/).map(x => x.replace(/\s*\n\s*/g, " ").trim()).filter(Boolean);
+  return bloques.map(b => ({ v: null, texto: b }));
+}
+function laminasDe(ps) { return dividirPasaje(ps.texto, ps.cita); }
+function refLamina(ps, lam) {
+  const p = parseCita(String(ps.cita || "").replace(/-\s*\d+.*$/, ""));
+  if (p && lam.v) return `${LIBROS[p.libro][0]} ${p.cap}:${lam.v} · ${ps.version}`;
+  return `${ps.cita} · ${ps.version}`;
+}
+function proyectarPasaje(id, i) {
+  const ps = PASAJES.find(x => x.id === id); if (!ps) return; const L = laminasDe(ps); if (!L[i]) return;
+  proyectarTexto(L[i].texto, refLamina(ps, L[i]), "", { tipo: "pasaje", id, i, n: L.length });
+  $$("[data-plam]").forEach(el => el.classList.toggle("on", el.dataset.pid === id && +el.dataset.plam === i));
+  const on = $("[data-plam].on"); if (on) on.scrollIntoView({ block: "nearest", behavior: "smooth" });
+}
+function vPasajes(modos) {
+  const lista = PASAJES.length ? PASAJES.map((ps, k) => {
+    const L = laminasDe(ps); const abierto = B.pasaje === ps.id;
+    return `<div class="field" style="gap:8px"><div style="display:flex;gap:8px;align-items:center"><button type="button" data-popen="${ps.id}" style="flex:1;min-width:0;text-align:left;border:0;background:none;padding:0"><b style="display:block;font-size:16px">${k + 1}. ${esc(ps.cita)} <span class="muted" style="font-weight:600;font-size:13px">${esc(ps.version)}</span></b><small class="muted">${L.length} ${L.length === 1 ? "lámina" : "láminas"} · ${abierto ? "tocá una para proyectar" : "tocá para abrir"}</small></button>
+      <button class="btn sm" type="button" data-pplay="${ps.id}">Proyectar</button></div>
+      ${abierto ? `<div class="vlist">${L.map((l, i) => `<div class="v ${CTX && CTX.tipo === "pasaje" && CTX.id === ps.id && CTX.i === i ? "on" : ""}" role="button" tabindex="0" data-pid="${ps.id}" data-plam="${i}"><span class="n">${l.v ?? i + 1}</span><span class="x">${esc(l.texto)}</span><span></span></div>`).join("")}</div>
+        <div style="display:flex;gap:8px;justify-content:space-between"><button class="btn ghost sm" type="button" data-pedit="${ps.id}">Editar</button></div>` : ""}</div>`;
+  }).join("") : `<div class="empty">Pegá aquí los versículos de la RV1960 (u otra versión) que vas a leer en el culto.<button class="btn sm" type="button" data-pnew>+ Agregar pasaje</button></div>`;
+  return `<div class="sec">${modos}
+    <div class="head"><h2>Pasajes del culto</h2><button class="btn sm" type="button" data-pnew>+ Pasaje</button></div>
+    <p class="muted" style="font-size:13.5px">En tu app de Biblia, seleccioná los versículos, tocá <b>Copiar</b> y pegalos aquí. La app los separa uno por uno y les pone la versión.</p>
+    <div class="list">${lista}</div>
+    ${PASAJES.length ? '<button class="btn danger sm" type="button" id="pClear" style="justify-self:start">Borrar todos al terminar el culto</button><div id="pClearBox"></div>' : ""}
+    </div>`;
+}
+function formPasaje(ps) {
+  const n = !ps; ps = ps || { cita: "", version: store.get("pr-pver", "RVR1960"), texto: "" };
+  abrirHoja(n ? "Nuevo pasaje" : "Editar pasaje", `<form class="form" id="fp">
+    <div class="two"><label>Cita<input id="p_c" required maxlength="40" placeholder="Juan 3:16-18" value="${esc(ps.cita)}"></label>
+    <label>Versión<input id="p_v" list="dl_pv" maxlength="12" value="${esc(ps.version)}"></label></div>
+    <datalist id="dl_pv">${VERS_PASAJE.map(v => `<option value="${v}">`).join("")}</datalist>
+    <label>Texto copiado de tu Biblia<textarea id="p_t" placeholder="16 Porque de tal manera amó Dios al mundo…&#10;17 Porque no envió Dios…">${esc(ps.texto)}</textarea></label>
+    <p class="muted" id="p_info" style="font-size:13px"></p>
+    <button class="btn wide" type="submit">${n ? "Guardar pasaje" : "Guardar cambios"}</button>
+    ${n ? "" : '<button class="btn danger wide" type="button" id="p_del">Borrar pasaje</button>'}</form>`, s => {
+    const info = () => {
+      const c = $("#p_c", s).value.trim(); const t = limpiarPegado($("#p_t", s).value, c);
+      const p = parseCita(c.replace(/-\s*\d+.*$/, ""));
+      const L = t ? dividirPasaje(t, c) : [];
+      $("#p_info", s).textContent = !c ? "Escribí la cita, por ejemplo Juan 3:16-18." : !p ? "No reconozco esa cita. Probá así: Juan 3:16-18" : !t ? "Pegá el texto." : `Se va a proyectar en ${L.length} ${L.length === 1 ? "lámina" : "láminas"}${L[0] && L[0].v ? ` (versículos ${L[0].v} al ${L[L.length - 1].v})` : ""}.`;
+    };
+    // si pegan "Juan 3:16-18 RVR1960" arriba del texto, llena la cita sola
+    $("#p_t", s).addEventListener("input", () => {
+      const raw = $("#p_t", s).value.replace(/https?:\/\/\S+/g, ""); const pri = raw.split("\n").map(x => x.trim()).filter(Boolean);
+      for (const linea of pri) {
+        if (!linea || linea.length > 50) continue;
+        const mv = linea.match(/\b(RVR?\d{2,4}|NVI|NTV|LBLA|NBLA|DHH|TLA|RVC)\b/i);
+        const sin = linea.replace(/\b(RVR?\d{2,4}|NVI|NTV|LBLA|NBLA|DHH|TLA|RVC)\b/gi, "").trim();
+        if (/\d+\s*[:.]\s*\d+/.test(sin) && parseCita(sin.replace(/-\s*\d+/, "").trim())) {
+          if (!$("#p_c", s).value.trim()) $("#p_c", s).value = sin;
+          if (mv) $("#p_v", s).value = mv[1].toUpperCase().replace(/^RV1960$/, "RVR1960");
+          break;
+        }
+      }
+      info();
+    });
+    $("#p_c", s).oninput = info; info();
+    $("#fp", s).onsubmit = async e => {
+      e.preventDefault();
+      const cita = $("#p_c", s).value.trim(), version = ($("#p_v", s).value.trim() || "RVR1960").toUpperCase();
+      const texto = limpiarPegado($("#p_t", s).value, cita);
+      if (!cita || !parseCita(cita.replace(/-\s*\d+.*$/, ""))) return toast("Revisá la cita. Ejemplo: Juan 3:16-18");
+      if (!texto) return toast("Pegá el texto del pasaje.");
+      store.set("pr-pver", version);
+      try {
+        if (n) { const r = await addDoc(collection(db, "proyector_pasajes"), { cita, version, texto, creado: Date.now() }); B.pasaje = r.id; }
+        else { await updateDoc(doc(db, "proyector_pasajes", ps.id), { cita, version, texto }); B.pasaje = ps.id; }
+        cerrarHoja(); toast("Pasaje guardado."); renderMain();
+      } catch (er) { toast("No se pudo guardar: " + (er.code || er.message)) }
+    };
+    const d = $("#p_del", s); if (d) d.onclick = async () => { try { await deleteDoc(doc(db, "proyector_pasajes", ps.id)); cerrarHoja(); toast("Pasaje borrado.") } catch (er) { toast("No se pudo borrar: " + (er.code || er.message)) } };
+  });
 }
 
 /* ---------- Canciones ---------- */
@@ -308,6 +418,15 @@ function paso(d) {
   if (!CTX) return;
   if (CTX.tipo === "biblia") pasoBiblia(d);
   else if (CTX.tipo === "cancion") { const i = CTX.i + d; if (i >= 0 && i < CTX.n) proyectarEstrofa(CTX.id, i); }
+  else if (CTX.tipo === "pasaje") {
+    const i = CTX.i + d;
+    if (i >= 0 && i < CTX.n) return proyectarPasaje(CTX.id, i);
+    // al terminar un pasaje, sigue con el próximo de la lista
+    const k = PASAJES.findIndex(x => x.id === CTX.id) + (d > 0 ? 1 : -1);
+    const sig = PASAJES[k]; if (!sig) return;
+    const L = laminasDe(sig); B.pasaje = sig.id; if (TAB === "biblia" && B.vista === "pasajes") renderMain();
+    proyectarPasaje(sig.id, d > 0 ? 0 : L.length - 1);
+  }
 }
 function hojaVisor() {
   const url = new URL("visor.html", location.href).href;
@@ -426,6 +545,14 @@ document.addEventListener("click", e => {
   if ((x = g("[data-capd]"))) { const bib = BIB[B.ver]; let l = B.libro, c = B.cap + +x.dataset.capd; if (c < 1) { if (l === 0) return; l--; c = bib[l].length } else if (c > bib[l].length) { if (l === 65) return; l++; c = 1 } B.libro = l; B.cap = c; renderMain(); scrollTo({ top: 0 }); return; }
   if ((x = g("[data-fav]"))) { toggleFav(B.libro, B.cap, +x.dataset.fav); x.classList.toggle("on"); return; }
   if ((x = g("[data-unfav]"))) { const [l, c, v] = x.dataset.unfav.split(",").map(Number); toggleFav(l, c, v); renderMain(); return; }
+  if (g("[data-pnew]")) { formPasaje(); return; }
+  if ((x = g("[data-pedit]"))) { formPasaje(PASAJES.find(p => p.id === x.dataset.pedit)); return; }
+  if ((x = g("[data-popen]"))) { B.pasaje = B.pasaje === x.dataset.popen ? null : x.dataset.popen; renderMain(); return; }
+  if ((x = g("[data-pplay]"))) { B.pasaje = x.dataset.pplay; renderMain(); proyectarPasaje(x.dataset.pplay, 0); return; }
+  if ((x = g("[data-plam]"))) { proyectarPasaje(x.dataset.pid, +x.dataset.plam); return; }
+  if (g("#pClear")) { $("#pClearBox").innerHTML = `<div class="confirm"><b>¿Borrar los ${PASAJES.length} pasajes?</b><div style="display:flex;gap:8px"><button class="btn danger sm" type="button" id="pClear2">Sí, borrar todos</button><button class="btn ghost sm" type="button" id="pClear0">Cancelar</button></div></div>`; return; }
+  if (g("#pClear0")) { $("#pClearBox").innerHTML = ""; return; }
+  if (g("#pClear2")) { Promise.all(PASAJES.map(p => deleteDoc(doc(db, "proyector_pasajes", p.id)))).then(() => toast("Pasajes borrados.")).catch(er => toast("No se pudo borrar: " + (er.code || er.message))); return; }
   if ((x = g("[data-bf]"))) { B.filtro = x.dataset.bf; renderMain(); return; }
   if ((x = g("[data-go]"))) { const [l, c, v] = x.dataset.go.split(",").map(Number); proyectarVerso(B.ver, l, c, v); $$(".v[data-go]").forEach(el => el.classList.toggle("on", el === x)); return; }
   if ((x = g(".v[data-v]"))) { proyectarVerso(B.ver, B.libro, B.cap, +x.dataset.v); return; }
@@ -474,6 +601,7 @@ onAuthStateChanged(auth, async u => {
   montarShell(); renderMain();
   cargarVersion(B.ver).then(() => { if (TAB === "biblia") renderMain() }).catch(er => toast(er.message));
   stopFns.push(onSnapshot(collection(db, "proyector_canciones"), s => { CANCIONES = s.docs.map(d => ({ id: d.id, ...d.data() })); if (TAB === "canciones") renderMain() }, er => toast("Canciones: " + (er.code || er.message))));
+  stopFns.push(onSnapshot(collection(db, "proyector_pasajes"), s => { PASAJES = s.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (a.creado || 0) - (b.creado || 0)); if (TAB === "biblia") renderMain() }, er => toast("Pasajes: " + (er.code || er.message))));
   stopFns.push(onSnapshot(collection(db, "proyector_anuncios"), s => { ANUNCIOS = s.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (b.creado || 0) - (a.creado || 0)); if (TAB === "anuncios") renderMain() }, er => toast("Anuncios: " + (er.code || er.message))));
   stopFns.push(onSnapshot(query(collection(db, "proyector"), where("tipo", "==", "fondo")), s => { FONDOS_IMG = s.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (a.creado || 0) - (b.creado || 0)); if (TAB === "fondos") renderMain(); pintar(escena, LIVE, fondoImgActual()) }, er => toast("Fondos: " + (er.code || er.message))));
   const salir = document.createElement("button"); salir.className = "iconbtn"; salir.type = "button"; salir.setAttribute("aria-label", "Cerrar sesión"); salir.innerHTML = IC.out; salir.onclick = () => signOut(auth);
