@@ -2,6 +2,11 @@
 <html lang="es-SV">
 <head>
 <meta charset="utf-8">
+<script>
+/* Si el navegador de la tele no entiende algo, lo mostramos en pantalla para poder arreglarlo */
+window.onerror=function(m,src,l){try{var d=document.getElementById('errtv');if(!d){d=document.createElement('div');d.id='errtv';d.style.cssText='position:fixed;left:0;right:0;bottom:0;z-index:9999;background:#7a1d1d;color:#fff;font:600 18px/1.4 sans-serif;padding:12px 18px';document.documentElement.appendChild(d)}d.textContent='Error del navegador: '+m+' (línea '+l+'). '+navigator.userAgent}catch(e){}};
+</script>
+
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon-192.png">
@@ -933,8 +938,8 @@ function tvPanel(){
   const st=$('#stage');let pn=$('#tvpanel',st);if(pn){pn.remove();return}
   pn=document.createElement('div');pn.id='tvpanel';pn.className='tvpanel';
   const pint=()=>{pn.innerHTML=TVL.on?`<b>📺 Transmitiendo a la tele</b><p class="muted">En la tele abrí este link. Lo que pasés aquí aparece allá.</p><div class="tvlink"><code>${tvURL}</code><button class="btn sm" type="button" id="tvcopy">Copiar</button></div><button class="btn ghost sm" type="button" id="tvoff">Dejar de transmitir</button>`:`<b>Mostrar la clase en la tele</b><p class="muted">Tu cel queda como control y la tele muestra las láminas. Entrás una vez con tu Gmail de instructor.</p><button class="btn sm" type="button" id="tvon">Conectar con la tele</button>`;
-    const on=$('#tvon',pn);if(on)on.onclick=async()=>{on.disabled=true;on.textContent='Conectando…';if(await tvConectar()){pint();$('#tvb',st)?.classList.add('on')}else{on.disabled=false;on.textContent='Conectar con la tele'}};
-    const off=$('#tvoff',pn);if(off)off.onclick=()=>{tvEnviar({on:false});TVL.on=false;pint();$('#tvb',st)?.classList.remove('on')};
+    const on=$('#tvon',pn);if(on)on.onclick=async()=>{on.disabled=true;on.textContent='Conectando…';if(await tvConectar()){pint();($('#tvb',st)||{classList:{add(){}}}).classList.add('on')}else{on.disabled=false;on.textContent='Conectar con la tele'}};
+    const off=$('#tvoff',pn);if(off)off.onclick=()=>{tvEnviar({on:false});TVL.on=false;pint();($('#tvb',st)||{classList:{remove(){}}}).classList.remove('on')};
     const cp=$('#tvcopy',pn);if(cp)cp.onclick=async()=>{try{await navigator.clipboard.writeText(tvURL);aviso('Link copiado.')}catch(e){const r=document.createRange();r.selectNodeContents(pn.querySelector('code'));const sl=getSelection();sl.removeAllRanges();sl.addRange(r);aviso('Mantené presionado para copiar.')}};
   };
   pint();st.appendChild(pn);

@@ -16,7 +16,7 @@ async function imagenFondo(st) {
   if (!f || !f.img) return null;
   if (fondos[f.id] !== undefined) return fondos[f.id];
   try { const d = await getDoc(doc(db, "proyector", f.id)); fondos[f.id] = d.exists() ? d.data().img || null : null; }
-  catch { fondos[f.id] = null; }
+  catch (e) { fondos[f.id] = null; }
   return fondos[f.id];
 }
 async function aplicar(st, origen) {
@@ -31,7 +31,7 @@ async function aplicar(st, origen) {
 }
 
 // Mismo aparato (otra pestaña o ventana): llega al instante, aun sin internet
-try { const bc = new BroadcastChannel("proyector-meraki"); bc.onmessage = e => { if (e.data && e.data.tipo === "estado") { if (e.data.fondoImg && e.data.estado.fondo) fondos[e.data.estado.fondo.id] = e.data.fondoImg; aplicar(e.data.estado, "local"); } }; } catch { }
+try { const bc = new BroadcastChannel("proyector-meraki"); bc.onmessage = e => { if (e.data && e.data.tipo === "estado") { if (e.data.fondoImg && e.data.estado.fondo) fondos[e.data.estado.fondo.id] = e.data.fondoImg; aplicar(e.data.estado, "local"); } }; } catch (e) { }
 
 // Otro aparato: por internet
 const app = initializeApp(firebaseConfig, "visor");
@@ -46,12 +46,12 @@ let errorFijo = false;
 
 // Pantalla completa y que no se apague
 let lock = null;
-const pedirLock = async () => { try { if ("wakeLock" in navigator && document.visibilityState === "visible") lock = await navigator.wakeLock.request("screen"); } catch { } };
+const pedirLock = async () => { try { if ("wakeLock" in navigator && document.visibilityState === "visible") lock = await navigator.wakeLock.request("screen"); } catch (e) { } };
 pedirLock(); document.addEventListener("visibilitychange", pedirLock);
 document.addEventListener("click", () => {
-  try { if (!document.fullscreenElement) { const p = document.documentElement.requestFullscreen(); if (p && p.catch) p.catch(() => { }); } } catch { }
+  try { if (!document.fullscreenElement) { const p = document.documentElement.requestFullscreen(); if (p && p.catch) p.catch(() => { }); } } catch (e) { }
   aviso.classList.add("off"); pedirLock();
 });
-document.addEventListener("keydown", e => { if (e.key === "f" || e.key === "F") document.documentElement.requestFullscreen?.().catch(() => { }); });
+document.addEventListener("keydown", e => { if (e.key === "f" || e.key === "F") { const de = document.documentElement; if (de.requestFullscreen) de.requestFullscreen().catch(() => { }); } });
 let rt; addEventListener("resize", () => { clearTimeout(rt); rt = setTimeout(() => { if (actual) { esc.key = null; const t = Object.assign({}, actual, { estilo: Object.assign({}, actual.estilo, { trans: "ninguna" }) }); pintar(esc, t, esc._img); } }, 150); });
 window.addEventListener("online", () => aviso.classList.add("off"));

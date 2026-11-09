@@ -46,7 +46,7 @@ export const TRANSICIONES = [["fade", "Desvanecer"], ["zoom", "Zoom"], ["subir",
 export const ESTILO_BASE = { fuente: "Montserrat", tam: 12, margen: 7, alin: "center", mayus: false, negrita: true, color: "#ffffff", sombra: true, sombraColor: "#000000", trans: "fade", cita: true, mov: false, borrarAlFondo: false };
 
 export const norm = s => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
-export const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+export const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
 /* ---- Citas ---- */
 const ALIAS = { sl: 18, salmo: 18, ps: 18, cant: 21, cantar: 21, cantico: 21, jn: 42, jua: 42, mc: 40, mr: 40, mar: 40, mat: 39, lc: 41, luc: 41, hch: 43, hech: 43, act: 43, ro: 44, rom: 44, ga: 47, gal: 47, ef: 48, fil: 49, flp: 49, col: 50, heb: 57, he: 57, stg: 58, sant: 58, ap: 65, apoc: 65, rev: 65, gn: 0, gen: 0, ex: 1, lv: 2, nm: 3, dt: 4, deut: 4, jue: 6, jdg: 6, pr: 19, prov: 19, ec: 20, ecl: 20, is: 22, isa: 22, jer: 23, lm: 24, lam: 24, ez: 25, eze: 25, dn: 26, os: 27, jl: 28, am: 29, abd: 30, jon: 31, mi: 32, miq: 32, nah: 33, hab: 34, sof: 35, hag: 36, zac: 37, mal: 38, mt: 39, jud: 64, tit: 55, flm: 56, file: 56 };
@@ -57,13 +57,13 @@ export function buscarLibro(txt) {
   const m = t.match(/^([123])(.*)$/); const pre = m ? m[1] : ""; const rest = m ? m[2] : t;
   if (!pre && ALIAS[t] !== undefined) return ALIAS[t];
   if (pre && ["jn", "jua", "juan"].includes(rest)) return { 1: 61, 2: 62, 3: 63 }[pre];
-  if (pre && ["s", "sa", "sam"].includes(rest)) return { 1: 8, 2: 9 }[pre] ?? -1;
-  if (pre && ["r", "re", "rey"].includes(rest)) return { 1: 10, 2: 11 }[pre] ?? -1;
-  if (pre && ["cr", "cro"].includes(rest)) return { 1: 12, 2: 13 }[pre] ?? -1;
-  if (pre && ["co", "cor"].includes(rest)) return { 1: 45, 2: 46 }[pre] ?? -1;
-  if (pre && ["ts", "tes"].includes(rest)) return { 1: 51, 2: 52 }[pre] ?? -1;
-  if (pre && ["ti", "tim"].includes(rest)) return { 1: 53, 2: 54 }[pre] ?? -1;
-  if (pre && ["p", "pe", "ped"].includes(rest)) return { 1: 59, 2: 60 }[pre] ?? -1;
+  if (pre && ["s", "sa", "sam"].includes(rest)) return ({ 1: 8, 2: 9 }[pre] || -1);
+  if (pre && ["r", "re", "rey"].includes(rest)) return ({ 1: 10, 2: 11 }[pre] || -1);
+  if (pre && ["cr", "cro"].includes(rest)) return ({ 1: 12, 2: 13 }[pre] || -1);
+  if (pre && ["co", "cor"].includes(rest)) return ({ 1: 45, 2: 46 }[pre] || -1);
+  if (pre && ["ts", "tes"].includes(rest)) return ({ 1: 51, 2: 52 }[pre] || -1);
+  if (pre && ["ti", "tim"].includes(rest)) return ({ 1: 53, 2: 54 }[pre] || -1);
+  if (pre && ["p", "pe", "ped"].includes(rest)) return ({ 1: 59, 2: 60 }[pre] || -1);
   const full = pre + rest;
   let i = NOMBRES_N.findIndex(n => n === full); if (i >= 0) return i;
   i = NOMBRES_N.findIndex(n => n.startsWith(full) && full.length >= (pre ? 2 : 2)); if (i >= 0) return i;
