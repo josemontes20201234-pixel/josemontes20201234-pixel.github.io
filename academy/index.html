@@ -235,7 +235,11 @@ body.tvmode{cursor:none}
 body.tvmode #app,body.tvmode .tabs{display:none!important}
 body.tvmode #stage .sh button,body.tvmode #stage .sf button,body.tvmode #stage #rv{display:none!important}
 body.tvmode #stage{padding:3vh 4vw}
-body.tvmode #stage .slide{font-size:clamp(18px,2.4vw,30px)}
+body.tvmode #stage .slide{font-size:20px;max-width:900px}
+body.tvmode #stage .slide > h2{font-size:64px}
+body.tvmode #stage .slide .card p,body.tvmode #stage .slide .info p{font-size:18px}
+body.tvmode #stage .sh .t{font-size:clamp(18px,2vw,34px)}
+body.tvmode #stage .count{font-size:clamp(13px,1.6vw,26px)}
 #tvwait{position:fixed;top:0;left:0;right:0;bottom:0;z-index:40;display:grid;place-content:center;justify-items:center;gap:18px;text-align:center;background:var(--bg);padding:24px}
 #tvwait h1{font:900 clamp(48px,9vw,120px)/.9 var(--display);text-transform:uppercase}
 #tvwait h1 em{font-style:normal;color:var(--brass);display:block}
@@ -963,7 +967,7 @@ async function modoTeleAcademy(){
   }catch(e){esp.querySelector('p').textContent='No se pudo conectar: '+e.message}
 }
 // En la tele no se puede deslizar: si la lámina es más alta que la pantalla, se reduce hasta que quepa completa
-function ajustarTele(){const b=$('#stage .body'),sl=$('#stage .slide');if(!b||!sl)return;sl.style.zoom=1;const disp=b.clientHeight-8,alto=sl.scrollHeight;if(alto>disp){sl.style.zoom=Math.max(.45,disp/alto*.95).toFixed(3)}}
+function ajustarTele(){const b=$('#stage .body'),sl=$('#stage .slide');if(!b||!sl)return;sl.style.zoom=1;const dh=b.clientHeight-8,dw=b.clientWidth-8,alto=sl.scrollHeight,ancho=sl.offsetWidth||1;let z=Math.min(dh/alto,dw/ancho)*.96;z=Math.max(.45,Math.min(z,2.6));sl.style.zoom=z.toFixed(3)}
 if(TVL.esTele){modoTeleAcademy();let rz;addEventListener('resize',()=>{clearTimeout(rz);rz=setTimeout(ajustarTele,150)})}
 
 /* ============ NAVEGACIÓN GLOBAL ============ */
