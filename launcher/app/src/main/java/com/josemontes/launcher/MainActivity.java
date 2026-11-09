@@ -173,6 +173,7 @@ public class MainActivity extends Activity {
     TextView buscarWeb, tituloCajon;
     final List<TextView> infoViews = new ArrayList<>();
     final List<Dial> diales = new ArrayList<>();
+    final List<TextView> fechas = new ArrayList<>();
     final List<App> todas = new ArrayList<>();
     final List<App> filtradas = new ArrayList<>();
     final Map<String, App> porKey = new HashMap<>();
@@ -187,7 +188,7 @@ public class MainActivity extends Activity {
     final BroadcastReceiver receptor = new BroadcastReceiver() {
         @Override public void onReceive(Context c, Intent i) {
             if (Intent.ACTION_BATTERY_CHANGED.equals(i.getAction())) { leerBateria(i); actualizarInfo(); }
-            else { for (Dial d : diales) d.invalidate(); if (!diaConstruido.equals(hoyClave())) construirInicio(); }
+            else { for (Dial d : diales) d.invalidate(); for (TextView t : fechas) t.setText(textoFecha()); if (!diaConstruido.equals(hoyClave())) construirInicio(); }
         }
     };
 
@@ -625,7 +626,7 @@ public class MainActivity extends Activity {
     // =====================================================================
     void construirInicio() {
         homeBox.removeAllViews();
-        infoViews.clear(); diales.clear();
+        infoViews.clear(); diales.clear(); fechas.clear();
         agendaLista = null; agendaCaja = null; agendaTitulo = null; widgetBox = null; scrollMedio = null;
         diaConstruido = hoyClave();
         View v;
@@ -673,6 +674,16 @@ public class MainActivity extends Activity {
         c.setIncludeFontPadding(false);
         c.setOnClickListener(v -> abrir(new Intent(AlarmClock.ACTION_SHOW_ALARMS), "No encontré la app del reloj."));
         return c;
+    }
+
+    /** Fecha siempre en español, aunque el teléfono esté en inglés. */
+    String textoFecha() { return mayus1(new SimpleDateFormat("EEEE d 'de' MMMM", ES).format(new Date())); }
+
+    TextView fecha(float sp, Typeface t, int color) {
+        TextView v = texto(textoFecha(), sp, color, t);
+        v.setOnClickListener(x -> abrirCalendario(-1));
+        fechas.add(v);
+        return v;
     }
 
     TextView info(float sp, int color) {
@@ -741,7 +752,7 @@ public class MainActivity extends Activity {
         hora.setLetterSpacing(-0.02f);
         if ("clasica".equals(letra) || "condensada".equals(letra)) hora.setTypeface(tf(false));
         h.addView(hora, lp(-2, -2, 26));
-        TextClock fecha = reloj(17, Typeface.create("sans-serif-medium", Typeface.NORMAL), acento, "EEEE d 'de' MMMM", "EEEE d 'de' MMMM");
+        TextView fecha = fecha(17, Typeface.create("sans-serif-medium", Typeface.NORMAL), acento);
         h.addView(fecha, lp(-2, -2, 6));
         h.addView(info(13, MUTED), lp(-1, -2, 8));
         h.addView(poste(132));
@@ -813,7 +824,7 @@ public class MainActivity extends Activity {
         diales.add(d);
         d.setOnClickListener(v -> abrir(new Intent(AlarmClock.ACTION_SHOW_ALARMS), "No encontré la app del reloj."));
         h.addView(d, new LinearLayout.LayoutParams(-1, dp(250)));
-        TextClock fecha = reloj(15, tf(false), acento, "EEEE d 'de' MMMM", "EEEE d 'de' MMMM");
+        TextView fecha = fecha(15, tf(false), acento);
         fecha.setGravity(Gravity.CENTER);
         h.addView(fecha, lp(-1, -2, 4));
         TextView inf = info(12.5f, MUTED);
