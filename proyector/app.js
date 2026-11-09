@@ -83,6 +83,22 @@ function versosDeHtml(html) {
   const docu = new DOMParser().parseFromString(`<div>${html}</div>`, "text/html");
   docu.querySelectorAll("*").forEach(el => { const c = (el.getAttribute("class") || "").toLowerCase(); if (QUITAR.test(c) || el.tagName === "SUP" && /note|fn|f\b/.test(c)) el.remove(); });
   const porVerso = {};
+  // Formato de YouVersion Platform: <span class="yv-v" v="5"></span><span class="yv-vlbl">5</span>texto…
+  const raiz = docu.body.firstElementChild;
+  if (raiz && raiz.querySelector(".yv-v[v]")) {
+    raiz.querySelectorAll(".yv-h, .yv-vlbl, .va, .yv-n, [data-verse-footnote], .yv-chapter").forEach(el => el.remove());
+    let cur = 0;
+    const tw = docu.createTreeWalker(raiz, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT);
+    while (tw.nextNode()) {
+      const n = tw.currentNode;
+      if (n.nodeType === 1) {
+        if (n.classList.contains("yv-v") && n.hasAttribute("v")) { const v = parseInt(n.getAttribute("v"), 10); if (v > 0) cur = v; }
+        else if (cur && /^(P|DIV|BR|LI)$/.test(n.tagName)) porVerso[cur] = (porVerso[cur] || "") + " ";
+      } else if (cur) porVerso[cur] = (porVerso[cur] || "") + n.nodeValue;
+    }
+    const ks = Object.keys(porVerso).map(Number);
+    if (ks.length) { const max = Math.max(...ks); return Array.from({ length: max }, (_, i) => (porVerso[i + 1] || "").replace(/\s+/g, " ").replace(/\s+([,.;:!?»”])/g, "$1").trim()); }
+  }
   docu.querySelectorAll("[data-usfm]").forEach(el => {
     const m = String(el.getAttribute("data-usfm")).split("+")[0].match(/\.(\d+)\.(\d+)$/); if (!m) return;
     if (el.querySelector("[data-usfm]")) return;
@@ -104,7 +120,7 @@ async function cargarCapYV(ver, l, c) {
   let d = await yvGet(`/v1/bibles/${id}/passages/${ref}`);
   let vs = d && d.content ? versosDeHtml(d.content) : null;
   if (!vs) { d = await yvGet(`/v1/bibles/${id}/passages/${ref}?format=text`); vs = versosDeTexto(d && (d.content ?? d)); }
-  if (!vs) throw new Error("No pude separar los versículos de este capítulo.");
+  if (!vs) { const crudo = String((d && (d.content ?? JSON.stringify(d))) || "").replace(/\s+/g, " ").slice(0, 220); throw new Error("No pude separar los versículos. Mandale esta captura a Claude: " + crudo); }
   return vs.map(v => v.normalize("NFC"));
 }
 async function asegurarCap(ver, l, c) {
