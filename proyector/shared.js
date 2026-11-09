@@ -146,7 +146,7 @@ export function pintar(esc, st, fondoImg) {
   }
   esc.negro.classList.toggle("on", !!st.negro);
   // Contenido
-  const key = st.oculto ? "oculto" : [st.modo, st.texto, st.ref, st.titulo, st.img ? st.img.length : 0].join("¦");
+  const key = st.oculto ? "oculto" : [st.modo, st.texto, st.ref, st.titulo, st.img ? st.img.length : 0, st.fin || ""].join("¦");
   const W = esc.root.clientWidth, H = esc.root.clientHeight;
   const maxPx = H * (e.tam / 100);
   const pad = `${(e.margen / 100) * H}px ${(e.margen / 100) * W}px`;
@@ -163,11 +163,28 @@ export function pintar(esc, st, fondoImg) {
     return;
   }
   esc.key = key;
+  clearInterval(esc._reloj);
   esc.capa.querySelectorAll(".esc-item").forEach(o => { o.classList.add("out"); setTimeout(() => o.remove(), 500); });
-  if (st.oculto || (st.modo !== "texto" && st.modo !== "img")) return;
+  if (st.oculto || (st.modo !== "texto" && st.modo !== "img" && st.modo !== "cuenta")) return;
   const it = document.createElement("div"); it.className = "esc-item";
   if (st.modo === "img" && st.img) {
     it.classList.add("img"); it.innerHTML = `<img alt="" src="${st.img}">`;
+  } else if (st.modo === "cuenta") {
+    // Cuenta regresiva: el reloj se calcula en cada pantalla a partir de la hora de fin
+    it.innerHTML = `<div class="t">${st.titulo ? `<span style="font-size:.5em;font-weight:600;letter-spacing:.02em">${esc_(st.titulo)}</span>\n` : ""}<span class="cd" style="font-variant-numeric:tabular-nums;font-size:1.9em;line-height:1.05">00:00</span></div>`;
+    estilizar(it);
+    const cd = it.querySelector(".cd");
+    const tic = () => {
+      const ms = Math.max(0, (st.fin || 0) - Date.now()); const tot = Math.ceil(ms / 1000);
+      const m = Math.floor(tot / 60), sg = tot % 60;
+      cd.textContent = ms > 0 ? `${String(m).padStart(2, "0")}:${String(sg).padStart(2, "0")}` : (st.texto || "00:00");
+      if (ms <= 0) { clearInterval(esc._reloj); if (st.texto) ajustar(it, maxPx); }
+    };
+    if (e.trans !== "ninguna") it.classList.add("in-" + e.trans);
+    esc.capa.appendChild(it);
+    cd.textContent = "00:00"; ajustar(it, maxPx); tic();
+    esc._reloj = setInterval(tic, 250);
+    return;
   } else {
     const ref = e.cita && st.ref ? `<div class="r">${esc_(st.ref)}</div>` : "";
     it.innerHTML = (st.titulo ? `<div class="t">${esc_(st.titulo)}${st.texto ? "\n" : ""}<span style="font-weight:400;font-size:.62em">${esc_(st.texto || "")}</span></div>` : `<div class="t">${esc_(st.texto || "")}</div>`) + ref;

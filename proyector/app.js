@@ -26,6 +26,10 @@ const IC = {
   negro: '<svg viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="5" width="18" height="14" rx="2"/></svg>',
   tv: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="4" width="19" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></svg>',
   out: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 4h4a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-4M10 16l-4-4 4-4M6 12h10"/></svg>',
+  culto: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6h11M9 12h11M9 18h11"/><path d="M4 5.5l1 1 1.5-2M4 11.5l1 1 1.5-2"/><circle cx="5" cy="18" r="1.2"/></svg>',
+  arriba: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 15l6-6 6 6"/></svg>',
+  abajo: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>',
+  reloj: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2.5M9 2h6"/></svg>',
   lupa: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5L21 21M8 10.5h5M10.5 8v5"/></svg>',
   x: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>',
   google: '<svg viewBox="0 0 24 24" width="20" height="20"><path fill="#4285F4" d="M22.6 12.3c0-.8-.1-1.6-.2-2.3H12v4.4h5.9a5 5 0 0 1-2.2 3.3v2.7h3.6c2.1-1.9 3.3-4.8 3.3-8.1z"/><path fill="#34A853" d="M12 23c3 0 5.5-1 7.3-2.7l-3.6-2.7c-1 .7-2.2 1.1-3.7 1.1-2.8 0-5.2-1.9-6.1-4.5H2.2v2.8A11 11 0 0 0 12 23z"/><path fill="#FBBC05" d="M5.9 14.2a6.6 6.6 0 0 1 0-4.3V7.1H2.2a11 11 0 0 0 0 9.9z"/><path fill="#EA4335" d="M12 5.4c1.6 0 3 .6 4.1 1.6l3.1-3.1A11 11 0 0 0 2.2 7.1l3.7 2.8C6.8 7.3 9.2 5.4 12 5.4z"/></svg>'
@@ -39,6 +43,7 @@ const HIMNOS = [{ id: "pd-santo", titulo: "¡Santo! ¡Santo! ¡Santo!", autor: "
 let LIVE = { ts: 0, modo: "fondo", texto: "", ref: "", titulo: "", img: null, fondo: { id: "noche" }, estilo: { ...ESTILO_BASE }, negro: false, oculto: false };
 let CTX = null;                          // de dónde vino lo que está en vivo, para Anterior / Siguiente
 let CANCIONES = [], ANUNCIOS = [], FONDOS_IMG = [], PASAJES = [];
+let CULTO = { items: [] };
 const BIB = {}, IDX = {};
 let TAB = store.get("pr-tab", "biblia");
 const B = { ver: store.get("pr-ver", "rv1909"), vista: "libros", libro: 42, cap: 3, q: "", filtro: "todo" };
@@ -333,6 +338,97 @@ function formPasaje(ps) {
 }
 
 
+
+/* ---------- Orden del culto ---------- */
+function iniciarCuenta(min, titulo, fin) {
+  enviar({ modo: "cuenta", fin: Date.now() + Math.round(min * 60000), titulo: titulo || "", texto: fin || "", ref: "", img: null, negro: false, oculto: false });
+}
+function guardarCulto() { return setDoc(doc(db, "proyector_cfg", "culto"), { items: CULTO.items, cambiado: Date.now() }).catch(er => toast("No se pudo guardar el culto: " + (er.code || er.message))); }
+const corta = (t, n = 60) => { t = String(t || "").replace(/\s+/g, " ").trim(); return t.length > n ? t.slice(0, n - 1) + "…" : t; };
+function slidesCulto() {
+  const out = [];
+  CULTO.items.forEach((it, k) => {
+    if (it.t === "biblia") { for (let v = it.v1; v <= (it.v2 || it.v1); v++) out.push({ k, t: "biblia", ver: it.ver, l: it.l, c: it.c, v, label: `${LIBROS[it.l][1]} ${it.c}:${v}` }); }
+    else if (it.t === "cancion") { const c = todasCanciones().find(x => x.id === it.id); if (!c) { out.push({ k, t: "falta", label: "Canción borrada" }); return; } const e = estrofas(c); e.forEach((x, i) => out.push({ k, t: "texto", texto: x, ref: `${c.titulo}  ·  ${i + 1}/${e.length}`, label: corta(x.split("\n")[0], 50) })); }
+    else if (it.t === "pasaje") { const ps = PASAJES.find(x => x.id === it.id); if (!ps) { out.push({ k, t: "falta", label: "Pasaje borrado" }); return; } laminasDe(ps).forEach(lam => out.push({ k, t: "texto", texto: lam.texto, ref: refLamina(ps, lam), label: `${lam.v ?? ""} ${corta(lam.texto, 46)}`.trim() })); }
+    else if (it.t === "anuncio") { const a = ANUNCIOS.find(x => x.id === it.id); out.push(a ? { k, t: "anuncio", a, label: a.titulo || corta(a.texto, 40) || "Imagen" } : { k, t: "falta", label: "Anuncio borrado" }); }
+    else if (it.t === "texto") { (it.partes || []).forEach(pz => out.push({ k, t: "texto", texto: pz, titulo: it.titulo || "", ref: "", label: corta(pz, 50) })); }
+    else if (it.t === "cuenta") out.push({ k, t: "cuenta", min: it.min, titulo: it.titulo, fin: it.fin, label: `${it.min} min · ${it.titulo || "Cuenta regresiva"}` });
+  });
+  return out;
+}
+function nombreItem(it) {
+  if (it.t === "biblia") return { tipo: "Lectura", nom: `${LIBROS[it.l][0]} ${it.c}:${it.v1}${it.v2 && it.v2 !== it.v1 ? "-" + it.v2 : ""} · ${verInfo(it.ver).corto}` };
+  if (it.t === "cancion") { const c = todasCanciones().find(x => x.id === it.id); return { tipo: "Canto", nom: c ? c.titulo : "Canción borrada" }; }
+  if (it.t === "pasaje") { const p = PASAJES.find(x => x.id === it.id); return { tipo: "Pasaje", nom: p ? `${p.cita} · ${p.version}` : "Pasaje borrado" }; }
+  if (it.t === "anuncio") { const a = ANUNCIOS.find(x => x.id === it.id); return { tipo: "Anuncio", nom: a ? (a.titulo || corta(a.texto, 40) || "Imagen") : "Anuncio borrado" }; }
+  if (it.t === "texto") return { tipo: "Texto", nom: it.titulo || corta((it.partes || [])[0], 40) };
+  if (it.t === "cuenta") return { tipo: "Cuenta regresiva", nom: `${it.min} minutos` };
+  return { tipo: "", nom: "" };
+}
+async function proyectarSlide(i) {
+  const S = slidesCulto(); const sl = S[i]; if (!sl) return;
+  const ctx = { tipo: "culto", i, n: S.length };
+  if (sl.t === "biblia") {
+    let cap; try { cap = await asegurarCap(sl.ver, sl.l, sl.c); } catch (er) { return toast(er.message); }
+    const t = cap?.[sl.v - 1]; if (t == null) return toast("No encontré " + sl.label);
+    proyectarTexto(t, citaTexto(sl.ver, sl.l, sl.c, sl.v), "", ctx);
+  } else if (sl.t === "texto") proyectarTexto(sl.texto, sl.ref || "", sl.titulo || "", ctx);
+  else if (sl.t === "anuncio") { proyectarAnuncio(sl.a); CTX = ctx; actualizarLive(); }
+  else if (sl.t === "cuenta") { CTX = ctx; iniciarCuenta(sl.min, sl.titulo, sl.fin); }
+  else { CTX = ctx; toast(sl.label + ": ya no existe. Quitalo del culto."); actualizarLive(); }
+  $$("[data-slide]").forEach(el => el.classList.toggle("on", +el.dataset.slide === i));
+  const on = $("[data-slide].on"); if (on) on.scrollIntoView({ block: "nearest", behavior: "smooth" });
+}
+function vCulto() {
+  const S = slidesCulto(); let idx = 0;
+  const actual = CTX && CTX.tipo === "culto" ? CTX.i : -1;
+  const items = CULTO.items.map((it, k) => {
+    const n = nombreItem(it); const mis = S.filter(x => x.k === k);
+    const html = `<div class="field" style="gap:8px"><div style="display:flex;gap:6px;align-items:center"><span style="flex:1;min-width:0"><span class="lbl" style="color:var(--accent)">${k + 1} · ${esc(n.tipo)}</span><b style="display:block;font-size:15.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(n.nom)}</b></span>
+      <button class="iconbtn" style="width:32px;height:32px" type="button" data-cmov="${k},-1" aria-label="Subir" ${k === 0 ? "disabled" : ""}>${IC.arriba}</button><button class="iconbtn" style="width:32px;height:32px" type="button" data-cmov="${k},1" aria-label="Bajar" ${k === CULTO.items.length - 1 ? "disabled" : ""}>${IC.abajo}</button><button class="iconbtn" style="width:32px;height:32px" type="button" data-cdel="${k}" aria-label="Quitar">${IC.x}</button></div>
+      <div class="vlist">${mis.map(sl => { const i = idx++; return `<div class="v ${i === actual ? "on" : ""}" role="button" tabindex="0" data-slide="${i}" style="padding:8px 10px"><span class="n">${i + 1}</span><span class="x" style="font-size:14px">${esc(sl.label)}</span><span></span></div>`; }).join("")}</div></div>`;
+    return html;
+  }).join("");
+  return `<div class="sec"><div class="head"><h2>Orden del culto</h2><button class="btn sm" type="button" data-cadd>+ Agregar</button></div>
+    <div class="field"><span>${IC.reloj.replace("<svg", '<svg style="width:16px;height:16px;vertical-align:-3px"')} Cuenta regresiva rápida</span>
+      <input class="input" id="cdTit" style="background:var(--surface-2)" value="${esc(store.get("pr-cdtit", "El culto inicia en"))}" aria-label="Texto arriba del reloj">
+      <div class="chips">${[1, 3, 5, 10, 15].map(m => `<button type="button" data-cdmin="${m}">${m} min</button>`).join("")}</div></div>
+    ${CULTO.items.length ? `<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" type="button" id="cStart">▶ Empezar desde el inicio</button></div><div class="list">${items}</div>
+      <p class="muted" style="font-size:13px">Con <b>Sigue</b> ▶ pasás por todo el culto en orden: versículos, estrofas, anuncios y cuentas regresivas.</p>
+      <button class="btn danger sm" type="button" id="cClear" style="justify-self:start">Nuevo culto (borrar la lista)</button><div id="cClearBox"></div>`
+      : `<div class="empty">Armá el orden del servicio antes del culto: bienvenida, cantos, lecturas, puntos de la prédica y anuncios. Después sólo tocás <b>Sigue</b>.<button class="btn sm" type="button" data-cadd>+ Agregar el primero</button></div>`}</div>`;
+}
+function hojaAgregarCulto() {
+  let tipo = "biblia";
+  const T = [["biblia", "Versículos"], ["cancion", "Canto"], ["texto", "Texto o bosquejo"], ["anuncio", "Anuncio"], ["pasaje", "Pasaje del culto"], ["cuenta", "Cuenta regresiva"]];
+  const form = () => {
+    if (tipo === "biblia") return `<label>Cita<input id="ca_cita" placeholder="Juan 3:16-18" autocomplete="off"></label><label>Versión<select id="ca_ver">${todasVersiones().map(v => `<option value="${esc(v.id)}" ${v.id === B.ver ? "selected" : ""}>${esc(v.corto)} · ${esc(v.nombre)}</option>`).join("")}</select></label>`;
+    if (tipo === "cancion") { const L = todasCanciones().sort((a, b) => a.titulo.localeCompare(b.titulo, "es")); return L.length ? `<label>Canto<select id="ca_id">${L.map(c => `<option value="${esc(c.id)}">${esc(c.titulo)}</option>`).join("")}</select></label>` : `<p class="muted">Primero agregá cantos en la pestaña Cantos.</p>`; }
+    if (tipo === "pasaje") return PASAJES.length ? `<label>Pasaje<select id="ca_id">${PASAJES.map(p => `<option value="${esc(p.id)}">${esc(p.cita)} · ${esc(p.version)}</option>`).join("")}</select></label>` : `<p class="muted">Primero pegá un pasaje en Biblia → Pasajes del culto.</p>`;
+    if (tipo === "anuncio") return ANUNCIOS.length ? `<label>Anuncio<select id="ca_id">${ANUNCIOS.map(a => `<option value="${esc(a.id)}">${esc(a.titulo || corta(a.texto, 40) || "Imagen")}</option>`).join("")}</select></label>` : `<p class="muted">Primero guardá un anuncio en la pestaña Anuncios.</p>`;
+    if (tipo === "texto") return `<label>Título (opcional, sale arriba en cada pantalla)<input id="ca_tit" placeholder="La fe que obedece"></label><label>Texto · dejá una línea en blanco para pasar a otra pantalla<textarea id="ca_txt" style="min-height:150px" placeholder="Bienvenidos a la casa de Dios&#10;&#10;1. La fe escucha&#10;&#10;2. La fe obedece"></textarea></label>`;
+    if (tipo === "cuenta") return `<label>Texto arriba del reloj<input id="ca_tit" value="El culto inicia en"></label><label>Minutos<input id="ca_min" type="number" min="1" max="120" value="5" inputmode="numeric"></label><label>Texto al llegar a cero (opcional)<input id="ca_fin" placeholder="¡Bienvenidos!"></label>`;
+  };
+  abrirHoja("Agregar al culto", `<div class="chips" id="caT">${T.map(t => `<button type="button" data-cat="${t[0]}" aria-pressed="${t[0] === tipo}">${t[1]}</button>`).join("")}</div><form class="form" id="caF"><div id="caBody">${form()}</div><button class="btn wide" type="submit">Agregar al final</button></form>`, s => {
+    s.addEventListener("click", e => { const b = e.target.closest("[data-cat]"); if (!b) return; tipo = b.dataset.cat; $$("[data-cat]", s).forEach(x => x.setAttribute("aria-pressed", x === b)); $("#caBody", s).innerHTML = form(); });
+    $("#caF", s).onsubmit = async e => {
+      e.preventDefault(); let it = null;
+      if (tipo === "biblia") {
+        const raw = $("#ca_cita", s).value.trim(); const m = raw.match(/-\s*(\d+)\s*$/); const p = parseCita(raw.replace(/-\s*\d+\s*$/, ""));
+        if (!p) return toast("No reconozco esa cita. Probá así: Juan 3:16-18");
+        const bib = BIB.rv1909 || await cargarVersion("rv1909"); if (!bib[p.libro] || p.cap > bib[p.libro].length) return toast("Ese capítulo no existe.");
+        const v1 = p.vers || 1, v2 = m ? +m[1] : (p.vers || bib[p.libro][p.cap - 1].length);
+        if (v2 < v1) return toast("El versículo final debe ser mayor que el inicial.");
+        it = { t: "biblia", ver: $("#ca_ver", s).value, l: p.libro, c: p.cap, v1, v2 };
+      } else if (tipo === "cancion" || tipo === "pasaje" || tipo === "anuncio") { const sel = $("#ca_id", s); if (!sel) return; it = { t: tipo, id: sel.value }; }
+      else if (tipo === "texto") { const partes = $("#ca_txt", s).value.replace(/\r/g, "").split(/\n\s*\n/).map(x => x.trim()).filter(Boolean); if (!partes.length) return toast("Escribí el texto."); it = { t: "texto", titulo: $("#ca_tit", s).value.trim(), partes }; }
+      else if (tipo === "cuenta") { const min = Math.max(1, Math.min(120, +$("#ca_min", s).value || 5)); it = { t: "cuenta", min, titulo: $("#ca_tit", s).value.trim(), fin: $("#ca_fin", s).value.trim() }; }
+      CULTO.items = [...CULTO.items, it]; await guardarCulto(); toast("Agregado al culto."); cerrarHoja(); renderMain();
+    };
+  });
+}
+
 /* ---------- Estudio: texto original, Strong y gramática (datos STEPBible.org, CC BY 4.0) ---------- */
 const EST = {}, LEX = {};
 async function libroEstudio(l) { if (!EST[l]) { const r = await fetch(`estudio/${l}.json`); if (!r.ok) throw new Error("No se pudo cargar el texto original."); EST[l] = await r.json(); } return EST[l]; }
@@ -610,6 +706,7 @@ function actualizarLive() {
   const t = $("#nowT"), s = $("#nowS"); if (!t) return;
   if (LIVE.modo === "texto") { t.textContent = LIVE.ref || LIVE.titulo || "Texto"; s.textContent = (LIVE.texto || "").replace(/\n/g, " "); }
   else if (LIVE.modo === "img") { t.textContent = "Imagen"; s.textContent = "Anuncio con imagen"; }
+  else if (LIVE.modo === "cuenta") { const f = new Date(LIVE.fin || 0); t.textContent = "Cuenta regresiva"; s.textContent = `${LIVE.titulo || ""} · termina ${f.toLocaleTimeString("es", { hour: "numeric", minute: "2-digit" })}`; }
   else { t.textContent = "Sólo el fondo"; s.textContent = "Escogé un versículo, canción o anuncio"; }
   if (LIVE.negro) s.textContent = "Pantalla en negro";
   else if (LIVE.oculto) s.textContent = "Texto oculto · se ve sólo el fondo";
@@ -620,6 +717,7 @@ function paso(d) {
   if (!CTX) return;
   if (CTX.tipo === "biblia") pasoBiblia(d);
   else if (CTX.tipo === "cancion") { const i = CTX.i + d; if (i >= 0 && i < CTX.n) proyectarEstrofa(CTX.id, i); }
+  else if (CTX.tipo === "culto") { proyectarSlide(CTX.i + d); return; }
   else if (CTX.tipo === "pasaje") {
     const i = CTX.i + d;
     if (i >= 0 && i < CTX.n) return proyectarPasaje(CTX.id, i);
@@ -691,13 +789,13 @@ function cerrarHoja() { $("#sheet").innerHTML = "" }
 
 /* ---------- pestañas ---------- */
 function renderTabs() {
-  const T = [["biblia", "Biblia"], ["canciones", "Canciones"], ["anuncios", "Anuncios"], ["fondos", "Fondos"], ["estilo", "Estilo"]];
-  const ic = { biblia: IC.biblia, canciones: IC.cancion, anuncios: IC.anuncio, fondos: IC.fondo, estilo: IC.estilo };
+  const T = [["culto", "Culto"], ["biblia", "Biblia"], ["canciones", "Cantos"], ["anuncios", "Anuncios"], ["fondos", "Fondos"], ["estilo", "Estilo"]];
+  const ic = { culto: IC.culto, biblia: IC.biblia, canciones: IC.cancion, anuncios: IC.anuncio, fondos: IC.fondo, estilo: IC.estilo };
   $("#tabs nav").innerHTML = T.map(t => `<button type="button" data-tab="${t[0]}" ${TAB === t[0] ? 'aria-current="page"' : ""}>${ic[t[0]]}${t[1]}</button>`).join("");
 }
 function renderMain() {
   const m = $("#main"); if (!m) return;
-  m.innerHTML = TAB === "biblia" ? vBiblia() : TAB === "canciones" ? vCanciones() : TAB === "anuncios" ? vAnuncios() : TAB === "fondos" ? vFondos() : vEstilo();
+  m.innerHTML = TAB === "culto" ? vCulto() : TAB === "biblia" ? vBiblia() : TAB === "canciones" ? vCanciones() : TAB === "anuncios" ? vAnuncios() : TAB === "fondos" ? vFondos() : vEstilo();
   renderTabs(); bindMain(); if (TAB === "biblia") marcarVerso();
 }
 function bindMain() {
@@ -746,6 +844,15 @@ document.addEventListener("click", e => {
   if ((x = g("[data-libro]"))) { B.libro = +x.dataset.libro; B.vista = "caps"; renderMain(); scrollTo({ top: 0 }); return; }
   if ((x = g("[data-cap]"))) { B.cap = +x.dataset.cap; B.vista = "vers"; renderMain(); scrollTo({ top: 0 }); return; }
   if ((x = g("[data-capd]"))) { const bib = BIB[B.ver]; let l = B.libro, c = B.cap + +x.dataset.capd; if (c < 1) { if (l === 0) return; l--; c = bib[l].length } else if (c > bib[l].length) { if (l === 65) return; l++; c = 1 } B.libro = l; B.cap = c; renderMain(); scrollTo({ top: 0 }); return; }
+  if (g("[data-cadd]")) { hojaAgregarCulto(); return; }
+  if ((x = g("[data-slide]"))) { proyectarSlide(+x.dataset.slide); return; }
+  if ((x = g("[data-cmov]"))) { const [k, d] = x.dataset.cmov.split(",").map(Number); const a = [...CULTO.items]; const j = k + d; if (j < 0 || j >= a.length) return; [a[k], a[j]] = [a[j], a[k]]; CULTO.items = a; if (CTX && CTX.tipo === "culto") CTX = null; guardarCulto(); renderMain(); actualizarLive(); return; }
+  if ((x = g("[data-cdel]"))) { CULTO.items = CULTO.items.filter((_, i) => i !== +x.dataset.cdel); if (CTX && CTX.tipo === "culto") CTX = null; guardarCulto(); renderMain(); actualizarLive(); return; }
+  if ((x = g("[data-cdmin]"))) { const t = ($("#cdTit")?.value || "").trim(); store.set("pr-cdtit", t); CTX = null; iniciarCuenta(+x.dataset.cdmin, t); toast(`Cuenta regresiva de ${x.dataset.cdmin} min en pantalla.`); return; }
+  if (g("#cStart")) { proyectarSlide(0); return; }
+  if (g("#cClear")) { $("#cClearBox").innerHTML = `<div class="confirm"><b>¿Borrar toda la lista del culto?</b><span style="font-size:14px">Los cantos, pasajes y anuncios no se borran; sólo la lista.</span><div style="display:flex;gap:8px"><button class="btn danger sm" type="button" id="cClear2">Sí, empezar de nuevo</button><button class="btn ghost sm" type="button" id="cClear0">Cancelar</button></div></div>`; return; }
+  if (g("#cClear0")) { $("#cClearBox").innerHTML = ""; return; }
+  if (g("#cClear2")) { CULTO.items = []; if (CTX && CTX.tipo === "culto") CTX = null; guardarCulto(); renderMain(); actualizarLive(); return; }
   if ((x = g("[data-study]"))) { const [l, c, v] = x.dataset.study.split(",").map(Number); estudiar(l, c, v); return; }
   if ((x = g("[data-fav]"))) { toggleFav(B.libro, B.cap, +x.dataset.fav); x.classList.toggle("on"); return; }
   if ((x = g("[data-unfav]"))) { const [l, c, v] = x.dataset.unfav.split(",").map(Number); toggleFav(l, c, v); renderMain(); return; }
@@ -807,6 +914,7 @@ onAuthStateChanged(auth, async u => {
   if (esYV(B.ver) && !todasVersiones().some(v => v.id === B.ver)) B.ver = "rv1909";
   cargarVersion(B.ver).then(() => { if (TAB === "biblia") renderMain() }).catch(er => toast(er.message));
   stopFns.push(onSnapshot(collection(db, "proyector_canciones"), s => { CANCIONES = s.docs.map(d => ({ id: d.id, ...d.data() })); if (TAB === "canciones") renderMain() }, er => toast("Canciones: " + (er.code || er.message))));
+  stopFns.push(onSnapshot(doc(db, "proyector_cfg", "culto"), d => { CULTO = d.exists() ? Object.assign({ items: [] }, d.data()) : { items: [] }; if (TAB === "culto") renderMain(); }, er => toast("Culto: " + (er.code || er.message))));
   stopFns.push(onSnapshot(collection(db, "proyector_pasajes"), s => { PASAJES = s.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (a.creado || 0) - (b.creado || 0)); if (TAB === "biblia") renderMain() }, er => toast("Pasajes: " + (er.code || er.message))));
   stopFns.push(onSnapshot(collection(db, "proyector_anuncios"), s => { ANUNCIOS = s.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (b.creado || 0) - (a.creado || 0)); if (TAB === "anuncios") renderMain() }, er => toast("Anuncios: " + (er.code || er.message))));
   stopFns.push(onSnapshot(query(collection(db, "proyector"), where("tipo", "==", "fondo")), s => { FONDOS_IMG = s.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (a.creado || 0) - (b.creado || 0)); if (TAB === "fondos") renderMain(); pintar(escena, LIVE, fondoImgActual()) }, er => toast("Fondos: " + (er.code || er.message))));
