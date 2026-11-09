@@ -26,6 +26,7 @@ const IC = {
   negro: '<svg viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="5" width="18" height="14" rx="2"/></svg>',
   tv: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="4" width="19" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></svg>',
   out: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 4h4a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-4M10 16l-4-4 4-4M6 12h10"/></svg>',
+  lupa: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5L21 21M8 10.5h5M10.5 8v5"/></svg>',
   x: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>',
   google: '<svg viewBox="0 0 24 24" width="20" height="20"><path fill="#4285F4" d="M22.6 12.3c0-.8-.1-1.6-.2-2.3H12v4.4h5.9a5 5 0 0 1-2.2 3.3v2.7h3.6c2.1-1.9 3.3-4.8 3.3-8.1z"/><path fill="#34A853" d="M12 23c3 0 5.5-1 7.3-2.7l-3.6-2.7c-1 .7-2.2 1.1-3.7 1.1-2.8 0-5.2-1.9-6.1-4.5H2.2v2.8A11 11 0 0 0 12 23z"/><path fill="#FBBC05" d="M5.9 14.2a6.6 6.6 0 0 1 0-4.3V7.1H2.2a11 11 0 0 0 0 9.9z"/><path fill="#EA4335" d="M12 5.4c1.6 0 3 .6 4.1 1.6l3.1-3.1A11 11 0 0 0 2.2 7.1l3.7 2.8C6.8 7.3 9.2 5.4 12 5.4z"/></svg>'
 };
@@ -207,7 +208,7 @@ function vBiblia() {
     }
     const cap = bib[B.libro][B.cap - 1] || [];
     body = `<div class="crumbs"><button type="button" data-bv="libros">Libros</button><span>›</span><button type="button" data-libro="${B.libro}">${esc(LIBROS[B.libro][0])}</button><span>›</span>Capítulo ${B.cap}</div>
-      <div class="vlist">${cap.map((t, i) => t ? `<div class="v" data-v="${i + 1}" role="button" tabindex="0"><span class="n">${i + 1}</span><span class="x">${esc(t)}</span><button type="button" class="star ${esFav(B.libro, B.cap, i + 1) ? "on" : ""}" data-fav="${i + 1}" aria-label="Favorito">★</button></div>` : "").join("")}</div>
+      <div class="vlist">${cap.map((t, i) => t ? `<div class="v" data-v="${i + 1}" role="button" tabindex="0"><span class="n">${i + 1}</span><span class="x">${esc(t)}</span><span class="acc"><button type="button" class="star ${esFav(B.libro, B.cap, i + 1) ? "on" : ""}" data-fav="${i + 1}" aria-label="Favorito">★</button><button type="button" class="studybtn" data-study="${B.libro},${B.cap},${i + 1}" aria-label="Estudiar en griego o hebreo">${IC.lupa}</button></span></div>` : "").join("")}</div>
       <div class="row" style="display:flex;gap:8px;justify-content:space-between"><button type="button" class="btn ghost sm" data-capd="-1" ${B.libro === 0 && B.cap === 1 ? "disabled" : ""}>← Cap. anterior</button><button type="button" class="btn ghost sm" data-capd="1">Cap. siguiente →</button></div>`;
   } else if (B.vista === "buscar") {
     if (esYV(B.ver)) return `<div class="sec">${vers}${ir}${modos}<div class="empty">La búsqueda por palabras funciona con las versiones RV1909, RV1865 y KJV. Para ${esc(verInfo(B.ver).corto)}, usá "Ir a…" o Libros.</div></div>`;
@@ -328,6 +329,100 @@ function formPasaje(ps) {
       } catch (er) { toast("No se pudo guardar: " + (er.code || er.message)) }
     };
     const d = $("#p_del", s); if (d) d.onclick = async () => { try { await deleteDoc(doc(db, "proyector_pasajes", ps.id)); cerrarHoja(); toast("Pasaje borrado.") } catch (er) { toast("No se pudo borrar: " + (er.code || er.message)) } };
+  });
+}
+
+
+/* ---------- Estudio: texto original, Strong y gramática (datos STEPBible.org, CC BY 4.0) ---------- */
+const EST = {}, LEX = {};
+async function libroEstudio(l) { if (!EST[l]) { const r = await fetch(`estudio/${l}.json`); if (!r.ok) throw new Error("No se pudo cargar el texto original."); EST[l] = await r.json(); } return EST[l]; }
+async function lexico(t) { if (!LEX[t]) { const r = await fetch(`estudio/lex-${t}.json`); if (!r.ok) throw new Error("No se pudo cargar el diccionario."); LEX[t] = await r.json(); } return LEX[t]; }
+function buscarLex(lx, s) {
+  if (!s || !lx) return null; if (lx[s]) return lx[s];
+  const m = String(s).match(/^([GH])(\d+)([A-Za-z]?)$/); if (!m) return null;
+  return lx[m[1] + m[2] + m[3].toLowerCase()] || lx[m[1] + m[2]] || lx[m[1] + m[2] + "a"] || null;
+}
+const strongCorto = s => String(s || "").replace(/^([GH])0*(\d+)([A-Za-z]?)$/, (m, a, n, x) => a + n + (x ? x.toLowerCase() : ""));
+const LK = { 0: "Gn", 39: "Mt" };
+function linkLogos(l, c, v) { return `https://logosklogos.com/${l >= 39 ? "NT" : "AT"}/${LK[l] || LIBROS[l][1]}/${c}/${v}`; }
+
+// Gramática griega (códigos Robinson) en español
+function morfoG(code) {
+  if (!code) return "";
+  const P = { ADV: "adverbio", CONJ: "conjunción", COND: "partícula condicional", PRT: "partícula", PREP: "preposición", INJ: "interjección", ARAM: "palabra aramea", HEB: "palabra hebrea" };
+  const base = code.split("-");
+  if (P[base[0]]) return P[base[0]] + (base[1] === "N" ? " negativa" : base[1] === "I" ? " interrogativa" : "");
+  const CAS = { N: "nominativo", G: "genitivo", D: "dativo", A: "acusativo", V: "vocativo" }, NUM = { S: "singular", P: "plural" }, GEN = { M: "masculino", F: "femenino", N: "neutro" };
+  const cng = x => { if (!x) return ""; const m = x.match(/^([123])?([NGDAV])([SP])([MFN])?/); if (!m) return ""; return [m[1] ? m[1] + "ª persona" : "", CAS[m[2]], NUM[m[3]], GEN[m[4]]].filter(Boolean).join(", "); };
+  const POS = { N: "sustantivo", A: "adjetivo", T: "artículo", P: "pronombre personal", R: "pronombre relativo", C: "pronombre recíproco", D: "pronombre demostrativo", K: "pronombre correlativo", I: "pronombre interrogativo", X: "pronombre indefinido", Q: "pronombre correlativo", F: "pronombre reflexivo", S: "pronombre posesivo" };
+  if (base[0] === "V") {
+    const m = (base[1] || "").match(/^(2)?([PIFARL])([AMPEDON])([ISOMNPR])$/);
+    const T = { P: "presente", I: "imperfecto", F: "futuro", A: "aoristo", R: "perfecto", L: "pluscuamperfecto" }, VZ = { A: "activa", M: "media", P: "pasiva", E: "media o pasiva", D: "media deponente", O: "pasiva deponente", N: "media o pasiva deponente" }, MO = { I: "indicativo", S: "subjuntivo", O: "optativo", M: "imperativo", N: "infinitivo", P: "participio", R: "participio imperativo" };
+    if (!m) return "verbo";
+    let out = `verbo, ${m[1] ? "segundo " : ""}${T[m[2]]}, voz ${VZ[m[3]]}, ${MO[m[4]]}`;
+    const r = base[2] || "";
+    if (/^[123][SP]$/.test(r)) out += `, ${r[0]}ª persona ${NUM[r[1]]}`; else if (r) out += ", " + cng(r);
+    return out;
+  }
+  if (POS[base[0]]) { const rest = cng(base[1]); return POS[base[0]] + (rest ? ", " + rest : "") + (base.includes("PRI") || base[1] === "PRI" ? " (nombre propio)" : ""); }
+  return code;
+}
+// Gramática hebrea (códigos OpenScriptures) en español
+function morfoH(code) {
+  if (!code) return "";
+  const lang = code[0] === "A" ? "arameo: " : "";
+  const G = { m: "masculino", f: "femenino", b: "ambos géneros", c: "común" }, N = { s: "singular", p: "plural", d: "dual" }, ST = { a: "absoluto", c: "constructo", d: "determinado" };
+  const STEM = { q: "qal", N: "nifal", p: "piel", P: "pual", h: "hifil", H: "hofal", t: "hitpael", o: "polel", O: "polal", r: "hitpolel", m: "poel", M: "poal", k: "palel", K: "pulal", Q: "qal pasivo", l: "pilpel", L: "polpal", f: "hitpalpel", D: "nitpael", j: "pealal", i: "pilel", u: "hotpaal", c: "tifil", v: "hishtafel", w: "nitpael", y: "hitpoel", z: "hitpael", e: "peal", E: "peil", a: "hafel", b: "hufal", g: "shafel", s: "hitpeel", x: "itpeal" };
+  const TY = { p: "perfecto (qatal)", q: "perfecto consecutivo (weqatal)", i: "imperfecto (yiqtol)", w: "imperfecto consecutivo (wayyiqtol)", h: "cohortativo", j: "yusivo", v: "imperativo", r: "participio activo", s: "participio pasivo", a: "infinitivo absoluto", c: "infinitivo constructo" };
+  const seg = s => {
+    const t = s[0], r = s.slice(1);
+    if (t === "V") { const p = r.match(/^(.)(.)([123])?([mfbc])?([spd])?([acd])?/); if (!p) return "verbo"; return ["verbo " + (STEM[p[1]] || ""), TY[p[2]] || "", p[3] ? p[3] + "ª persona" : "", G[p[4]], N[p[5]]].filter(Boolean).join(", "); }
+    if (t === "N") { const p = r.match(/^([cgpx])?([mfbc])?([spd])?([acd])?/) || []; return [p[1] === "p" ? "nombre propio" : p[1] === "g" ? "gentilicio" : "sustantivo", G[p[2]], N[p[3]], ST[p[4]]].filter(Boolean).join(", "); }
+    if (t === "A") { const p = r.match(/^([acgo])?([mfbc])?([spd])?([acd])?/) || []; return [{ a: "adjetivo", c: "número cardinal", g: "gentilicio", o: "número ordinal" }[p[1]] || "adjetivo", G[p[2]], N[p[3]], ST[p[4]]].filter(Boolean).join(", "); }
+    if (t === "P") { const p = r.match(/^([dfipr])?([123])?([mfbc])?([spd])?/) || []; return [{ d: "pronombre demostrativo", f: "pronombre indefinido", i: "pronombre interrogativo", p: "pronombre personal", r: "pronombre relativo" }[p[1]] || "pronombre", p[2] ? p[2] + "ª persona" : "", G[p[3]], N[p[4]]].filter(Boolean).join(", "); }
+    if (t === "S") { const p = r.match(/^([dhnp])([123])?([mfbc])?([spd])?/) || []; return p[1] === "p" ? ["sufijo pronominal", p[2] ? p[2] + "ª persona" : "", G[p[3]], N[p[4]]].filter(Boolean).join(", ") : { d: "he direccional", h: "he paragógica", n: "nun paragógica" }[p[1]] || "sufijo"; }
+    if (t === "T") return { a: "partícula afirmativa", d: "artículo definido", e: "partícula exhortativa", i: "partícula interrogativa", j: "interjección", m: "partícula demostrativa", n: "partícula negativa", o: "marca de objeto directo", r: "partícula relativa" }[r[0]] || "partícula";
+    if (t === "R") return r[0] === "d" ? "preposición con artículo" : "preposición";
+    if (t === "C") return "conjunción";
+    if (t === "D") return "adverbio";
+    return s;
+  };
+  return lang + code.slice(1).split("/").map(seg).join(" + ");
+}
+
+async function estudiar(l, c, v) {
+  const nt = l >= 39;
+  abrirHoja(`${LIBROS[l][0]} ${c}:${v}`, `<div id="estbox" style="display:grid;gap:12px"><p class="muted">Cargando el ${nt ? "griego" : "hebreo"}…</p></div>`);
+  const box = $("#estbox"); if (!box) return;
+  let ws, lx;
+  try { const r = await Promise.all([libroEstudio(l), lexico(nt ? "g" : "h")]); ws = r[0]?.[c]?.[v]; lx = r[1]; }
+  catch (er) { box.innerHTML = `<div class="confirm">${esc(er.message)}</div>`; return; }
+  if (!ws || !ws.length) { box.innerHTML = `<div class="empty">No hay texto original para este versículo.</div><a class="btn ghost sm" href="${linkLogos(l, c, v)}" target="_blank" rel="noopener">Abrir en LogosKLogos</a>`; return; }
+  const trad = BIB[B.ver]?.[l]?.[c - 1]?.[v - 1] || BIB.rv1909?.[l]?.[c - 1]?.[v - 1] || "";
+  const original = ws.map(w => w[0]).join(" ");
+  const glosa = w => nt ? (w[4] || w[5]) : w[5];
+  box.innerHTML = `${trad ? `<p style="font-size:15px">${esc(trad)} <span class="muted" style="font-size:12px">· ${esc(verInfo(B.ver).corto)}</span></p>` : ""}
+    <p class="orig" dir="${nt ? "ltr" : "rtl"}">${esc(original)}</p>
+    <span class="lbl">${nt ? "Griego · tocá una palabra" : "Hebreo · se lee de derecha a izquierda · tocá una palabra"}</span>
+    <div class="inter ${nt ? "" : "rtl"}">${ws.map((w, i) => `<button type="button" class="pal" data-pal="${i}"><span class="o" dir="${nt ? "ltr" : "rtl"}">${esc(w[0])}</span><span class="tr">${esc(w[1])}</span><span class="gl">${esc(glosa(w) || "—")}</span><span class="sn">${esc(strongCorto(w[2]))}</span></button>`).join("")}</div>
+    <div id="det"></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn sm" type="button" id="projOrig">Proyectar el ${nt ? "griego" : "hebreo"}</button><a class="btn ghost sm" href="${linkLogos(l, c, v)}" target="_blank" rel="noopener" style="text-decoration:none">Abrir en LogosKLogos</a></div>
+    <p class="credit">Texto original, Strong y gramática: STEPBible.org (Tyndale House), licencia CC BY 4.0.${nt ? "" : " Las traducciones palabra por palabra del hebreo están en inglés."}</p>`;
+  $("#projOrig").onclick = () => { CTX = { tipo: "biblia", ver: B.ver, l, c, v }; enviar({ modo: "texto", texto: original, ref: `${LIBROS[l][0]} ${c}:${v} · ${nt ? "Griego" : "Hebreo"}`, titulo: "", img: null, negro: false, oculto: false }); toast("Proyectando el texto original."); };
+  box.addEventListener("click", e => {
+    const b = e.target.closest("[data-pal]"); if (!b) return;
+    $$(".pal", box).forEach(x => x.classList.toggle("on", x === b));
+    const w = ws[+b.dataset.pal]; const L = buscarLex(lx, w[2]) || [];
+    const lema = L[0] || w[6] || w[0], tr = String(L[1] || w[1]).replace(/\./g, ""), gl = (nt ? w[4] : "") || L[2] || w[5] || "";
+    const sig = L[2] ? L[2] + " (inglés)" : gl;
+    const det = $("#det", box);
+    det.innerHTML = `<div class="det"><div class="lem" dir="${nt ? "ltr" : "rtl"}">${esc(lema)}</div><span class="muted" style="font-style:italic">${esc(tr)}</span>
+      <dl><dt>Strong</dt><dd class="mono">${esc(strongCorto(w[2]))}</dd><dt>Significado</dt><dd>${esc(sig)}</dd><dt>En este versículo</dt><dd>${esc(w[0])} · ${esc(glosa(w) || "")}</dd><dt>Gramática</dt><dd style="font-weight:600">${esc(nt ? morfoG(w[3]) : morfoH(w[3]))}</dd></dl>
+      ${L[3] ? `<span class="lbl">Definición del diccionario (en inglés)</span><div class="def">${esc(L[3])}</div>` : ""}
+      <label style="display:grid;gap:4px;font-size:13px;font-weight:700;color:var(--muted)">Texto para la pantalla<input id="palGl" class="input" value="${esc(gl)}"></label>
+      <button class="btn sm" type="button" id="projPal">Proyectar esta palabra</button></div>`;
+    $("#projPal", det).onclick = () => { const g = $("#palGl", det).value.trim(); CTX = null; enviar({ modo: "texto", titulo: lema, texto: `${tr}${g ? "\n«" + g + "»" : ""}`, ref: `${strongCorto(w[2])} · ${LIBROS[l][0]} ${c}:${v}`, img: null, negro: false, oculto: false }); toast("Proyectando " + lema); };
+    det.scrollIntoView({ block: "nearest", behavior: "smooth" });
   });
 }
 
@@ -651,6 +746,7 @@ document.addEventListener("click", e => {
   if ((x = g("[data-libro]"))) { B.libro = +x.dataset.libro; B.vista = "caps"; renderMain(); scrollTo({ top: 0 }); return; }
   if ((x = g("[data-cap]"))) { B.cap = +x.dataset.cap; B.vista = "vers"; renderMain(); scrollTo({ top: 0 }); return; }
   if ((x = g("[data-capd]"))) { const bib = BIB[B.ver]; let l = B.libro, c = B.cap + +x.dataset.capd; if (c < 1) { if (l === 0) return; l--; c = bib[l].length } else if (c > bib[l].length) { if (l === 65) return; l++; c = 1 } B.libro = l; B.cap = c; renderMain(); scrollTo({ top: 0 }); return; }
+  if ((x = g("[data-study]"))) { const [l, c, v] = x.dataset.study.split(",").map(Number); estudiar(l, c, v); return; }
   if ((x = g("[data-fav]"))) { toggleFav(B.libro, B.cap, +x.dataset.fav); x.classList.toggle("on"); return; }
   if ((x = g("[data-unfav]"))) { const [l, c, v] = x.dataset.unfav.split(",").map(Number); toggleFav(l, c, v); renderMain(); return; }
   if (g("[data-pnew]")) { formPasaje(); return; }

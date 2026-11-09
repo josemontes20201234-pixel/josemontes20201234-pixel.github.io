@@ -10,7 +10,7 @@
 <link rel="apple-touch-icon" href="icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&family=Bebas+Neue&family=Cinzel:wght@400;700&family=Lato:wght@400;700&family=Merriweather:wght@400;700&family=Montserrat:wght@400;700&family=Oswald:wght@400;700&family=Playfair+Display:wght@400;700&family=Quicksand:wght@400;700&family=Raleway:wght@400;700&family=Roboto+Slab:wght@400;700&family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&family=Noto+Serif:wght@400;700&family=Noto+Serif+Hebrew:wght@400;700&family=Bebas+Neue&family=Cinzel:wght@400;700&family=Lato:wght@400;700&family=Merriweather:wght@400;700&family=Montserrat:wght@400;700&family=Oswald:wght@400;700&family=Playfair+Display:wght@400;700&family=Quicksand:wght@400;700&family=Raleway:wght@400;700&family=Roboto+Slab:wght@400;700&family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap">
 <style>
 /* Control del proyector: barra "en vivo" arriba, contenido en el medio, pestañas abajo.
    Tinta azul de noche con un solo acento: el rojo "EN VIVO" de una consola de transmisión. */
@@ -147,6 +147,25 @@ p{margin:0}
 #modotele .mt-bar button{border:0;background:var(--surface-2);color:var(--fg);border-radius:10px;padding:8px 10px;font:800 12px var(--body);display:grid;place-items:center;gap:2px;min-width:54px}
 #modotele .mt-bar button svg{width:18px;height:18px}
 #modotele .mt-bar .mt-salir{background:var(--live-soft);color:var(--live)}
+
+.v .acc{display:grid;gap:4px;justify-items:center}
+.studybtn{border:0;background:none;padding:2px;color:var(--muted);line-height:0}
+.studybtn svg{width:18px;height:18px}
+.inter{display:flex;flex-wrap:wrap;gap:6px}
+.inter.rtl{direction:rtl}
+.pal{direction:ltr;border:1px solid var(--line);background:var(--surface-2);border-radius:10px;padding:8px 9px;display:grid;gap:1px;text-align:center;min-width:64px;max-width:100%}
+.pal .o{font:600 21px/1.25 'Noto Serif','Noto Serif Hebrew',serif;color:var(--fg)}
+.pal .tr{font-size:11.5px;color:var(--muted);font-style:italic}
+.pal .gl{font-size:13px;font-weight:700;color:var(--accent)}
+.pal .sn{font:600 10.5px var(--mono);color:var(--muted)}
+.pal.on{border-color:var(--accent);background:var(--accent-soft)}
+.det{display:grid;gap:8px;background:var(--surface-2);border-radius:12px;padding:12px}
+.det .lem{font:700 28px/1.2 'Noto Serif','Noto Serif Hebrew',serif}
+.det .def{white-space:pre-line;font-size:14px;color:var(--muted);max-height:220px;overflow:auto}
+.det dl{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;margin:0;font-size:14px}
+.det dt{color:var(--muted)} .det dd{margin:0;font-weight:700}
+.orig{font:500 22px/1.6 'Noto Serif','Noto Serif Hebrew',serif}
+.credit{font-size:11.5px;color:var(--muted)}
 @media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
 </style>
 <style id="escena-css"></style>

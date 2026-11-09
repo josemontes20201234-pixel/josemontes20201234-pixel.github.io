@@ -110,7 +110,7 @@ export const ESCENA_CSS = `
 @media (prefers-reduced-motion: reduce){.esc *{animation:none!important;transition:none!important}}
 `;
 
-function fuenteCss(nombre) { const f = FUENTES.find(x => x[0] === nombre); return f ? f[1] : FUENTES[0][1]; }
+function fuenteCss(nombre) { const f = FUENTES.find(x => x[0] === nombre); return (f ? f[1] : FUENTES[0][1]) + ",'Noto Serif','Noto Serif Hebrew',serif"; }
 
 // Ajusta el tamaño de letra para que todo quepa en la pantalla
 function ajustar(item, maxPx) {
