@@ -174,15 +174,18 @@ export function pintar(esc, st, fondoImg) {
     it.innerHTML = `<div class="t">${st.titulo ? `<span style="font-size:.5em;font-weight:600;letter-spacing:.02em">${esc_(st.titulo)}</span>\n` : ""}<span class="cd" style="font-variant-numeric:tabular-nums;font-size:1.9em;line-height:1.05">00:00</span></div>`;
     estilizar(it);
     const cd = it.querySelector(".cd");
+    // Si dura una hora o más, el reloj muestra horas (1:00:00) desde el inicio para que el tamaño no brinque
+    const largo = (st.fin || 0) - Date.now() >= 3599000;
     const tic = () => {
       const ms = Math.max(0, (st.fin || 0) - Date.now()); const tot = Math.ceil(ms / 1000);
-      const m = Math.floor(tot / 60), sg = tot % 60;
-      cd.textContent = ms > 0 ? `${String(m).padStart(2, "0")}:${String(sg).padStart(2, "0")}` : (st.texto || "00:00");
+      const h = Math.floor(tot / 3600), m = Math.floor(tot / 60) % 60, sg = tot % 60;
+      const mmss = `${String(m).padStart(2, "0")}:${String(sg).padStart(2, "0")}`;
+      cd.textContent = ms > 0 ? (largo ? `${h}:${mmss}` : mmss) : (st.texto || "00:00");
       if (ms <= 0) { clearInterval(esc._reloj); if (st.texto) ajustar(it, maxPx); }
     };
     if (e.trans !== "ninguna") it.classList.add("in-" + e.trans);
     esc.capa.appendChild(it);
-    cd.textContent = "00:00"; ajustar(it, maxPx); tic();
+    cd.textContent = largo ? "0:00:00" : "00:00"; ajustar(it, maxPx); tic();
     esc._reloj = setInterval(tic, 250);
     return;
   } else {

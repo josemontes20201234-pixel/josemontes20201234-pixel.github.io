@@ -393,7 +393,7 @@ function vCulto() {
   return `<div class="sec"><div class="head"><h2>Orden del culto</h2><button class="btn sm" type="button" data-cadd>+ Agregar</button></div>
     <div class="field"><span>${IC.reloj.replace("<svg", '<svg style="width:16px;height:16px;vertical-align:-3px"')} Cuenta regresiva rápida</span>
       <input class="input" id="cdTit" style="background:var(--surface-2)" value="${esc(store.get("pr-cdtit", "El culto inicia en"))}" aria-label="Texto arriba del reloj">
-      <div class="chips">${[1, 3, 5, 10, 15].map(m => `<button type="button" data-cdmin="${m}">${m} min</button>`).join("")}</div></div>
+      <div class="chips">${[1, 3, 5, 10, 15, 20, 30, 45, 60].map(m => `<button type="button" data-cdmin="${m}">${m === 60 ? "1 hora" : m + " min"}</button>`).join("")}</div></div>
     ${CULTO.items.length ? `<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" type="button" id="cStart">▶ Empezar desde el inicio</button></div><div class="list">${items}</div>
       <p class="muted" style="font-size:13px">Con <b>Sigue</b> ▶ pasás por todo el culto en orden: versículos, estrofas, anuncios y cuentas regresivas.</p>
       <button class="btn danger sm" type="button" id="cClear" style="justify-self:start">Nuevo culto (borrar la lista)</button><div id="cClearBox"></div>`
@@ -848,7 +848,7 @@ document.addEventListener("click", e => {
   if ((x = g("[data-slide]"))) { proyectarSlide(+x.dataset.slide); return; }
   if ((x = g("[data-cmov]"))) { const [k, d] = x.dataset.cmov.split(",").map(Number); const a = [...CULTO.items]; const j = k + d; if (j < 0 || j >= a.length) return; [a[k], a[j]] = [a[j], a[k]]; CULTO.items = a; if (CTX && CTX.tipo === "culto") CTX = null; guardarCulto(); renderMain(); actualizarLive(); return; }
   if ((x = g("[data-cdel]"))) { CULTO.items = CULTO.items.filter((_, i) => i !== +x.dataset.cdel); if (CTX && CTX.tipo === "culto") CTX = null; guardarCulto(); renderMain(); actualizarLive(); return; }
-  if ((x = g("[data-cdmin]"))) { const t = ($("#cdTit")?.value || "").trim(); store.set("pr-cdtit", t); CTX = null; iniciarCuenta(+x.dataset.cdmin, t); toast(`Cuenta regresiva de ${x.dataset.cdmin} min en pantalla.`); return; }
+  if ((x = g("[data-cdmin]"))) { const t = ($("#cdTit")?.value || "").trim(); store.set("pr-cdtit", t); CTX = null; iniciarCuenta(+x.dataset.cdmin, t); toast(`Cuenta regresiva de ${x.dataset.cdmin === "60" ? "1 hora" : x.dataset.cdmin + " min"} en pantalla.`); return; }
   if (g("#cStart")) { proyectarSlide(0); return; }
   if (g("#cClear")) { $("#cClearBox").innerHTML = `<div class="confirm"><b>¿Borrar toda la lista del culto?</b><span style="font-size:14px">Los cantos, pasajes y anuncios no se borran; sólo la lista.</span><div style="display:flex;gap:8px"><button class="btn danger sm" type="button" id="cClear2">Sí, empezar de nuevo</button><button class="btn ghost sm" type="button" id="cClear0">Cancelar</button></div></div>`; return; }
   if (g("#cClear0")) { $("#cClearBox").innerHTML = ""; return; }
