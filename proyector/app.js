@@ -117,7 +117,7 @@ function versosDeTexto(t) {
 }
 async function cargarCapYV(ver, l, c) {
   const id = ver.slice(3); const ref = `${USFM[l]}.${c}`;
-  let d = await yvGet(`/v1/bibles/${id}/passages/${ref}`);
+  let d = await yvGet(`/v1/bibles/${id}/passages/${ref}?format=html&include_headings=false&include_notes=false`);
   let vs = d && d.content ? versosDeHtml(d.content) : null;
   if (!vs) { d = await yvGet(`/v1/bibles/${id}/passages/${ref}?format=text`); vs = versosDeTexto(d && (d.content ?? d)); }
   if (!vs) { const crudo = String((d && (d.content ?? JSON.stringify(d))) || "").replace(/\s+/g, " ").slice(0, 220); throw new Error("No pude separar los versículos. Mandale esta captura a Claude: " + crudo); }
