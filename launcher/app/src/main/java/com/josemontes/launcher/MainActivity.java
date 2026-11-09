@@ -134,7 +134,7 @@ public class MainActivity extends Activity {
     static final String[][] CAJON_ESTILOS = {{"cuadricula", "Cuadrícula"}, {"lista", "Lista"}};
     static final String[][] CAJON_ORDEN = {{"alfa", "Alfabético"}, {"uso", "Las que más usás primero"}};
     static final String[][] ACCIONES = {{"cajon", "Abrir todas las apps"}, {"notificaciones", "Bajar notificaciones"}, {"buscar", "Buscar"},
-            {"google", "Abrir Google"}, {"ajustes", "Ajustes del launcher"}, {"bloquear", "Apagar la pantalla"}, {"app", "Abrir una app…"}, {"nada", "No hacer nada"}};
+            {"google", "Abrir Google"}, {"ajustes", "Ajustes del launcher"}, {"app", "Abrir una app…"}, {"nada", "No hacer nada"}};
     static final String[][] GESTOS = {{"g_arriba", "Deslizar hacia arriba", "cajon"}, {"g_abajo", "Deslizar hacia abajo", "notificaciones"},
             {"g_doble", "Doble toque", "ajustes"}, {"g_derecha", "Deslizar a la derecha", "nada"}, {"g_izquierda", "Deslizar a la izquierda", "nada"}};
     static final String[][] COLUMNAS = {{"4", "4 columnas"}, {"5", "5 columnas"}};
@@ -557,7 +557,6 @@ public class MainActivity extends Activity {
                 elegirApp("¿Qué app abrir?", ap -> guardar(clave, "app:" + ap.key()));
                 return;
             }
-            if ("bloquear".equals(op) && Bloqueo.activo == null) apagarPantalla();
             guardar(clave, op);
         }).setNegativeButton("Cancelar", null).show();
     }
@@ -1595,7 +1594,6 @@ public class MainActivity extends Activity {
         opcion(l, "Paquete de íconos", paquete != null || !paqueteNombre.isEmpty() ? PaqueteIconos.instalados(getPackageManager()).getOrDefault(paqueteNombre, "Ninguno") : "Ninguno", this::elegirPaquete);
         opcion(l, "Estilo de íconos", nombre(ICONOS, iconos), () -> elegir("Íconos", ICONOS, "iconos", iconos));
         opcion(l, "Tamaño de íconos", nombre(TAMANOS, String.valueOf(tamIcono)), () -> elegir("Tamaño de íconos", TAMANOS, "tam_icono", String.valueOf(tamIcono)));
-        opcion(l, "Puntitos de notificación", nombre(INSIGNIAS, insignias) + ("no".equals(insignias) || permisoNotificaciones() ? "" : " · falta activar el permiso"), this::configurarInsignias);
         interruptor(l, "Nombres debajo de los íconos del inicio", verNombres, v -> guardar("ver_nombres", v));
 
         seccion(l, "Lista de todas las apps");
