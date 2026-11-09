@@ -17,6 +17,7 @@ import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.database.Cursor;
 import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.ColorFilter;
@@ -77,6 +78,9 @@ import android.widget.Toast;
 import org.json.JSONObject;
 
 import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
@@ -116,6 +120,7 @@ public class MainActivity extends Activity {
     static final String[][] LETRAS = {{"moderna", "Moderna"}, {"clasica", "Clásica (con serifa)"}, {"condensada", "Condensada"}};
     static final String[][] TEMAS = {{"oscuro", "Oscuro"}, {"claro", "Claro"}};
     static final String[][] TAMANOS = {{"0", "Pequeños"}, {"1", "Normales"}, {"2", "Grandes"}};
+    static final String[][] FONDOS = {{"meraki", "Meraki (según el tema oscuro o claro)"}, {"foto", "Una foto de mi galería"}, {"sistema", "El fondo de pantalla del teléfono"}};
     static final String[][] COLUMNAS = {{"4", "4 columnas"}, {"5", "5 columnas"}};
 
     static class App {
@@ -127,6 +132,7 @@ public class MainActivity extends Activity {
     SharedPreferences prefs;
     // configuración actual
     String estilo, iconos, letra, nombre;
+    String fondo;
     boolean claro, fondoMeraki, verClima, verBateria, verAgenda, verBusqueda;
     int acento, tamIcono, columnas;
     int FG, MUTED, CARD, LINEA, CAJON;
@@ -225,6 +231,7 @@ public class MainActivity extends Activity {
         nombre = prefs.getString("nombre", "Jose");
         claro = "claro".equals(prefs.getString("tema", "oscuro"));
         fondoMeraki = prefs.getBoolean("fondo_meraki", true);
+        fondo = prefs.getString("fondo", fondoMeraki ? "meraki" : "sistema");
         verClima = prefs.getBoolean("ver_clima", true);
         verBateria = prefs.getBoolean("ver_bateria", true);
         verAgenda = prefs.getBoolean("ver_agenda", true);
@@ -818,8 +825,12 @@ public class MainActivity extends Activity {
     // fondos
     // =====================================================================
     void aplicarFondo() {
-        if (fondoMeraki) root.setBackground(claro ? new FondoClaro() : new FondoMeraki());
-        else root.setBackground(new Velo());
+        if ("foto".equals(fondo)) {
+            Bitmap bm = cargarFoto();
+            if (bm != null) { root.setBackground(new FondoFoto(bm)); return; }
+        }
+        if ("sistema".equals(fondo)) root.setBackground(new Velo());
+        else root.setBackground(claro ? new FondoClaro() : new FondoMeraki());
     }
 
     abstract class Fondo extends Drawable {
@@ -864,6 +875,85 @@ public class MainActivity extends Activity {
             p.setShader(new LinearGradient(0, 0, 0, r.height(), new int[]{a, b, b, z}, new float[]{0, .35f, .6f, 1}, Shader.TileMode.CLAMP));
             c.drawRect(r, p);
         }
+    }
+
+    Bitmap fotoCache; long fotoVersion = -1;
+
+    Bitmap cargarFoto() {
+        File f = new File(getFilesDir(), "fondo.jpg");
+        if (!f.exists()) return null;
+        if (fotoCache != null && fotoVersion == f.lastModified()) return fotoCache;
+        try { fotoCache = BitmapFactory.decodeFile(f.getAbsolutePath()); fotoVersion = f.lastModified(); } catch (Throwable e) { fotoCache = null; }
+        return fotoCache;
+    }
+
+    /** Tu foto llenando la pantalla (recortada al centro), con un velo para que se lea todo. */
+    class FondoFoto extends Fondo {
+        final Bitmap bm; final Velo velo = new Velo();
+        FondoFoto(Bitmap b) { bm = b; }
+        @Override public void draw(Canvas c) {
+            Rect r = getBounds();
+            float esc = Math.max(r.width() / (float) bm.getWidth(), r.height() / (float) bm.getHeight());
+            float w = bm.getWidth() * esc, h = bm.getHeight() * esc;
+            RectF dst = new RectF((r.width() - w) / 2f, (r.height() - h) / 2f, (r.width() + w) / 2f, (r.height() + h) / 2f);
+            p.setShader(null); p.setFilterBitmap(true);
+            c.drawBitmap(bm, null, dst, p);
+            velo.setBounds(r); velo.draw(c);
+        }
+        @Override public int getOpacity() { return PixelFormat.OPAQUE; }
+    }
+
+    static final int ELEGIR_FOTO = 31;
+
+    void elegirFoto() {
+        Intent i = new Intent(Intent.ACTION_GET_CONTENT).setType("image/*").addCategory(Intent.CATEGORY_OPENABLE);
+        try { startActivityForResult(Intent.createChooser(i, "Elegí la foto para tu fondo"), ELEGIR_FOTO); }
+        catch (Exception e) {
+            try { startActivityForResult(new Intent(Intent.ACTION_PICK).setType("image/*"), ELEGIR_FOTO); }
+            catch (Exception e2) { toast("No encontré la galería."); }
+        }
+    }
+
+    @Override
+    protected void onActivityResult(int rc, int res, Intent data) {
+        super.onActivityResult(rc, res, data);
+        if (rc != ELEGIR_FOTO || res != RESULT_OK || data == null || data.getData() == null) return;
+        final Uri u = data.getData();
+        toast("Poniendo tu foto de fondo…");
+        new Thread(() -> {
+            boolean ok = false;
+            try {
+                // Medir y reducir a la resolución de la pantalla para que no pese
+                BitmapFactory.Options o = new BitmapFactory.Options(); o.inJustDecodeBounds = true;
+                try (InputStream in = getContentResolver().openInputStream(u)) { BitmapFactory.decodeStream(in, null, o); }
+                int alto = Math.max(getResources().getDisplayMetrics().heightPixels, 1600);
+                int muestra = 1; while (Math.min(o.outWidth, o.outHeight) / (muestra * 2) >= alto / 2) muestra *= 2;
+                BitmapFactory.Options o2 = new BitmapFactory.Options(); o2.inSampleSize = muestra;
+                Bitmap bm;
+                try (InputStream in = getContentResolver().openInputStream(u)) { bm = BitmapFactory.decodeStream(in, null, o2); }
+                if (bm != null) {
+                    bm = girarSiHaceFalta(u, bm);
+                    try (FileOutputStream out = new FileOutputStream(new File(getFilesDir(), "fondo.jpg"))) { bm.compress(Bitmap.CompressFormat.JPEG, 90, out); }
+                    ok = true;
+                }
+            } catch (Throwable e) { ok = false; }
+            final boolean listo = ok;
+            ui.post(() -> {
+                if (listo) { fotoCache = null; prefs.edit().putString("fondo", "foto").putBoolean("fondo_meraki", false).apply(); aplicarTodo(); toast("¡Listo! Ese es tu fondo."); }
+                else toast("No pude abrir esa foto. Probá con otra.");
+            });
+        }).start();
+    }
+
+    Bitmap girarSiHaceFalta(Uri u, Bitmap bm) {
+        try (InputStream in = getContentResolver().openInputStream(u)) {
+            android.media.ExifInterface ex = new android.media.ExifInterface(in);
+            int or = ex.getAttributeInt(android.media.ExifInterface.TAG_ORIENTATION, android.media.ExifInterface.ORIENTATION_NORMAL);
+            int grados = or == android.media.ExifInterface.ORIENTATION_ROTATE_90 ? 90 : or == android.media.ExifInterface.ORIENTATION_ROTATE_180 ? 180 : or == android.media.ExifInterface.ORIENTATION_ROTATE_270 ? 270 : 0;
+            if (grados == 0) return bm;
+            android.graphics.Matrix m = new android.graphics.Matrix(); m.postRotate(grados);
+            return Bitmap.createBitmap(bm, 0, 0, bm.getWidth(), bm.getHeight(), m, true);
+        } catch (Throwable e) { return bm; }
     }
 
     /** Franja de poste de barbero. */
@@ -1175,18 +1265,18 @@ public class MainActivity extends Activity {
     }
 
     void menuInicio() {
-        String[] ops = {"Ajustes del launcher", "Cambiar estilo de inicio", "Cambiar íconos", "Cambiar fondo de pantalla", "Ajustes del teléfono"};
+        String[] ops = {"Ajustes del launcher", "Cambiar estilo de inicio", "Cambiar íconos", "Poner una foto de fondo", "Ajustes del teléfono"};
         dialogo().setTitle("Meraki Launcher").setItems(ops, (d, w) -> {
             if (w == 0) abrirAjustes();
             else if (w == 1) elegir("Estilo de inicio", ESTILOS, "estilo", estilo);
             else if (w == 2) elegir("Íconos", ICONOS, "iconos", iconos);
-            else if (w == 3) cambiarFondoPantalla();
+            else if (w == 3) elegirFoto();
             else abrir(new Intent(Settings.ACTION_SETTINGS), "No se pudieron abrir los ajustes.");
         }).show();
     }
 
     void cambiarFondoPantalla() {
-        prefs.edit().putBoolean("fondo_meraki", false).apply(); aplicarTodo();
+        prefs.edit().putBoolean("fondo_meraki", false).putString("fondo", "sistema").apply(); aplicarTodo();
         abrir(Intent.createChooser(new Intent(Intent.ACTION_SET_WALLPAPER), "Elegí tu fondo"), "No encontré dónde cambiar el fondo.");
     }
 
@@ -1261,7 +1351,10 @@ public class MainActivity extends Activity {
         ajustes.animate().alpha(0f).setDuration(140).withEndAction(() -> ajustes.setVisibility(View.GONE)).start();
     }
 
+    ScrollView ajustesScroll;
+
     void construirAjustes() {
+        final int y = ajustesScroll != null && ajustes.getVisibility() == View.VISIBLE ? ajustesScroll.getScrollY() : 0;
         ajustes.removeAllViews();
         ajustes.setBackgroundColor(claro ? 0xFFF4F1EA : 0xFF0B0A08);
         LinearLayout cab = new LinearLayout(this);
@@ -1275,6 +1368,8 @@ public class MainActivity extends Activity {
         ajustes.addView(cab);
 
         ScrollView sv = new ScrollView(this);
+        ajustesScroll = sv;
+        sv.post(() -> sv.scrollTo(0, y));
         LinearLayout l = columnaBase();
         l.setPadding(dp(20), dp(6), dp(20), insetAbajo + dp(30));
         sv.addView(l);
@@ -1294,8 +1389,9 @@ public class MainActivity extends Activity {
         opcion(l, "Apps ocultas", ocultas().size() + " oculta" + (ocultas().size() == 1 ? "" : "s"), this::gestionarOcultas);
 
         seccion(l, "Fondo");
-        opcion(l, "Fondo", fondoMeraki ? (claro ? "Claro Meraki" : "Negro Meraki") : "Mi fondo de pantalla", () -> guardar("fondo_meraki", !fondoMeraki));
-        opcion(l, "Cambiar fondo de pantalla", "Elegí una foto de tu galería", this::cambiarFondoPantalla);
+        opcion(l, "Fondo", nombre(FONDOS, fondo), () -> elegir("Fondo", FONDOS, "fondo", fondo));
+        opcion(l, "Elegir foto de fondo", "Cualquier foto de tu galería", this::elegirFoto);
+        opcion(l, "Fondo de pantalla del teléfono", "Abre el selector de fondos de tu cel", this::cambiarFondoPantalla);
 
         seccion(l, "Qué mostrar");
         interruptor(l, "Clima de Apopa", verClima, v -> { guardar("ver_clima", v); if (v) cargarClima(true); });
@@ -1350,6 +1446,8 @@ public class MainActivity extends Activity {
         for (int i = 0; i < ops.length; i++) { nombres[i] = ops[i][1]; if (ops[i][0].equals(actual)) sel = i; }
         dialogo().setTitle(titulo).setSingleChoiceItems(nombres, sel, (d, w) -> {
             d.dismiss();
+            if ("fondo".equals(clave) && "foto".equals(ops[w][0])) { elegirFoto(); return; }
+            if ("fondo".equals(clave)) prefs.edit().putBoolean("fondo_meraki", "meraki".equals(ops[w][0])).apply();
             guardar(clave, ops[w][0]);
         }).setNegativeButton("Cancelar", null).show();
     }
