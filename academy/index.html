@@ -219,6 +219,24 @@ input[type=range]{width:100%;accent-color:var(--brass)}
 .classq h3{font:800 clamp(26px,4vw,44px)/1.2 var(--body)}
 .classq .opt{font-size:clamp(16px,2vw,22px)}
 
+
+.iconbtn.tvbtn.on{background:var(--brass);color:var(--brass-ink);border-color:transparent}
+.tvpanel{position:absolute;right:max(16px,env(safe-area-inset-right,0px));top:calc(64px + env(safe-area-inset-top,0px));z-index:60;width:min(380px,calc(100vw - 32px));background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:16px;display:grid;gap:10px;box-shadow:0 20px 50px rgba(0,0,0,.5)}
+.tvpanel p{font-size:14px}
+.tvlink{display:grid;gap:8px;background:var(--surface-2);border-radius:10px;padding:10px}
+.tvlink code{font:600 12.5px var(--mono);word-break:break-all;user-select:all}
+.tvtoast{position:fixed;left:50%;bottom:calc(30px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:90;background:var(--fg);color:var(--bg);padding:10px 16px;border-radius:12px;font-weight:700;font-size:14px;max-width:90vw;text-align:center}
+body.tvmode{cursor:none}
+body.tvmode #app,body.tvmode .tabs{display:none!important}
+body.tvmode #stage .sh button,body.tvmode #stage .sf button,body.tvmode #stage #rv{display:none!important}
+body.tvmode #stage{padding:3vh 4vw}
+body.tvmode #stage .slide{font-size:clamp(18px,2.4vw,30px)}
+#tvwait{position:fixed;inset:0;z-index:40;display:grid;place-content:center;justify-items:center;gap:18px;text-align:center;background:var(--bg);padding:24px}
+#tvwait h1{font:900 clamp(48px,9vw,120px)/.9 var(--display);text-transform:uppercase}
+#tvwait h1 em{font-style:normal;color:var(--brass);display:block}
+#tvwait p{color:var(--muted);font-size:clamp(16px,2vw,24px)}
+#tvwait small{color:var(--muted);opacity:.7}
+#tvwait .pole{width:min(420px,70vw)}
 @media (prefers-reduced-motion: reduce){.pole,.spin{animation:none!important}*{transition:none!important}}
 </style>
 
@@ -566,6 +584,7 @@ const IC={
  gloss:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h11a3 3 0 0 1 3 3v13H7a3 3 0 0 1-3-3z"/><path d="M18 20H7a3 3 0 0 1 0-6h11"/></svg>',
  theme:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 13A9 9 0 1 1 11 3a7 7 0 0 0 10 10z"/></svg>',
  full:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>',
+ tele:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="4" width="19" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></svg>',
  x:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>'
 };
 
@@ -864,22 +883,83 @@ function render(){
 /* ============ MODO CLASE ============ */
 let ST={m:null,i:0,slides:[]};
 function openStage(id){const m=modById(id);ST={m,i:0,slides:[{cover:1},...m.sec.map(s=>({s})),...m.q.map(q=>({q}))]};$('#stage').hidden=false;document.body.style.overflow='hidden';drawStage()}
-function closeStage(){$('#stage').hidden=true;document.body.style.overflow='';try{if(document.fullscreenElement)document.exitFullscreen()}catch(e){}}
+function closeStage(){if(TVL.on&&!TVL.esTele)tvEnviar({on:false});$('#stage').hidden=true;document.body.style.overflow='';try{if(document.fullscreenElement)document.exitFullscreen()}catch(e){}}
 function drawStage(){const st=$('#stage'),sl=ST.slides[ST.i],m=ST.m,i=MODULES.indexOf(m)+1;let body='';
  if(sl.cover)body=`<div class="slide" style="align-content:center;min-height:60vh"><div class="pole"></div><span class="lbl">Meraki Academy · Módulo ${pad(i)}</span><h2>${m.t}</h2><p class="muted" style="font-size:clamp(18px,2.4vw,26px)">${m.s}</p></div>`;
  else if(sl.s)body=`<div class="slide"><span class="lbl">Módulo ${pad(i)} · ${m.t}</span><h2>${sl.s.h}</h2>${blocks(sl.s.b)}</div>`;
  else{const q=sl.q;body=`<div class="slide classq"><span class="lbl">Pregunta para la clase</span><h3>${q.q}</h3><div class="opts">${q.o.map((o,k)=>`<div class="opt" data-l="${'ABCD'[k]}" data-k="${k}">${o}</div>`).join('')}</div><div class="row"><button class="btn" id="rv" type="button">Revelar respuesta</button></div><p class="expl" id="rx" hidden>${q.e}</p></div>`}
- st.innerHTML=`<div class="sh"><span class="t">${m.t}</span><span class="count">${ST.i+1} / ${ST.slides.length}</span><button class="iconbtn" id="fs" type="button" aria-label="Pantalla completa">${IC.full}</button><button class="iconbtn" id="cx" type="button" aria-label="Cerrar">${IC.x}</button></div><div class="body">${body}</div><div class="sf"><button class="btn ghost" id="pv" type="button" ${ST.i===0?'disabled':''}>←</button><div class="pole" style="opacity:.8"></div><button class="btn" id="nx" type="button">${ST.i===ST.slides.length-1?'Terminar':'→'}</button></div>`;
+ st.innerHTML=`<div class="sh"><span class="t">${m.t}</span><span class="count">${ST.i+1} / ${ST.slides.length}</span><button class="iconbtn tvbtn ${TVL.on?'on':''}" id="tvb" type="button" aria-label="Mostrar en la tele">${IC.tele}</button><button class="iconbtn" id="fs" type="button" aria-label="Pantalla completa">${IC.full}</button><button class="iconbtn" id="cx" type="button" aria-label="Cerrar">${IC.x}</button></div><div class="body">${body}</div><div class="sf"><button class="btn ghost" id="pv" type="button" ${ST.i===0?'disabled':''}>←</button><div class="pole" style="opacity:.8"></div><button class="btn" id="nx" type="button">${ST.i===ST.slides.length-1?'Terminar':'→'}</button></div>`;
  mount(st);
  $('#cx',st).onclick=closeStage;$('#pv',st).onclick=()=>step(-1);$('#nx',st).onclick=()=>ST.i===ST.slides.length-1?closeStage():step(1);
  $('#fs',st).onclick=()=>{try{const p=document.fullscreenElement?document.exitFullscreen():st.requestFullscreen();if(p&&p.catch)p.catch(()=>{})}catch(e){}};
- const rv=$('#rv',st);if(rv)rv.onclick=()=>{$$('.opt',st).forEach(o=>{if(+o.dataset.k===sl.q.a)o.classList.add('right')});$('#rx',st).hidden=false;rv.hidden=true};
+ const rv=$('#rv',st);if(rv)rv.onclick=()=>{$$('.opt',st).forEach(o=>{if(+o.dataset.k===sl.q.a)o.classList.add('right')});$('#rx',st).hidden=false;rv.hidden=true;ST.rev=true;tvPublicar()};
+ if(ST.rev&&rv)rv.onclick();
+ $('#tvb',st).onclick=tvPanel;
+ tvPublicar();
 }
-function step(d){const n=ST.i+d;if(n<0||n>=ST.slides.length)return;ST.i=n;drawStage();$('#stage .body').scrollTop=0}
+function step(d){const n=ST.i+d;if(n<0||n>=ST.slides.length)return;ST.i=n;ST.rev=false;drawStage();$('#stage .body').scrollTop=0}
 document.addEventListener('keydown',e=>{if($('#stage').hidden)return;if(e.target.tagName==='INPUT')return;if(e.key==='ArrowRight'||e.key===' '){e.preventDefault();step(1)}else if(e.key==='ArrowLeft')step(-1);else if(e.key==='Escape')closeStage()});
 let tx=null,ty=null;
 $('#stage').addEventListener('touchstart',e=>{if(e.target.closest('input,.vis'))return tx=null;tx=e.touches[0].clientX;ty=e.touches[0].clientY},{passive:true});
 $('#stage').addEventListener('touchend',e=>{if(tx===null)return;const dx=e.changedTouches[0].clientX-tx,dy=e.changedTouches[0].clientY-ty;if(Math.abs(dx)>60&&Math.abs(dx)>Math.abs(dy)*1.5)step(dx<0?1:-1);tx=null},{passive:true});
+
+
+/* ============ CLASE EN LA TELE ============ */
+// El cel (instructor) manda módulo y lámina; la tele abre /academy/tv/ y muestra lo mismo.
+const TVL={on:false,esTele:new URLSearchParams(location.search).has('tv'),fb:null};
+const tvURL=new URL('tv/',location.href.split('?')[0].replace(/[^/]*$/,'')).href;
+function aviso(m){const t=document.createElement('div');t.className='tvtoast';t.textContent=m;document.body.appendChild(t);setTimeout(()=>t.remove(),2600)}
+async function tvFirebase(){
+  if(TVL.fb)return TVL.fb;
+  const [{firebaseConfig,ADMIN_EMAIL},A,AU,F]=await Promise.all([import('../config.js'),import('https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js'),import('https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js'),import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js')]);
+  const app=A.initializeApp(firebaseConfig,'academy');
+  TVL.fb={app,db:F.getFirestore(app),F,AU,auth:AU.getAuth(app),admin:ADMIN_EMAIL};
+  return TVL.fb;
+}
+function tvEnviar(extra){const f=TVL.fb;if(!f)return;f.F.setDoc(f.F.doc(f.db,'proyector','academia'),Object.assign({on:true,mod:ST.m&&ST.m.id,i:ST.i,rev:!!ST.rev,ts:Date.now()},extra||{})).catch(e=>aviso('No se pudo enviar a la tele: '+(e.code||e.message)))}
+function tvPublicar(){if(TVL.on&&!TVL.esTele&&ST.m)tvEnviar()}
+async function tvConectar(){
+  try{
+    const f=await tvFirebase();
+    const esAdmin=u=>u&&u.emailVerified&&String(u.email||'').toLowerCase()===String(f.admin).toLowerCase();
+    let u=f.auth.currentUser;
+    if(!u){await new Promise(r=>{const off=f.AU.onAuthStateChanged(f.auth,x=>{off();r()})});u=f.auth.currentUser}
+    if(!esAdmin(u)){const p=new f.AU.GoogleAuthProvider();p.setCustomParameters({prompt:'select_account'});const r=await f.AU.signInWithPopup(f.auth,p);u=r.user}
+    if(!esAdmin(u)){aviso('Sólo el instructor puede transmitir a la tele.');await f.AU.signOut(f.auth);return false}
+    TVL.on=true;tvPublicar();return true;
+  }catch(e){aviso((e.code||'').includes('popup-closed')?'Cancelaste el inicio de sesión.':'No se pudo conectar: '+(e.code||e.message));return false}
+}
+function tvPanel(){
+  const st=$('#stage');let pn=$('#tvpanel',st);if(pn){pn.remove();return}
+  pn=document.createElement('div');pn.id='tvpanel';pn.className='tvpanel';
+  const pint=()=>{pn.innerHTML=TVL.on?`<b>📺 Transmitiendo a la tele</b><p class="muted">En la tele abrí este link. Lo que pasés aquí aparece allá.</p><div class="tvlink"><code>${tvURL}</code><button class="btn sm" type="button" id="tvcopy">Copiar</button></div><button class="btn ghost sm" type="button" id="tvoff">Dejar de transmitir</button>`:`<b>Mostrar la clase en la tele</b><p class="muted">Tu cel queda como control y la tele muestra las láminas. Entrás una vez con tu Gmail de instructor.</p><button class="btn sm" type="button" id="tvon">Conectar con la tele</button>`;
+    const on=$('#tvon',pn);if(on)on.onclick=async()=>{on.disabled=true;on.textContent='Conectando…';if(await tvConectar()){pint();$('#tvb',st)?.classList.add('on')}else{on.disabled=false;on.textContent='Conectar con la tele'}};
+    const off=$('#tvoff',pn);if(off)off.onclick=()=>{tvEnviar({on:false});TVL.on=false;pint();$('#tvb',st)?.classList.remove('on')};
+    const cp=$('#tvcopy',pn);if(cp)cp.onclick=async()=>{try{await navigator.clipboard.writeText(tvURL);aviso('Link copiado.')}catch(e){const r=document.createRange();r.selectNodeContents(pn.querySelector('code'));const sl=getSelection();sl.removeAllRanges();sl.addRange(r);aviso('Mantené presionado para copiar.')}};
+  };
+  pint();st.appendChild(pn);
+}
+// Modo tele: esta pantalla sólo muestra lo que manda el instructor
+async function modoTeleAcademy(){
+  document.body.classList.add('tvmode');document.documentElement.dataset.theme='dark';
+  const esp=document.createElement('div');esp.id='tvwait';esp.innerHTML='<div class="pole"></div><h1>Meraki <em>Academy</em></h1><p>Esperando la clase…</p><small>Tocá la pantalla para ponerla completa</small>';document.body.appendChild(esp);
+  document.addEventListener('click',()=>{try{if(!document.fullscreenElement){const p=document.documentElement.requestFullscreen();if(p&&p.catch)p.catch(()=>{})}}catch(e){}});
+  const lock=async()=>{try{if('wakeLock' in navigator&&document.visibilityState==='visible')await navigator.wakeLock.request('screen')}catch(e){}};lock();document.addEventListener('visibilitychange',lock);
+  try{
+    const f=await tvFirebase();let ult=0;
+    f.F.onSnapshot(f.F.doc(f.db,'proyector','academia'),d=>{
+      const x=d.exists()?d.data():null;if(!x||(x.ts||0)<ult)return;ult=x.ts||0;
+      if(!x.on||!modById(x.mod)){$('#stage').hidden=true;esp.hidden=false;return}
+      esp.hidden=true;
+      if(!ST.m||ST.m.id!==x.mod){openStage(x.mod)}
+      ST.i=Math.max(0,Math.min(x.i||0,ST.slides.length-1));ST.rev=!!x.rev;$('#stage').hidden=false;drawStage();$('#stage .body').scrollTop=0;
+      requestAnimationFrame(()=>setTimeout(ajustarTele,60));
+    },e=>{esp.querySelector('p').textContent=(e.code||'').includes('permission')?'Falta el permiso de lectura en Firebase.':'Sin conexión. Reintentando…'});
+  }catch(e){esp.querySelector('p').textContent='No se pudo conectar: '+e.message}
+}
+// En la tele no se puede deslizar: si la lámina es más alta que la pantalla, se reduce hasta que quepa completa
+function ajustarTele(){const b=$('#stage .body'),sl=$('#stage .slide');if(!b||!sl)return;sl.style.zoom=1;const disp=b.clientHeight-8,alto=sl.scrollHeight;if(alto>disp){sl.style.zoom=Math.max(.45,disp/alto*.95).toFixed(3)}}
+if(TVL.esTele){modoTeleAcademy();let rz;addEventListener('resize',()=>{clearTimeout(rz);rz=setTimeout(ajustarTele,150)})}
 
 /* ============ NAVEGACIÓN GLOBAL ============ */
 document.addEventListener('click',e=>{
