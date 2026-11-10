@@ -1506,8 +1506,19 @@ public class MainActivity extends Activity {
                 if (!arrastreTerminado) {
                     arrastreTerminado = true;
                     if (arrastreVista != null) arrastreVista.setAlpha(1f);
-                    final String k = arrastreKey; final boolean movido = arrastreMovido;
+                    final String k = arrastreKey; final boolean movido = arrastreMovido, delCajon = arrastreDesdeCajon;
                     arrastreKey = null; arrastreVista = null; arrastreDesdeCajon = false;
+                    // Respaldo: si venía de la lista de apps y se soltó en el inicio, queda agregada aunque no cayera encima de nada
+                    if (delCajon && movido && k != null) {
+                        List<String> favs = favoritos();
+                        boolean enCarpeta = false;
+                        java.util.Iterator<String> it = carpetas().keys();
+                        while (it.hasNext()) { String id = it.next(); for (App b : appsCarpeta(id)) if (b.key().equals(k)) enCarpeta = true; }
+                        if (!favs.contains(k) && !enCarpeta) {
+                            if (favs.size() < 32) { favs.add(k); guardarFavs(favs); App ap = porKey.get(k); toast((ap != null ? ap.label : "App") + " agregada al inicio"); }
+                            else toast("Ya tenés 32 apps en el inicio. Quitá una primero.");
+                        }
+                    }
                     if (movido && buscar.length() > 0) ui.post(() -> buscar.setText(""));
                     if (!movido && k != null) ui.post(() -> menuDe(k));
                     else ui.post(this::pintarFavoritos);
