@@ -21,6 +21,7 @@
         android:label="Meraki Launcher"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher"
+        android:allowBackup="true"
         android:theme="@style/Tema"
         android:supportsRtl="false">
         <activity

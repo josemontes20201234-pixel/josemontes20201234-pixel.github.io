@@ -343,6 +343,7 @@ public class MainActivity extends Activity {
         cargarAgenda();
         cargarApps();
         cargarClima(false);
+        respaldoAutomatico(false);
         for (Dial d : diales) d.invalidate();
     }
 
@@ -1898,9 +1899,16 @@ public class MainActivity extends Activity {
         interruptor(l, "Barra de búsqueda", verBusqueda, v -> guardar("ver_busqueda", v));
         interruptor(l, "Pantalla completa (ocultar barra de notificaciones)", pantallaCompleta, v -> guardar("pantalla_completa", v));
 
+        seccion(l, "Temas listos");
+        opcion(l, "Elegir un tema listo", "Diseños armados para aplicar con un toque (no toca tus apps ni carpetas)", this::elegirTemaListo);
+        opcion(l, "Volver a mi configuración anterior", "Deshace el último tema aplicado", this::volverTemaAnterior);
+        opcion(l, "Compartir mi tema", "Manda un código por WhatsApp para que otro tenga tu mismo diseño", this::compartirTema);
+        opcion(l, "Pegar código de tema", "Aplica un diseño que te compartieron", this::pegarCodigoTema);
+
         seccion(l, "Copia de seguridad");
+        opcion(l, "Respaldo automático semanal", textoUltimoRespaldo() + "\nTocá para respaldar ahora", () -> respaldoAutomatico(true));
         opcion(l, "Guardar copia de mi configuración", "Un archivo con tu estilo, apps fijadas, carpetas y gestos", this::guardarRespaldo);
-        opcion(l, "Restaurar una copia", "Por si cambiás de cel o reinstalás", this::abrirRespaldo);
+        opcion(l, "Restaurar una copia", "Por si cambiás de cel o reinstalás (también el automático, en Descargas)", this::abrirRespaldo);
 
         seccion(l, "Teléfono");
         opcion(l, "Pantalla de inicio predeterminada", "Elegir Meraki u otro launcher", () -> abrir(new Intent(Settings.ACTION_HOME_SETTINGS), "Buscalo en Ajustes > Aplicaciones > Aplicaciones predeterminadas."));
@@ -2551,8 +2559,7 @@ public class MainActivity extends Activity {
         try { startActivityForResult(i, REQ_ABRIR); } catch (Exception e) { toast("Tu teléfono no dejó abrir archivos."); }
     }
 
-    void escribirRespaldo(Uri u) {
-        try {
+    String jsonRespaldo() throws Exception {
             JSONObject j = new JSONObject();
             j.put("app", "meraki-launcher"); j.put("version", 1);
             JSONObject d = new JSONObject();
@@ -2569,9 +2576,158 @@ public class MainActivity extends Activity {
                 d.put(k, x);
             }
             j.put("datos", d);
-            try (OutputStream out = getContentResolver().openOutputStream(u)) { out.write(j.toString(2).getBytes("UTF-8")); }
+            return j.toString(2);
+    }
+
+    void escribirRespaldo(Uri u) {
+        try {
+            String js = jsonRespaldo();
+            try (OutputStream out = getContentResolver().openOutputStream(u)) { out.write(js.getBytes("UTF-8")); }
             toast("Copia guardada. Guardala también en tu Drive.");
         } catch (Exception e) { toast("No pude guardar la copia."); }
+    }
+
+    // =====================================================================
+    // RESPALDO AUTOMÁTICO (cada semana, en Descargas/Meraki Launcher)
+    // =====================================================================
+    void respaldoAutomatico(boolean forzar) {
+        if (Build.VERSION.SDK_INT < 29) return;
+        long ult = prefs.getLong("auto_ts", 0);
+        if (!forzar && System.currentTimeMillis() - ult < 7L * 24 * 3600 * 1000) return;
+        new Thread(() -> {
+            try {
+                String js = jsonRespaldo();
+                android.content.ContentResolver cr = getContentResolver();
+                Uri dest = null;
+                String guardada = prefs.getString("auto_uri", null);
+                if (guardada != null) {
+                    try { try (OutputStream o = cr.openOutputStream(Uri.parse(guardada), "wt")) { o.write(js.getBytes("UTF-8")); } dest = Uri.parse(guardada); }
+                    catch (Exception e) { dest = null; }
+                }
+                if (dest == null) {
+                    android.content.ContentValues cv = new android.content.ContentValues();
+                    cv.put(android.provider.MediaStore.MediaColumns.DISPLAY_NAME, "meraki-launcher-respaldo-automatico.json");
+                    cv.put(android.provider.MediaStore.MediaColumns.MIME_TYPE, "application/json");
+                    cv.put(android.provider.MediaStore.MediaColumns.RELATIVE_PATH, android.os.Environment.DIRECTORY_DOWNLOADS + "/Meraki Launcher");
+                    dest = cr.insert(android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI, cv);
+                    if (dest == null) return;
+                    try (OutputStream o = cr.openOutputStream(dest, "wt")) { o.write(js.getBytes("UTF-8")); }
+                }
+                final Uri fin = dest;
+                prefs.edit().putLong("auto_ts", System.currentTimeMillis()).putString("auto_uri", fin.toString()).apply();
+                if (forzar) ui.post(() -> { toast("Respaldo guardado en Descargas › Meraki Launcher"); construirAjustes(); });
+            } catch (Exception e) { if (forzar) ui.post(() -> toast("No pude guardar el respaldo automático.")); }
+        }).start();
+    }
+
+    String textoUltimoRespaldo() {
+        long t = prefs.getLong("auto_ts", 0);
+        if (Build.VERSION.SDK_INT < 29) return "Tu Android no lo permite; usá «Guardar copia»";
+        if (t == 0) return "Todavía no; se hace solo esta semana";
+        return "Último: " + new SimpleDateFormat("d 'de' MMMM, h:mm a", ES).format(new Date(t)) + " · Descargas › Meraki Launcher";
+    }
+
+    // =====================================================================
+    // TEMAS LISTOS y CÓDIGO PARA COMPARTIR
+    // =====================================================================
+    static final String[] CLAVES_TEMA = {"estilo", "tema", "acento", "letra", "iconos", "tam_icono", "fondo", "fondo_meraki", "ver_nombres", "cajon_estilo", "columnas", "pantalla_completa", "ver_busqueda", "ver_clima", "ver_bateria", "ver_agenda"};
+    // nombre, descripción, y luego pares clave=valor
+    static final String[][] TEMAS_LISTOS = {
+            {"Barbería de lujo", "Negro y oro, reloj grande, íconos dorados", "estilo=meraki", "tema=oscuro", "acento=D9B55C", "letra=moderna", "iconos=oro", "fondo=meraki", "ver_nombres=true", "tam_icono=1"},
+            {"Poste clásico", "Rojo de poste de barbero sobre negro", "estilo=meraki", "tema=oscuro", "acento=D8443A", "letra=condensada", "iconos=original", "fondo=meraki", "ver_nombres=true", "tam_icono=1"},
+            {"Negro minimal", "Hora vertical, íconos blancos, sin nombres", "estilo=columna", "tema=oscuro", "acento=F5F1E8", "letra=condensada", "iconos=mono", "fondo=meraki", "ver_nombres=false", "tam_icono=1"},
+            {"Revista blanca", "Letras grandes en blanco y negro, como los videos", "estilo=revista", "tema=claro", "acento=F5F1E8", "letra=clasica", "iconos=mono", "fondo=meraki", "ver_nombres=true", "tam_icono=0"},
+            {"Reloj eterno", "Anillo de minutos y íconos en círculo dorado", "estilo=reloj", "tema=oscuro", "acento=D9B55C", "letra=moderna", "iconos=circulo", "fondo=meraki", "ver_nombres=false", "tam_icono=1"},
+            {"Azul océano", "Reloj de anillo en azul con íconos en círculo", "estilo=reloj", "tema=oscuro", "acento=3F6FD8", "letra=moderna", "iconos=circulo", "fondo=meraki", "ver_nombres=false", "tam_icono=1"},
+            {"Menta fresca", "Claro y limpio, con verde menta", "estilo=columna", "tema=claro", "acento=6FCF97", "letra=moderna", "iconos=oro", "fondo=meraki", "ver_nombres=false", "tam_icono=1"},
+            {"Lavanda", "Revista clara con lavanda e íconos en círculo", "estilo=revista", "tema=claro", "acento=C9A7FF", "letra=clasica", "iconos=circulo", "fondo=meraki", "ver_nombres=true", "tam_icono=1"},
+            {"Mi foto de fondo", "Tu foto con letras claras e íconos monocromos", "estilo=meraki", "tema=oscuro", "acento=F5F1E8", "letra=moderna", "iconos=mono", "fondo=foto", "ver_nombres=true", "tam_icono=1"},
+    };
+
+    JSONObject temaActual() {
+        JSONObject t = new JSONObject();
+        for (String k : CLAVES_TEMA) {
+            Object v = prefs.getAll().get(k);
+            if (v != null) try { t.put(k, v); } catch (Exception e) { }
+        }
+        return t;
+    }
+
+    void aplicarValores(JSONObject t) {
+        SharedPreferences.Editor ed = prefs.edit();
+        java.util.Iterator<String> it = t.keys();
+        while (it.hasNext()) {
+            String k = it.next(); Object v = t.opt(k);
+            if (!Arrays.asList(CLAVES_TEMA).contains(k)) continue; // sólo apariencia: nunca toca apps, carpetas ni widgets
+            if (v instanceof Boolean) ed.putBoolean(k, (Boolean) v);
+            else if ("true".equals(String.valueOf(v)) || "false".equals(String.valueOf(v))) ed.putBoolean(k, Boolean.parseBoolean(String.valueOf(v)));
+            else ed.putString(k, String.valueOf(v));
+        }
+        if (t.has("fondo")) ed.putBoolean("fondo_meraki", "meraki".equals(t.optString("fondo")));
+        ed.apply();
+    }
+
+    void aplicarTemaListo(String[] tema) {
+        prefs.edit().putString("tema_anterior", temaActual().toString()).apply();
+        JSONObject t = new JSONObject();
+        for (int i = 2; i < tema.length; i++) { String[] kv = tema[i].split("=", 2); try { t.put(kv[0], kv[1]); } catch (Exception e) { } }
+        if ("foto".equals(t.optString("fondo")) && !new File(getFilesDir(), "fondo.jpg").exists()) {
+            try { t.put("fondo", "meraki"); } catch (Exception e) { }
+            aplicarValores(t); aplicarTodo();
+            toast("Elegí la foto para tu fondo"); elegirFoto();
+            return;
+        }
+        aplicarValores(t); aplicarTodo();
+        toast("Tema «" + tema[0] + "» aplicado. Si no te gusta: Ajustes › Volver a mi configuración anterior");
+    }
+
+    void elegirTemaListo() {
+        String[] n = new String[TEMAS_LISTOS.length];
+        for (int i = 0; i < n.length; i++) n[i] = TEMAS_LISTOS[i][0] + " — " + TEMAS_LISTOS[i][1];
+        dialogo().setTitle("Temas listos").setItems(n, (d, w) -> aplicarTemaListo(TEMAS_LISTOS[w])).setNegativeButton("Cancelar", null).show();
+    }
+
+    void volverTemaAnterior() {
+        String s = prefs.getString("tema_anterior", null);
+        if (s == null) { toast("No hay una configuración anterior guardada."); return; }
+        try { String actual = temaActual().toString(); aplicarValores(new JSONObject(s)); prefs.edit().putString("tema_anterior", actual).apply(); aplicarTodo(); toast("Listo, volviste a tu configuración anterior."); }
+        catch (Exception e) { toast("No se pudo volver atrás."); }
+    }
+
+    /** Código para compartir el diseño por WhatsApp (sólo apariencia, sin tus apps). */
+    void compartirTema() {
+        try {
+            String cod = "MERAKI-TEMA:" + android.util.Base64.encodeToString(temaActual().toString().getBytes("UTF-8"), android.util.Base64.NO_WRAP);
+            Intent i = new Intent(Intent.ACTION_SEND).setType("text/plain")
+                    .putExtra(Intent.EXTRA_TEXT, "Mi tema de Meraki Launcher 💈\nCopiá este código y pegalo en Ajustes › Pegar código de tema:\n\n" + cod);
+            startActivity(Intent.createChooser(i, "Compartir mi tema"));
+        } catch (Exception e) { toast("No se pudo compartir."); }
+    }
+
+    void pegarCodigoTema() {
+        EditText e = new EditText(this);
+        e.setHint("MERAKI-TEMA:…");
+        e.setMinLines(3);
+        try {
+            android.content.ClipboardManager cm = (android.content.ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+            if (cm != null && cm.hasPrimaryClip() && cm.getPrimaryClip().getItemCount() > 0) {
+                CharSequence c = cm.getPrimaryClip().getItemAt(0).getText();
+                if (c != null && c.toString().contains("MERAKI-TEMA:")) e.setText(c);
+            }
+        } catch (Exception ex) { }
+        FrameLayout f = new FrameLayout(this); f.setPadding(dp(22), dp(8), dp(22), 0); f.addView(e);
+        dialogo().setTitle("Pegar código de tema").setView(f).setPositiveButton("Aplicar", (d, w) -> {
+            try {
+                String txt = e.getText().toString();
+                int i = txt.indexOf("MERAKI-TEMA:");
+                if (i < 0) { toast("Ese no es un código de tema de Meraki."); return; }
+                String b64 = txt.substring(i + 12).trim().split("\\s")[0];
+                JSONObject t = new JSONObject(new String(android.util.Base64.decode(b64, android.util.Base64.DEFAULT), "UTF-8"));
+                prefs.edit().putString("tema_anterior", temaActual().toString()).apply();
+                aplicarValores(t); aplicarTodo();
+                toast("¡Tema aplicado!");
+            } catch (Exception ex) { toast("No pude leer ese código. Copialo completo."); }
+        }).setNegativeButton("Cancelar", null).show();
     }
 
     void leerRespaldo(Uri u) {
