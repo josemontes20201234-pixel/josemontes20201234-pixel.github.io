@@ -489,7 +489,10 @@ public class MainActivity extends Activity {
                     if (enScrollMedio() && scrollMedio.canScrollVertically(dy < 0 ? 1 : -1)) return false;
                     return accion(dy < 0 ? "g_arriba" : "g_abajo");
                 }
-                if (Math.abs(dx) > dp(80) && Math.abs(dx) > Math.abs(dy) * 1.5f) return accion(dx > 0 ? "g_derecha" : "g_izquierda");
+                if (Math.abs(dx) > dp(80) && Math.abs(dx) > Math.abs(dy) * 1.5f) {
+                    if (dentroDe(dockScroll, bajoX, bajoY)) return false; // la cajita de apps se desliza sola
+                    return accion(dx > 0 ? "g_derecha" : "g_izquierda");
+                }
                 return false;
             }
             @Override
@@ -630,7 +633,7 @@ public class MainActivity extends Activity {
     void construirInicio() {
         homeBox.removeAllViews();
         infoViews.clear(); diales.clear(); fechas.clear();
-        agendaLista = null; agendaCaja = null; agendaTitulo = null; widgetBox = null; scrollMedio = null;
+        agendaLista = null; agendaCaja = null; agendaTitulo = null; widgetBox = null; scrollMedio = null; dockScroll = null; puntosDock = null;
         diaConstruido = hoyClave();
         View v;
         switch (estilo) {
@@ -768,12 +771,25 @@ public class MainActivity extends Activity {
             pista.setOnClickListener(v -> abrirCajon());
             h.addView(pista, lp(-1, -2, 0));
         }
-        GridLayout g = new GridLayout(this);
-        g.setColumnCount(4);
-        g.setBackground(caja(CARD, 26, LINEA));
-        g.setPadding(dp(6), dp(12), dp(6), dp(6));
-        favBox = g; favModo = "grid";
-        h.addView(g, lp(-1, -2, 12));
+        // Cajita de apps: siempre 2 filas; deslizando a los lados pasa de página
+        LinearLayout dock = columnaBase();
+        dock.setBackground(caja(CARD, 26, LINEA));
+        dock.setPadding(dp(6), dp(12), dp(6), dp(8));
+        PaginasDock hs = new PaginasDock(this);
+        hs.setHorizontalScrollBarEnabled(false);
+        hs.setOverScrollMode(View.OVER_SCROLL_NEVER);
+        hs.setTag("pager");
+        hs.setOnDragListener(this::alArrastrar);
+        LinearLayout paginas = new LinearLayout(this);
+        hs.addView(paginas);
+        dock.addView(hs, new LinearLayout.LayoutParams(-1, -2));
+        puntosDock = new LinearLayout(this);
+        puntosDock.setGravity(Gravity.CENTER);
+        dock.addView(puntosDock, lp(-1, dp(10), 2));
+        hs.setOnScrollChangeListener((v, x, y, ox, oy) -> marcarPunto());
+        dockScroll = hs;
+        favBox = paginas; favModo = "paginas";
+        h.addView(dock, lp(-1, -2, 12));
         return h;
     }
 
@@ -1315,7 +1331,7 @@ public class MainActivity extends Activity {
             case "revista": return 12;
             case "reloj": return 10;
             case "columna": return 12;
-            default: return 12;
+            default: return 32;
         }
     }
 
@@ -1339,6 +1355,67 @@ public class MainActivity extends Activity {
     boolean existe(String k) {
         if (k.startsWith("carpeta:")) return carpetas().has(k.substring(8));
         return porKey.containsKey(k);
+    }
+
+    static final int POR_PAGINA = 8;
+    PaginasDock dockScroll; LinearLayout puntosDock; int paginaDock = 0;
+    long ultimoCambioPagina = 0;
+
+    int anchoPagina() { return getResources().getDisplayMetrics().widthPixels - dp(44) - dp(12); }
+
+    void marcarPunto() {
+        if (dockScroll == null || puntosDock == null) return;
+        int n = puntosDock.getChildCount(), w = Math.max(1, anchoPagina());
+        paginaDock = Math.max(0, Math.min(n - 1, Math.round(dockScroll.getScrollX() / (float) w)));
+        for (int i = 0; i < n; i++) puntosDock.getChildAt(i).setAlpha(i == paginaDock ? 1f : .3f);
+    }
+
+    void irAPagina(int p, boolean animado) {
+        if (dockScroll == null || favBox == null) return;
+        int n = favBox.getChildCount();
+        p = Math.max(0, Math.min(n - 1, p));
+        paginaDock = p;
+        if (animado) dockScroll.smoothScrollTo(p * anchoPagina(), 0); else dockScroll.scrollTo(p * anchoPagina(), 0);
+    }
+
+    /** Desliza de página en página (no se queda a medias). */
+    class PaginasDock extends android.widget.HorizontalScrollView {
+        float x0; int scroll0;
+        PaginasDock(Context c) { super(c); }
+        @Override public void fling(int v) { /* sin inercia: se acomoda por páginas */ }
+        @Override public boolean onTouchEvent(MotionEvent e) {
+            if (e.getActionMasked() == MotionEvent.ACTION_DOWN) { x0 = e.getX(); scroll0 = getScrollX(); }
+            boolean r = super.onTouchEvent(e);
+            if (e.getActionMasked() == MotionEvent.ACTION_UP || e.getActionMasked() == MotionEvent.ACTION_CANCEL) {
+                int w = anchoPagina(), base = Math.round(scroll0 / (float) w), dx = getScrollX() - scroll0;
+                int p = dx > w * .15f ? base + 1 : dx < -w * .15f ? base - 1 : base;
+                irAPagina(p, true);
+            }
+            return r;
+        }
+        @Override public boolean onInterceptTouchEvent(MotionEvent e) {
+            if (e.getActionMasked() == MotionEvent.ACTION_DOWN) { x0 = e.getX(); scroll0 = getScrollX(); }
+            return super.onInterceptTouchEvent(e);
+        }
+    }
+
+    boolean dentroDe(View v, float rawX, float rawY) {
+        if (v == null || !v.isShown()) return false;
+        int[] xy = new int[2]; v.getLocationOnScreen(xy);
+        return rawX >= xy[0] && rawX <= xy[0] + v.getWidth() && rawY >= xy[1] && rawY <= xy[1] + v.getHeight();
+    }
+
+    /** Arrastrando una app al borde de la cajita: pasa a la página de al lado. */
+    void revisarBordeDock(View v, android.view.DragEvent e) {
+        if (dockScroll == null || !dockScroll.isShown() || puntosDock == null) return;
+        int[] a = new int[2]; v.getLocationOnScreen(a);
+        float rx = a[0] + e.getX(), ry = a[1] + e.getY();
+        if (!dentroDe(dockScroll, rx, ry)) return;
+        int[] d = new int[2]; dockScroll.getLocationOnScreen(d);
+        long ahora = System.currentTimeMillis();
+        if (ahora - ultimoCambioPagina < 700) return;
+        if (rx < d[0] + dp(26) && paginaDock > 0) { ultimoCambioPagina = ahora; irAPagina(paginaDock - 1, true); }
+        else if (rx > d[0] + dockScroll.getWidth() - dp(26)) { ultimoCambioPagina = ahora; irAPagina(paginaDock + 1, true); }
     }
 
     View vistaFav(String k, String modo, int s, boolean conNombre) {
@@ -1383,6 +1460,7 @@ public class MainActivity extends Activity {
             case android.view.DragEvent.ACTION_DRAG_STARTED:
                 return arrastreKey != null;
             case android.view.DragEvent.ACTION_DRAG_LOCATION:
+                if (!"cajon".equals(destino)) revisarBordeDock(v, e);
                 if ("cajon".equals(destino) && arrastreDesdeCajon) {
                     if (arrastreX0 < 0) { arrastreX0 = e.getX(); arrastreY0 = e.getY(); }
                     else if (Math.hypot(e.getX() - arrastreX0, e.getY() - arrastreY0) > dp(28) && drawer.getVisibility() == View.VISIBLE) {
@@ -1395,15 +1473,23 @@ public class MainActivity extends Activity {
                 }
                 return true;
             case android.view.DragEvent.ACTION_DRAG_ENTERED:
-                if (v != arrastreVista && destino != null && !"cajon".equals(destino)) { v.animate().scaleX(1.12f).scaleY(1.12f).setDuration(120).start(); arrastreMovido = true; }
+                if (v != arrastreVista && destino != null && !"cajon".equals(destino) && !"pager".equals(destino)) { v.animate().scaleX(1.12f).scaleY(1.12f).setDuration(120).start(); arrastreMovido = true; }
                 return true;
             case android.view.DragEvent.ACTION_DRAG_EXITED:
                 if (v == arrastreVista) arrastreMovido = true;
-                else if (destino != null) v.animate().scaleX(1f).scaleY(1f).setDuration(120).start();
+                else if (destino != null && !"pager".equals(destino)) v.animate().scaleX(1f).scaleY(1f).setDuration(120).start();
                 return true;
             case android.view.DragEvent.ACTION_DROP:
                 v.animate().scaleX(1f).scaleY(1f).setDuration(80).start();
                 if (arrastreKey == null || "cajon".equals(destino)) return true;
+                if ("pager".equals(destino)) {
+                    // Espacio vacío de la cajita: queda al final
+                    List<String> favs = favoritos();
+                    favs.remove(arrastreKey);
+                    if (favs.size() < 32) favs.add(arrastreKey);
+                    guardarFavs(favs);
+                    return true;
+                }
                 if (destino == null) {
                     // Soltada en un espacio vacío del inicio: se agrega al final
                     if (arrastreDesdeCajon) {
@@ -1446,7 +1532,7 @@ public class MainActivity extends Activity {
         int de = favs.indexOf(origen), a = favs.indexOf(destino);
         if (a < 0) return;
         if (de >= 0) favs.remove(de);
-        else if (favs.size() >= 12) { toast("Ya tenés 12 apps en el inicio. Quitá una primero."); return; }
+        else if (favs.size() >= 32) { toast("Ya tenés 32 apps en el inicio. Quitá una primero."); return; }
         favs.add(Math.min(a, favs.size()), origen); // queda en el lugar donde la soltaste
         guardarFavs(favs);
     }
@@ -1470,6 +1556,33 @@ public class MainActivity extends Activity {
         }
         int s = tamIconoPx();
         switch (favModo) {
+            case "paginas": {
+                int w = anchoPagina(), celda = w / 4;
+                int altoFila = s + (verNombres ? dp(30) : dp(12));
+                int nPag = Math.max(1, (keys.size() + POR_PAGINA - 1) / POR_PAGINA);
+                for (int pg = 0; pg < nPag; pg++) {
+                    GridLayout g = new GridLayout(this);
+                    g.setColumnCount(4);
+                    g.setMinimumHeight(altoFila * 2 + dp(8));
+                    for (int i = pg * POR_PAGINA; i < Math.min(keys.size(), (pg + 1) * POR_PAGINA); i++) {
+                        GridLayout.LayoutParams p = new GridLayout.LayoutParams();
+                        p.width = celda; p.bottomMargin = dp(8);
+                        g.addView(vistaFav(keys.get(i), "grid", s, verNombres), p);
+                    }
+                    favBox.addView(g, new LinearLayout.LayoutParams(w, -2));
+                }
+                if (puntosDock != null) {
+                    puntosDock.removeAllViews();
+                    if (nPag > 1) for (int i = 0; i < nPag; i++) {
+                        View pt = new View(this); pt.setBackground(caja(acento, 99, 0));
+                        LinearLayout.LayoutParams lpp = new LinearLayout.LayoutParams(dp(6), dp(6)); lpp.leftMargin = lpp.rightMargin = dp(3);
+                        puntosDock.addView(pt, lpp);
+                    }
+                }
+                final int volver = Math.min(paginaDock, nPag - 1);
+                ui.post(() -> { irAPagina(volver, false); marcarPunto(); });
+                break;
+            }
             case "lista":
                 for (String k : keys) favBox.addView(vistaFav(k, "lista", s, true), lp(-1, -2, 2));
                 break;
@@ -1597,7 +1710,7 @@ public class MainActivity extends Activity {
                     break;
                 }
                 case "Fijar en inicio":
-                    if (favs.size() >= 12) { toast("Ya tenés 12 apps fijadas. Quitá una primero."); return; }
+                    if (favs.size() >= 32) { toast("Ya tenés 32 apps fijadas. Quitá una primero."); return; }
                     favs.add(a.key()); guardarFavs(favs); pintarFavoritos();
                     toast(favs.size() > maxFavs() ? a.label + " fijada (este estilo muestra sólo " + maxFavs() + ")" : a.label + " fijada en inicio");
                     break;
