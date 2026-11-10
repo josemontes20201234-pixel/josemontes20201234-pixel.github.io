@@ -451,7 +451,10 @@ public class MainActivity extends Activity {
         adapter = new AppAdapter();
         grid.setAdapter(adapter);
         grid.setOnItemClickListener((p, v, pos, id) -> lanzar(filtradas.get(pos)));
-        grid.setOnItemLongClickListener((p, v, pos, id) -> { opcionesApp(filtradas.get(pos)); return true; });
+        grid.setOnItemLongClickListener((p, v, pos, id) -> { iniciarArrastreCajon(v, filtradas.get(pos).key()); return true; });
+        drawer.setTag("cajon");
+        drawer.setOnDragListener(this::alArrastrar);
+        homeBox.setOnDragListener(this::alArrastrar);
         LinearLayout.LayoutParams lg = new LinearLayout.LayoutParams(-1, 0, 1f); lg.topMargin = dp(10);
         drawer.addView(grid, lg);
 
@@ -1349,10 +1352,19 @@ public class MainActivity extends Activity {
         return v;
     }
 
-    String arrastreKey; View arrastreVista; boolean arrastreMovido, arrastreTerminado;
+    String arrastreKey; View arrastreVista; boolean arrastreMovido, arrastreTerminado, arrastreDesdeCajon;
+    float arrastreX0 = -1, arrastreY0 = -1;
+
+    /** Arrastrar desde la lista de todas las apps hacia el inicio. */
+    void iniciarArrastreCajon(View v, String k) {
+        arrastreKey = k; arrastreVista = null; arrastreMovido = false; arrastreTerminado = false; arrastreDesdeCajon = true; arrastreX0 = -1;
+        v.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS);
+        try { v.startDragAndDrop(android.content.ClipData.newPlainText("app", k), new View.DragShadowBuilder(v), k, 0); }
+        catch (Exception e) { arrastreKey = null; App a = porKey.get(k); if (a != null) opcionesApp(a); }
+    }
 
     void iniciarArrastre(View v, String k) {
-        arrastreKey = k; arrastreVista = v; arrastreMovido = false; arrastreTerminado = false;
+        arrastreKey = k; arrastreVista = v; arrastreMovido = false; arrastreTerminado = false; arrastreDesdeCajon = false;
         v.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS);
         try {
             v.startDragAndDrop(android.content.ClipData.newPlainText("app", k), new View.DragShadowBuilder(v), k, 0);
@@ -1370,24 +1382,47 @@ public class MainActivity extends Activity {
         switch (e.getAction()) {
             case android.view.DragEvent.ACTION_DRAG_STARTED:
                 return arrastreKey != null;
+            case android.view.DragEvent.ACTION_DRAG_LOCATION:
+                if ("cajon".equals(destino) && arrastreDesdeCajon) {
+                    if (arrastreX0 < 0) { arrastreX0 = e.getX(); arrastreY0 = e.getY(); }
+                    else if (Math.hypot(e.getX() - arrastreX0, e.getY() - arrastreY0) > dp(28) && drawer.getVisibility() == View.VISIBLE) {
+                        // Se movió: se cierra la lista y aparece el inicio para soltar la app
+                        arrastreMovido = true;
+                        drawer.setVisibility(View.GONE);
+                        InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
+                        if (imm != null) imm.hideSoftInputFromWindow(buscar.getWindowToken(), 0);
+                    }
+                }
+                return true;
             case android.view.DragEvent.ACTION_DRAG_ENTERED:
-                if (v != arrastreVista) { v.animate().scaleX(1.12f).scaleY(1.12f).setDuration(120).start(); arrastreMovido = true; }
+                if (v != arrastreVista && destino != null && !"cajon".equals(destino)) { v.animate().scaleX(1.12f).scaleY(1.12f).setDuration(120).start(); arrastreMovido = true; }
                 return true;
             case android.view.DragEvent.ACTION_DRAG_EXITED:
                 if (v == arrastreVista) arrastreMovido = true;
-                else v.animate().scaleX(1f).scaleY(1f).setDuration(120).start();
+                else if (destino != null) v.animate().scaleX(1f).scaleY(1f).setDuration(120).start();
                 return true;
             case android.view.DragEvent.ACTION_DROP:
                 v.animate().scaleX(1f).scaleY(1f).setDuration(80).start();
-                if (destino == null || arrastreKey == null || destino.equals(arrastreKey)) return true;
+                if (arrastreKey == null || "cajon".equals(destino)) return true;
+                if (destino == null) {
+                    // Soltada en un espacio vacío del inicio: se agrega al final
+                    if (arrastreDesdeCajon) {
+                        List<String> favs = favoritos();
+                        if (!favs.contains(arrastreKey)) { favs.add(arrastreKey); guardarFavs(favs); }
+                    }
+                    return true;
+                }
+                if (destino.equals(arrastreKey)) return true;
                 soltarSobre(arrastreKey, destino);
                 return true;
             case android.view.DragEvent.ACTION_DRAG_ENDED:
                 v.setAlpha(1f); v.setScaleX(1f); v.setScaleY(1f);
                 if (!arrastreTerminado) {
                     arrastreTerminado = true;
+                    if (arrastreVista != null) arrastreVista.setAlpha(1f);
                     final String k = arrastreKey; final boolean movido = arrastreMovido;
-                    arrastreKey = null; arrastreVista = null;
+                    arrastreKey = null; arrastreVista = null; arrastreDesdeCajon = false;
+                    if (movido && buscar.length() > 0) ui.post(() -> buscar.setText(""));
                     if (!movido && k != null) ui.post(() -> menuDe(k));
                     else ui.post(this::pintarFavoritos);
                 }
@@ -1409,9 +1444,10 @@ public class MainActivity extends Activity {
             return;
         }
         int de = favs.indexOf(origen), a = favs.indexOf(destino);
-        if (de < 0 || a < 0) return;
-        favs.remove(de);
-        favs.add(a, origen); // queda en el lugar donde la soltaste
+        if (a < 0) return;
+        if (de >= 0) favs.remove(de);
+        else if (favs.size() >= 12) { toast("Ya tenés 12 apps en el inicio. Quitá una primero."); return; }
+        favs.add(Math.min(a, favs.size()), origen); // queda en el lugar donde la soltaste
         guardarFavs(favs);
     }
 
@@ -2366,6 +2402,7 @@ public class MainActivity extends Activity {
         int s = tamIconoPx(); if (columnas == 5) s = Math.round(s * 0.86f);
         for (App a : l) {
             View v = celdaApp(a, true, true, s);
+            v.setOnLongClickListener(x -> { iniciarArrastreCajon(x, a.key()); return true; });
             sugeridasBox.addView(v, new LinearLayout.LayoutParams(0, -2, 1f));
         }
         for (int i = l.size(); i < columnas && !l.isEmpty(); i++) sugeridasBox.addView(new View(this), new LinearLayout.LayoutParams(0, 1, 1f));
