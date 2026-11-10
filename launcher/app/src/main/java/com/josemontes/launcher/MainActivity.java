@@ -1339,9 +1339,80 @@ public class MainActivity extends Activity {
     }
 
     View vistaFav(String k, String modo, int s, boolean conNombre) {
-        if (k.startsWith("carpeta:")) return vistaCarpeta(k.substring(8), "lista".equals(modo), conNombre, s);
-        App a = porKey.get(k);
-        return "lista".equals(modo) ? filaLista(a) : celdaApp(a, true, conNombre, s);
+        View v;
+        if (k.startsWith("carpeta:")) v = vistaCarpeta(k.substring(8), "lista".equals(modo), conNombre, s);
+        else { App a = porKey.get(k); v = "lista".equals(modo) ? filaLista(a) : celdaApp(a, true, conNombre, s); }
+        // Mantener presionado: si movés el dedo se arrastra; si soltás sin mover, sale el menú
+        v.setTag(k);
+        v.setOnLongClickListener(x -> { iniciarArrastre(x, k); return true; });
+        v.setOnDragListener(this::alArrastrar);
+        return v;
+    }
+
+    String arrastreKey; View arrastreVista; boolean arrastreMovido, arrastreTerminado;
+
+    void iniciarArrastre(View v, String k) {
+        arrastreKey = k; arrastreVista = v; arrastreMovido = false; arrastreTerminado = false;
+        v.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS);
+        try {
+            v.startDragAndDrop(android.content.ClipData.newPlainText("app", k), new View.DragShadowBuilder(v), k, 0);
+            v.setAlpha(.3f);
+        } catch (Exception e) { menuDe(k); }
+    }
+
+    void menuDe(String k) {
+        if (k.startsWith("carpeta:")) opcionesCarpeta(k.substring(8));
+        else { App a = porKey.get(k); if (a != null) opcionesApp(a); }
+    }
+
+    boolean alArrastrar(View v, android.view.DragEvent e) {
+        String destino = (String) v.getTag();
+        switch (e.getAction()) {
+            case android.view.DragEvent.ACTION_DRAG_STARTED:
+                return arrastreKey != null;
+            case android.view.DragEvent.ACTION_DRAG_ENTERED:
+                if (v != arrastreVista) { v.animate().scaleX(1.12f).scaleY(1.12f).setDuration(120).start(); arrastreMovido = true; }
+                return true;
+            case android.view.DragEvent.ACTION_DRAG_EXITED:
+                if (v == arrastreVista) arrastreMovido = true;
+                else v.animate().scaleX(1f).scaleY(1f).setDuration(120).start();
+                return true;
+            case android.view.DragEvent.ACTION_DROP:
+                v.animate().scaleX(1f).scaleY(1f).setDuration(80).start();
+                if (destino == null || arrastreKey == null || destino.equals(arrastreKey)) return true;
+                soltarSobre(arrastreKey, destino);
+                return true;
+            case android.view.DragEvent.ACTION_DRAG_ENDED:
+                v.setAlpha(1f); v.setScaleX(1f); v.setScaleY(1f);
+                if (!arrastreTerminado) {
+                    arrastreTerminado = true;
+                    final String k = arrastreKey; final boolean movido = arrastreMovido;
+                    arrastreKey = null; arrastreVista = null;
+                    if (!movido && k != null) ui.post(() -> menuDe(k));
+                    else ui.post(this::pintarFavoritos);
+                }
+                return true;
+        }
+        return true;
+    }
+
+    void soltarSobre(String origen, String destino) {
+        List<String> favs = favoritos();
+        // App encima de una carpeta: entra a la carpeta
+        if (destino.startsWith("carpeta:") && !origen.startsWith("carpeta:")) {
+            String id = destino.substring(8);
+            List<String> keys = new ArrayList<>(); for (App b : appsCarpeta(id)) keys.add(b.key());
+            if (!keys.contains(origen)) keys.add(origen);
+            guardarAppsCarpeta(id, keys);
+            favs.remove(origen); guardarFavs(favs);
+            App a = porKey.get(origen); toast((a != null ? a.label : "App") + " está en «" + nombreCarpeta(id) + "»");
+            return;
+        }
+        int de = favs.indexOf(origen), a = favs.indexOf(destino);
+        if (de < 0 || a < 0) return;
+        favs.remove(de);
+        favs.add(a, origen); // queda en el lugar donde la soltaste
+        guardarFavs(favs);
     }
 
     void pintarFavoritos() {
