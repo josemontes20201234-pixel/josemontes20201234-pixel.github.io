@@ -1,4 +1,5 @@
 // Proyector: piezas compartidas entre el control (cel) y el visor (tele).
+import { DIAPOS_CSS } from "./diapos.js";
 
 export const LIBROS = [
   ["Génesis","Gn"],["Éxodo","Ex"],["Levítico","Lv"],["Números","Nm"],["Deuteronomio","Dt"],["Josué","Jos"],["Jueces","Jue"],["Rut","Rt"],
@@ -82,8 +83,8 @@ export const nombreLibro = (i, en) => en ? BOOKS_EN[i] : LIBROS[i][0];
 /* ---- Pantalla (se usa en el visor y en la vista previa) ---- */
 export function crearEscena(root) {
   root.classList.add("esc");
-  root.innerHTML = '<div class="esc-bg"></div><div class="esc-img" hidden></div><div class="esc-capa"></div><div class="esc-negro"></div>';
-  return { root, bg: root.querySelector(".esc-bg"), capa: root.querySelector(".esc-capa"), negro: root.querySelector(".esc-negro"), key: null, fondoKey: null };
+  root.innerHTML = '<div class="esc-bg"></div><div class="esc-img" hidden></div><div class="esc-capa"></div><div class="esc-pres"></div><div class="esc-negro"></div>';
+  return { root, bg: root.querySelector(".esc-bg"), capa: root.querySelector(".esc-capa"), pres: root.querySelector(".esc-pres"), negro: root.querySelector(".esc-negro"), key: null, fondoKey: null };
 }
 export const ESCENA_CSS = `
 .esc{position:relative;overflow:hidden;background:#000;container-type:size;color:#fff}
@@ -108,7 +109,7 @@ export const ESCENA_CSS = `
 .in-rebote{animation:iReb .9s both}@keyframes iReb{0%{opacity:0;transform:scale(.6)}55%{opacity:1;transform:scale(1.06)}75%{transform:scale(.97)}100%{transform:scale(1)}}
 .in-pulso{animation:iPul .9s both}@keyframes iPul{0%{opacity:0;transform:scale(1)}40%{opacity:1;transform:scale(1.05)}100%{transform:scale(1)}}
 @media (prefers-reduced-motion: reduce){.esc *{animation:none!important;transition:none!important}}
-`;
+` + DIAPOS_CSS;
 
 function fuenteCss(nombre) { const f = FUENTES.find(x => x[0] === nombre); return (f ? f[1] : FUENTES[0][1]) + ",'Noto Serif','Noto Serif Hebrew',serif"; }
 

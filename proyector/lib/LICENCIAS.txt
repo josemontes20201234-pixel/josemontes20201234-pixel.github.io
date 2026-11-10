@@ -1,0 +1,5 @@
+Bibliotecas de terceros usadas por el Proyector (sólo en el cel, para leer archivos):
+
+- JSZip 3.10.1 — (c) Stuart Knightley y colaboradores. Licencia MIT (o GPLv3). https://stuk.github.io/jszip/
+  Incluye pako (licencia MIT).
+- PDF.js 6.2.108 (versión "legacy") — (c) Mozilla Foundation. Licencia Apache 2.0. https://mozilla.github.io/pdf.js/

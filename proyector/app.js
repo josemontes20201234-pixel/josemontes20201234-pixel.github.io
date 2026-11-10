@@ -1,9 +1,10 @@
-// Proyector: control desde el cel. Biblia, canciones, anuncios, fondos y estilo.
+// Proyector: control desde el cel. Biblia, canciones, diapositivas, anuncios, fondos y estilo.
 import { firebaseConfig, ADMIN_EMAIL } from "../config.js";
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { getFirestore, doc, setDoc, getDoc, addDoc, updateDoc, deleteDoc, collection, onSnapshot, query, where } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { getFirestore, doc, setDoc, getDoc, addDoc, updateDoc, deleteDoc, collection, onSnapshot, query, where, Bytes, writeBatch } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { LIBROS, VERSIONES, FUENTES, FONDOS, TRANSICIONES, ESTILO_BASE, norm, esc, parseCita, nombreLibro, crearEscena, pintar, ESCENA_CSS } from "./shared.js";
+import { configurarAlmacen, registrarArchivo, recordarEscena, cargarEscena, pintarPres, reencajarPres, miniatura, archivo, archivosDe, archivosEscena, borrarArchivoLocal, mediosDe, cargarFuentes } from "./diapos.js";
 
 document.getElementById("escena-css").textContent = ESCENA_CSS;
 const fb = initializeApp(firebaseConfig, "proyector");
@@ -32,6 +33,14 @@ const IC = {
   reloj: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2.5M9 2h6"/></svg>',
   lupa: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5L21 21M8 10.5h5M10.5 8v5"/></svg>',
   x: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>',
+  diapos: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="4" width="19" height="13" rx="2"/><path d="M10 8.2v4.6l4-2.3z" fill="currentColor"/><path d="M8 21h8"/></svg>',
+  subir: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg>',
+  mas: '<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>',
+  vPlay: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13l10.5-6.5z"/></svg>',
+  vPausa: '<svg viewBox="0 0 24 24" fill="currentColor"><rect x="6.5" y="5" width="4" height="14" rx="1"/><rect x="13.5" y="5" width="4" height="14" rx="1"/></svg>',
+  vInicio: '<svg viewBox="0 0 24 24" fill="currentColor"><rect x="5" y="5" width="2.6" height="14" rx="1"/><path d="M19 5.5v13L9 12z"/></svg>',
+  vSonido: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10v4h3.5L13 18V6L7.5 10z" fill="currentColor"/><path d="M16.5 9a4 4 0 0 1 0 6M19 6.5a7.5 7.5 0 0 1 0 11"/></svg>',
+  vMudo: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10v4h3.5L13 18V6L7.5 10z" fill="currentColor"/><path d="M17 9.5l5 5M22 9.5l-5 5"/></svg>',
   google: '<svg viewBox="0 0 24 24" width="20" height="20"><path fill="#4285F4" d="M22.6 12.3c0-.8-.1-1.6-.2-2.3H12v4.4h5.9a5 5 0 0 1-2.2 3.3v2.7h3.6c2.1-1.9 3.3-4.8 3.3-8.1z"/><path fill="#34A853" d="M12 23c3 0 5.5-1 7.3-2.7l-3.6-2.7c-1 .7-2.2 1.1-3.7 1.1-2.8 0-5.2-1.9-6.1-4.5H2.2v2.8A11 11 0 0 0 12 23z"/><path fill="#FBBC05" d="M5.9 14.2a6.6 6.6 0 0 1 0-4.3V7.1H2.2a11 11 0 0 0 0 9.9z"/><path fill="#EA4335" d="M12 5.4c1.6 0 3 .6 4.1 1.6l3.1-3.1A11 11 0 0 0 2.2 7.1l3.7 2.8C6.8 7.3 9.2 5.4 12 5.4z"/></svg>'
 };
 
@@ -57,13 +66,18 @@ let tGuardar = null;
 function fondoImgActual() { const f = LIVE.fondo; if (!f || !f.img) return null; const x = FONDOS_IMG.find(d => d.id === f.id); return x ? x.img : null; }
 function enviar(cambio, lento) {
   LIVE = Object.assign({}, LIVE, cambio, { ts: Date.now() });
-  pintar(escena, LIVE, fondoImgActual());
-  if (TELE) pintar(TELE, LIVE, fondoImgActual());
+  pintarVistas();
   actualizarLive();
   try { bc && bc.postMessage({ tipo: "estado", estado: LIVE, fondoImg: fondoImgActual() }); } catch { }
   clearTimeout(tGuardar);
   const guardar = () => setDoc(doc(db, "proyector", "en_vivo"), LIVE).catch(e => toast("No se pudo enviar a la tele: " + (e.code || e.message)));
   if (lento) tGuardar = setTimeout(guardar, 350); else guardar();
+}
+function pintarVistas() {
+  const img = fondoImgActual();
+  if (escena) { pintar(escena, LIVE, img); pintarPres(escena, LIVE, { mini: true }); }
+  if (TELE) { pintar(TELE, LIVE, img); pintarPres(TELE, LIVE); }
+  if (PZ) { pintar(PZ.esc, LIVE, img); pintarPres(PZ.esc, LIVE, { mini: true }); }
 }
 function proyectarTexto(texto, ref, titulo, ctx) {
   CTX = ctx || null;
@@ -354,6 +368,7 @@ function slidesCulto() {
     else if (it.t === "anuncio") { const a = ANUNCIOS.find(x => x.id === it.id); out.push(a ? { k, t: "anuncio", a, label: a.titulo || corta(a.texto, 40) || "Imagen" } : { k, t: "falta", label: "Anuncio borrado" }); }
     else if (it.t === "texto") { (it.partes || []).forEach(pz => out.push({ k, t: "texto", texto: pz, titulo: it.titulo || "", ref: "", label: corta(pz, 50) })); }
     else if (it.t === "cuenta") out.push({ k, t: "cuenta", min: it.min, titulo: it.titulo, fin: it.fin, label: `${it.min} min · ${it.titulo || "Cuenta regresiva"}` });
+    else if (it.t === "pres") { const m = DIAPOS.find(x => x.id === it.id); out.push(m ? { k, t: "pres", id: it.id, label: `▶ ${m.n} ${m.n === 1 ? "diapositiva" : "diapositivas"} · se abre el presentador` } : { k, t: "falta", label: "Diapositivas borradas" }); }
   });
   return out;
 }
@@ -364,10 +379,12 @@ function nombreItem(it) {
   if (it.t === "anuncio") { const a = ANUNCIOS.find(x => x.id === it.id); return { tipo: "Anuncio", nom: a ? (a.titulo || corta(a.texto, 40) || "Imagen") : "Anuncio borrado" }; }
   if (it.t === "texto") return { tipo: "Texto", nom: it.titulo || corta((it.partes || [])[0], 40) };
   if (it.t === "cuenta") return { tipo: "Cuenta regresiva", nom: `${it.min} minutos` };
+  if (it.t === "pres") { const m = DIAPOS.find(x => x.id === it.id); return { tipo: "Diapositivas", nom: m ? m.nombre : "Diapositivas borradas" }; }
   return { tipo: "", nom: "" };
 }
-async function proyectarSlide(i) {
+async function proyectarSlide(i, atras) {
   const S = slidesCulto(); const sl = S[i]; if (!sl) return;
+  if (sl.t === "pres") { await presentar(sl.id, { culto: i, alFinal: !!atras }); $$("[data-slide]").forEach(el => el.classList.toggle("on", +el.dataset.slide === i)); return; }
   const ctx = { tipo: "culto", i, n: S.length };
   if (sl.t === "biblia") {
     let cap; try { cap = await asegurarCap(sl.ver, sl.l, sl.c); } catch (er) { return toast(er.message); }
@@ -382,7 +399,7 @@ async function proyectarSlide(i) {
 }
 function vCulto() {
   const S = slidesCulto(); let idx = 0;
-  const actual = CTX && CTX.tipo === "culto" ? CTX.i : -1;
+  const actual = CTX && CTX.tipo === "culto" ? CTX.i : CTX && CTX.tipo === "pres" && CTX.culto != null ? CTX.culto : -1;
   const items = CULTO.items.map((it, k) => {
     const n = nombreItem(it); const mis = S.filter(x => x.k === k);
     const html = `<div class="field" style="gap:8px"><div style="display:flex;gap:6px;align-items:center"><span style="flex:1;min-width:0"><span class="lbl" style="color:var(--accent)">${k + 1} · ${esc(n.tipo)}</span><b style="display:block;font-size:15.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(n.nom)}</b></span>
@@ -401,10 +418,11 @@ function vCulto() {
 }
 function hojaAgregarCulto() {
   let tipo = "biblia";
-  const T = [["biblia", "Versículos"], ["cancion", "Canto"], ["texto", "Texto o bosquejo"], ["anuncio", "Anuncio"], ["pasaje", "Pasaje del culto"], ["cuenta", "Cuenta regresiva"]];
+  const T = [["biblia", "Versículos"], ["cancion", "Canto"], ["texto", "Texto o bosquejo"], ["pres", "Diapositivas"], ["anuncio", "Anuncio"], ["pasaje", "Pasaje del culto"], ["cuenta", "Cuenta regresiva"]];
   const form = () => {
     if (tipo === "biblia") return `<label>Cita<input id="ca_cita" placeholder="Juan 3:16-18" autocomplete="off"></label><label>Versión<select id="ca_ver">${todasVersiones().map(v => `<option value="${esc(v.id)}" ${v.id === B.ver ? "selected" : ""}>${esc(v.corto)} · ${esc(v.nombre)}</option>`).join("")}</select></label>`;
     if (tipo === "cancion") { const L = todasCanciones().sort((a, b) => a.titulo.localeCompare(b.titulo, "es")); return L.length ? `<label>Canto<select id="ca_id">${L.map(c => `<option value="${esc(c.id)}">${esc(c.titulo)}</option>`).join("")}</select></label>` : `<p class="muted">Primero agregá cantos en la pestaña Cantos.</p>`; }
+    if (tipo === "pres") return DIAPOS.length ? `<label>Presentación<select id="ca_id">${[...DIAPOS].sort((a, b) => (b.usado || b.creado || 0) - (a.usado || a.creado || 0)).map(m => `<option value="${esc(m.id)}">${esc(m.nombre)} · ${m.n} diapositivas</option>`).join("")}</select></label>` : `<p class="muted">Primero subí diapositivas en la pestaña Diapos.</p>`;
     if (tipo === "pasaje") return PASAJES.length ? `<label>Pasaje<select id="ca_id">${PASAJES.map(p => `<option value="${esc(p.id)}">${esc(p.cita)} · ${esc(p.version)}</option>`).join("")}</select></label>` : `<p class="muted">Primero pegá un pasaje en Biblia → Pasajes del culto.</p>`;
     if (tipo === "anuncio") return ANUNCIOS.length ? `<label>Anuncio<select id="ca_id">${ANUNCIOS.map(a => `<option value="${esc(a.id)}">${esc(a.titulo || corta(a.texto, 40) || "Imagen")}</option>`).join("")}</select></label>` : `<p class="muted">Primero guardá un anuncio en la pestaña Anuncios.</p>`;
     if (tipo === "texto") return `<label>Título (opcional, sale arriba en cada pantalla)<input id="ca_tit" placeholder="La fe que obedece"></label><label>Texto · dejá una línea en blanco para pasar a otra pantalla<textarea id="ca_txt" style="min-height:150px" placeholder="Bienvenidos a la casa de Dios&#10;&#10;1. La fe escucha&#10;&#10;2. La fe obedece"></textarea></label>`;
@@ -421,7 +439,7 @@ function hojaAgregarCulto() {
         const v1 = p.vers || 1, v2 = m ? +m[1] : (p.vers || bib[p.libro][p.cap - 1].length);
         if (v2 < v1) return toast("El versículo final debe ser mayor que el inicial.");
         it = { t: "biblia", ver: $("#ca_ver", s).value, l: p.libro, c: p.cap, v1, v2 };
-      } else if (tipo === "cancion" || tipo === "pasaje" || tipo === "anuncio") { const sel = $("#ca_id", s); if (!sel) return; it = { t: tipo, id: sel.value }; }
+      } else if (tipo === "cancion" || tipo === "pasaje" || tipo === "anuncio" || tipo === "pres") { const sel = $("#ca_id", s); if (!sel) return; it = { t: tipo, id: sel.value }; }
       else if (tipo === "texto") { const partes = $("#ca_txt", s).value.replace(/\r/g, "").split(/\n\s*\n/).map(x => x.trim()).filter(Boolean); if (!partes.length) return toast("Escribí el texto."); it = { t: "texto", titulo: $("#ca_tit", s).value.trim(), partes }; }
       else if (tipo === "cuenta") { const min = Math.max(1, Math.min(120, +$("#ca_min", s).value || 5)); it = { t: "cuenta", min, titulo: $("#ca_tit", s).value.trim(), fin: $("#ca_fin", s).value.trim() }; }
       CULTO.items = [...CULTO.items, it]; await guardarCulto(); toast("Agregado al culto."); cerrarHoja(); renderMain();
@@ -684,6 +702,459 @@ function vEstilo() {
 }
 function setEstilo(c, lento) { enviar({ estilo: Object.assign({}, ESTILO_BASE, LIVE.estilo, c) }, lento); }
 
+/* ---------- Diapositivas: PowerPoint, PDF, fotos, videos y YouTube ---------- */
+const PARTE_BYTES = 900000, PARTE_TXT = 300000, GRATIS = 1024 * 1024 * 1024;
+let DIAPOS = [], DIAPOS_LISTAS = false;
+let PRES = null;                                  // presentación abierta: { id, pv, sc, meta }
+const POS = store.get("pr-pos", {});              // dónde quedó cada presentación
+const VID = { el: null, sonando: false, base: 0, desde: 0, dur: 0, mudo: false };
+let T_AUTO = null, PZ = null;
+configurarAlmacen({ leerDoc: async id => { const d = await getDoc(doc(db, "proyector", id)); return d.exists() ? d.data() : null; } });
+const tam = b => b >= 1e9 ? (b / 1073741824).toFixed(2).replace(".", ",") + " GB" : b >= 1048576 ? Math.round(b / 1048576) + " MB" : Math.max(1, Math.round(b / 1024)) + " KB";
+const ORIGEN = { pptx: "PowerPoint", pdf: "PDF", img: "Fotos", video: "Video", yt: "YouTube", mix: "Varias" };
+const DIAS = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
+const venceEn = m => Math.max(m.creado || 0, m.usado || 0) + 48 * 3600e3;
+function textoVence(m) {
+  const d = new Date(venceEn(m)), hoy = new Date();
+  const hora = d.toLocaleTimeString("es", { hour: "numeric", minute: "2-digit" });
+  const dd = Math.round((new Date(d.getFullYear(), d.getMonth(), d.getDate()) - new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate())) / 864e5);
+  return "Se borra sola " + (dd <= 0 ? "hoy" : dd === 1 ? "mañana" : "el " + DIAS[d.getDay()]) + " a las " + hora;
+}
+async function enParalelo(tareas, n) { let i = 0; const corre = async () => { while (i < tareas.length) { const k = i++; await tareas[k](); } }; await Promise.all(Array.from({ length: Math.min(n, tareas.length) }, corre)); }
+async function subirArchivo(a, alSubir) {
+  const partes = Math.max(1, Math.ceil(a.blob.size / PARTE_BYTES));
+  const pedazo = async k => new Uint8Array(await a.blob.slice(k * PARTE_BYTES, (k + 1) * PARTE_BYTES).arrayBuffer());
+  const tareas = [];
+  for (let k = 1; k < partes; k++) tareas.push(async () => { const b = await pedazo(k); await setDoc(doc(db, "proyector", `a_${a.id}_${k}`), { b: Bytes.fromUint8Array(b) }); alSubir(b.length); });
+  await enParalelo(tareas, 3);
+  const b0 = await pedazo(0);
+  await setDoc(doc(db, "proyector", "a_" + a.id), { tipo: "archivo", mime: a.mime || "", size: a.blob.size, partes, b: Bytes.fromUint8Array(b0) });
+  alSubir(b0.length);
+  return partes;
+}
+async function guardarEscena(id, sc) {
+  const json = JSON.stringify(sc); const partes = Math.max(1, Math.ceil(json.length / PARTE_TXT));
+  for (let k = 1; k < partes; k++) await setDoc(doc(db, "proyector", `pres_${id}_p${k}`), { json: json.slice(k * PARTE_TXT, (k + 1) * PARTE_TXT) });
+  await setDoc(doc(db, "proyector", "pres_" + id), { tipo: "pres", partes, json: json.slice(0, PARTE_TXT) });
+  return partes;
+}
+async function borrarDocs(ids) {
+  for (let i = 0; i < ids.length; i += 400) { const b = writeBatch(db); ids.slice(i, i + 400).forEach(x => b.delete(doc(db, "proyector", x))); await b.commit(); }
+}
+const docsDeArchivo = a => { const o = ["a_" + a.id]; for (let k = 1; k < (a.partes || 1); k++) o.push(`a_${a.id}_${k}`); return o; };
+async function borrarPres(m, callado) {
+  if (LIVE.modo === "pres" && LIVE.pres === m.id) { CTX = null; enviar({ modo: "fondo", texto: "", ref: "", titulo: "", img: null, auto: null }); }
+  if (PRES && PRES.id === m.id) cerrarPresentador();
+  const ids = ["pres_" + m.id];
+  for (let k = 1; k < (m.partesMax || m.partes || 1) + 2; k++) ids.push(`pres_${m.id}_p${k}`);
+  (m.assets || []).forEach(a => { ids.push(...docsDeArchivo(a)); borrarArchivoLocal(a.id); });
+  await borrarDocs(ids);
+  await deleteDoc(doc(db, "proyector_diapos", m.id));
+  CULTO.items.some(it => it.t === "pres" && it.id === m.id) && (CULTO.items = CULTO.items.filter(it => !(it.t === "pres" && it.id === m.id)), guardarCulto());
+  delete POS[m.id]; store.set("pr-pos", POS);
+  if (!callado) toast("Presentación borrada.");
+}
+function limpiarSubidaCortada() {
+  const x = store.get("pr-subiendo", null); if (!x) return;
+  const usados = new Set(DIAPOS.flatMap(m => (m.assets || []).map(a => a.id)));
+  const ids = [];
+  (x.assets || []).filter(a => !usados.has(a.id)).forEach(a => { ids.push(...docsDeArchivo(a)); borrarArchivoLocal(a.id); });
+  if (x.pres && !DIAPOS.some(m => m.id === x.pres)) { ids.push("pres_" + x.pres); for (let k = 1; k < 12; k++) ids.push(`pres_${x.pres}_p${k}`); }
+  store.set("pr-subiendo", null);
+  if (ids.length) borrarDocs(ids).catch(() => { });
+}
+function limpiarVencidas() {
+  DIAPOS.filter(m => m.temporal && venceEn(m) < Date.now() && !(LIVE.modo === "pres" && LIVE.pres === m.id)).forEach(m => borrarPres(m, true).catch(() => { }));
+}
+async function escenaDe(m) { const sc = await cargarEscena(m.id, m.pv || 1); if (sc.fuentes) cargarFuentes(sc.fuentes); return sc; }
+async function bajarDiapo(sc, i) { await Promise.all(archivosDe(sc.slides[i] || {}, true).map(a => archivo(a).catch(() => null))); }
+
+/* importar un archivo y subirlo */
+async function importarYSubir({ files, yt, op, nombre, temporal, agregarA }, avanceUI) {
+  const imp = await import("./importar.js");
+  avanceUI(.01, "Preparando…");
+  const r = yt ? imp.importarYouTube(yt, op) : await imp.importarArchivos(files, op, (x, msg) => avanceUI(x * .45, msg));
+  const total = r.archivos.reduce((a, b) => a + b.blob.size, 0);
+  const libre = GRATIS - DIAPOS.reduce((a, m) => a + (m.tam || 0), 0);
+  if (total > libre - 30 * 1048576) throw new Error(`No cabe: ocupa ${tam(total)} y te quedan ${tam(Math.max(0, libre))} libres. Borrá alguna presentación vieja.`);
+  let hecho = 0; const assets = [];
+  const idNuevo = agregarA ? null : imp.nuevoId(10);
+  // si se corta la subida, la próxima vez se borra lo que quedó a medias
+  store.set("pr-subiendo", { pres: idNuevo, assets: r.archivos.map(a => ({ id: a.id, partes: Math.max(1, Math.ceil(a.blob.size / PARTE_BYTES)) })) });
+  for (const a of r.archivos) {
+    registrarArchivo(a.id, a.blob, a.mime);
+    const partes = await subirArchivo(a, n => { hecho += n; avanceUI(.45 + .5 * (total ? hecho / total : 1), `Subiendo… ${tam(hecho)} de ${tam(total)}`); });
+    const x = { id: a.id, partes, size: a.blob.size, mime: a.mime || "" }; if (a.dur) x.dur = Math.round(a.dur * 10) / 10;
+    assets.push(x);
+  }
+  avanceUI(.97, "Guardando…");
+  if (agregarA) {
+    const m = DIAPOS.find(x => x.id === agregarA); if (!m) throw new Error("Esa presentación ya no existe.");
+    const sc = await escenaDe(m);
+    const nuevas = r.sc.slides.map(s => (r.sc.w !== sc.w || r.sc.h !== sc.h) ? Object.assign({ w: r.sc.w, h: r.sc.h }, s) : s);
+    const sc2 = Object.assign({}, sc, { slides: sc.slides.concat(nuevas), fuentes: Array.from(new Set([...(sc.fuentes || []), ...(r.sc.fuentes || [])])) });
+    const partes = await guardarEscena(m.id, sc2); const pv = (m.pv || 1) + 1; recordarEscena(m.id, pv, sc2);
+    await updateDoc(doc(db, "proyector_diapos", m.id), { n: sc2.slides.length, tam: (m.tam || 0) + total, notas: [...(m.notas || []), ...r.notas], titulos: [...(m.titulos || []), ...r.titulos], assets: [...(m.assets || []), ...assets], partes, partesMax: Math.max(partes, m.partesMax || m.partes || 1), pv, origen: m.origen === r.origen ? m.origen : "mix" });
+    store.set("pr-subiendo", null);
+    return { id: m.id, r, n: nuevas.length };
+  }
+  const id = idNuevo;
+  const partes = await guardarEscena(id, r.sc); recordarEscena(id, 1, r.sc);
+  await setDoc(doc(db, "proyector_diapos", id), { nombre, creado: Date.now(), usado: 0, temporal: !!temporal, n: r.sc.slides.length, tam: total, portada: r.portada || null, origen: r.origen, notas: r.notas, titulos: r.titulos, assets, partes, partesMax: partes, pv: 1, yt: r.yt || null, w: r.sc.w, h: r.sc.h });
+  store.set("pr-subiendo", null);
+  return { id, r, n: r.sc.slides.length };
+}
+
+function hojaSubir(agregarA) {
+  const m = agregarA ? DIAPOS.find(x => x.id === agregarA) : null;
+  let files = [], temporal = store.get("pr-dptemp", false);
+  abrirHoja(m ? "Agregar a «" + corta(m.nombre, 28) + "»" : "Subir diapositivas", `<form class="form" id="dpF">
+    <label class="dp-escoger"><input type="file" id="dpFile" accept=".pptx,.ppsx,.potx,.pptm,.pdf,image/*,video/*,audio/*,.mov,.mp4,.m4v" multiple hidden>
+      <span class="dp-escoger-ic">${IC.subir}</span><b id="dpFileT">Escoger archivo</b><small id="dpFileS">PowerPoint, PDF (Canva, Google Slides), fotos o videos</small></label>
+    <div class="dp-o"><span>o un video de YouTube</span></div>
+    <input id="dpYt" placeholder="Pegá el link de YouTube" autocomplete="off" inputmode="url">
+    ${m ? "" : `<label>Nombre<input id="dpNom" maxlength="80" placeholder="Prédica del domingo"></label>
+    <div class="chips" id="dpTemp"><button type="button" data-dptemp="0" aria-pressed="${!temporal}">Guardar en la biblioteca</button><button type="button" data-dptemp="1" aria-pressed="${temporal}">Usar y borrar</button></div>
+    <p class="muted" id="dpTempInfo" style="font-size:13px;margin-top:-4px"></p>`}
+    <div id="dpOpVid" hidden><label class="sw" style="font-weight:600;color:var(--fg)"><span>El video arranca solo al mostrarlo</span><input type="checkbox" id="dpAuto" checked></label><label class="sw" style="font-weight:600;color:var(--fg)"><span>Repetir el video sin parar</span><input type="checkbox" id="dpLoop"></label></div>
+    <details class="dp-ayuda"><summary>¿Cómo lo bajo de Canva o Google Slides?</summary>
+      <p><b>Canva:</b> Compartir → Descargar → <b>PDF estándar</b> (o PowerPoint). Si tu diseño tiene videos o animaciones de Canva, bajalo como <b>Video MP4</b> y subilo aquí.</p>
+      <p><b>Google Slides:</b> Archivo → Descargar → <b>Microsoft PowerPoint (.pptx)</b>. Así se conservan las animaciones.</p>
+      <p><b>PowerPoint:</b> subí el .pptx tal cual. Las animaciones, transiciones, videos y notas vienen incluidos.</p>
+      <p><b>Keynote:</b> Archivo → Exportar a → PowerPoint.</p></details>
+    <div id="dpProg" hidden><div class="dp-barra"><i id="dpBarra"></i></div><small class="muted" id="dpProgT">Preparando…</small></div>
+    <div id="dpAvisos"></div>
+    <button class="btn wide" type="submit" id="dpGo">${m ? "Agregar" : "Subir"}</button></form>`, s => {
+    const info = () => { const t = $("#dpTempInfo", s); if (t) t.textContent = temporal ? "Para algo de una sola vez: se borra sola 2 días después de usarla, para no llenar el espacio." : "Queda guardada para usarla cuando querás."; };
+    info();
+    $("#dpFile", s).onchange = e => {
+      files = Array.from(e.target.files || []); if (!files.length) return;
+      $("#dpFileT", s).textContent = files.length === 1 ? files[0].name : files.length + " archivos";
+      $("#dpFileS", s).textContent = tam(files.reduce((a, f) => a + f.size, 0)) + " · tocá para cambiar";
+      const nom = $("#dpNom", s); if (nom && !nom.value) nom.value = files.length === 1 ? files[0].name.replace(/\.[^.]+$/, "").replace(/[_-]+/g, " ").trim() : "Fotos " + new Date().toLocaleDateString("es");
+      $("#dpOpVid", s).hidden = !files.some(f => /^video\//.test(f.type) || /\.(mp4|mov|m4v|webm)$/i.test(f.name));
+      $("#dpYt", s).value = "";
+    };
+    $("#dpYt", s).oninput = () => { const v = $("#dpYt", s).value.trim(); $("#dpOpVid", s).hidden = !v && !files.some(f => /^video\//.test(f.type)); const nom = $("#dpNom", s); if (v && nom && !nom.value) nom.value = "Video de YouTube"; };
+    s.addEventListener("click", e => { const b = e.target.closest("[data-dptemp]"); if (!b) return; temporal = b.dataset.dptemp === "1"; store.set("pr-dptemp", temporal); $$("[data-dptemp]", s).forEach(x => x.setAttribute("aria-pressed", x === b)); info(); });
+    $("#dpF", s).onsubmit = async e => {
+      e.preventDefault();
+      const yt = $("#dpYt", s).value.trim();
+      if (!files.length && !yt) return toast("Escogé un archivo o pegá un link de YouTube.");
+      const nombre = (($("#dpNom", s) || {}).value || "").trim() || (files[0] ? files[0].name.replace(/\.[^.]+$/, "") : "Video de YouTube");
+      const go = $("#dpGo", s); go.disabled = true; go.textContent = "Trabajando…";
+      $("#dpProg", s).hidden = false; $("#dpAvisos", s).innerHTML = "";
+      let lock = null; try { lock = await navigator.wakeLock.request("screen"); } catch { }
+      const av = (x, t) => { $("#dpBarra", s).style.width = Math.round(x * 100) + "%"; if (t) $("#dpProgT", s).textContent = t; };
+      try {
+        const res = await importarYSubir({ files, yt: files.length ? null : yt, op: { auto: $("#dpAuto", s).checked, repetir: $("#dpLoop", s).checked }, nombre, temporal, agregarA }, av);
+        av(1, "¡Listo!");
+        const avisos = res.r.avisos || [];
+        if (avisos.length) {
+          $("#dpAvisos", s).innerHTML = `<div class="confirm" style="background:rgba(243,198,77,.12)"><b>Listo, con ${avisos.length === 1 ? "un detalle" : "unos detalles"}:</b>${avisos.map(a => `<span style="font-size:14px">• ${esc(a)}</span>`).join("")}<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn sm" type="button" id="dpVer">Presentar</button><button class="btn ghost sm" type="button" data-close>Cerrar</button></div></div>`;
+          $("#dpVer", s).onclick = () => { cerrarHoja(); presentar(res.id); };
+          go.hidden = true;
+        } else { cerrarHoja(); toast(agregarA ? `Se agregaron ${res.n} diapositivas.` : `«${nombre}» lista: ${res.n} ${res.n === 1 ? "diapositiva" : "diapositivas"}.`); }
+        TAB = "diapos"; store.set("pr-tab", TAB); renderMain();
+      } catch (er) {
+        console.error(er);
+        $("#dpAvisos", s).innerHTML = `<div class="confirm"><b>No se pudo</b><span style="font-size:14px">${esc(er.message || String(er))}</span></div>`;
+        limpiarSubidaCortada();
+        go.disabled = false; go.textContent = "Probar otra vez"; $("#dpProg", s).hidden = true;
+      } finally { try { lock && lock.release(); } catch { } }
+    };
+  });
+}
+
+/* biblioteca */
+function vDiapos() {
+  const usado = DIAPOS.reduce((a, m) => a + (m.tam || 0), 0), pct = Math.min(100, usado / GRATIS * 100);
+  const lista = [...DIAPOS].sort((a, b) => (b.usado || b.creado || 0) - (a.usado || a.creado || 0));
+  const enVivo = LIVE.modo === "pres" ? LIVE.pres : null;
+  const items = lista.map(m => {
+    const pos = POS[m.id];
+    const seguir = pos && pos.i > 0 && Date.now() - pos.t < 6 * 3600e3 && pos.i < (m.n || 1);
+    return `<div class="dp-item ${enVivo === m.id ? "on" : ""}">
+      <button type="button" class="dp-portada" data-dppres="${m.id}" aria-label="Presentar ${esc(m.nombre)}" ${m.portada ? "" : `data-vivo="${m.id}"`}>${m.portada ? `<img src="${m.portada}" alt="">` : m.yt ? `<img src="https://i.ytimg.com/vi/${esc(m.yt)}/mqdefault.jpg" alt="">` : ""}<span class="dp-n">${m.n || 0}</span></button>
+      <div class="dp-info"><b>${esc(m.nombre)}</b><small>${m.n || 0} ${m.n === 1 ? "diapositiva" : "diapositivas"} · ${ORIGEN[m.origen] || "Archivo"} · ${tam(m.tam || 0)}</small>${m.temporal ? `<small class="dp-vence">${esc(textoVence(m))}</small>` : ""}
+        <div class="dp-acc"><button class="btn sm" type="button" data-dppres="${m.id}">▶ ${enVivo === m.id ? "Abrir" : "Presentar"}</button>${seguir && enVivo !== m.id ? `<button class="btn ghost sm" type="button" data-dpseguir="${m.id}">Seguir en la ${pos.i + 1}</button>` : ""}<button class="iconbtn" type="button" data-dpmenu="${m.id}" aria-label="Más opciones">${IC.mas}</button></div></div></div>`;
+  }).join("");
+  return `<div class="sec"><div class="head"><h2>Diapositivas</h2><button class="btn sm" type="button" data-dpsubir>+ Subir</button></div>
+    ${DIAPOS.length ? `<div class="dp-medidor"><div class="dp-barra"><i style="width:${pct.toFixed(1)}%;${pct > 85 ? "background:var(--bad)" : ""}"></i></div><small class="muted">Usás ${tam(usado)} de 1 GB gratis${pct > 85 ? " · ya casi se llena: borrá lo que no usés" : ""}</small></div><div class="list">${items}</div>
+      <p class="muted" style="font-size:13px">Tocá una presentación para proyectarla. Con <b>Sigue</b> ▶ pasás cada animación y cada diapositiva. Las notas sólo las ves vos.</p>`
+      : DIAPOS_LISTAS ? `<div class="empty">Subí un PowerPoint, un PDF de Canva o Google Slides, fotos o videos, o pegá un link de YouTube.<br>Se ven en la tele con sus animaciones, transiciones y videos.<button class="btn sm" type="button" data-dpsubir>+ Subir la primera</button></div>` : '<div class="empty">Cargando…</div>'}</div>`;
+}
+function bindDiapos() {
+  $$(".dp-portada[data-vivo]").forEach(async b => {
+    const m = DIAPOS.find(x => x.id === b.dataset.vivo); if (!m) return;
+    try { const sc = await escenaDe(m); await bajarDiapo(sc, 0); if (!b.isConnected) return; const c = document.createElement("div"); c.className = "dp-mini"; b.prepend(c); miniatura(c, sc, sc.slides[0]); } catch { }
+  });
+}
+function hojaMenuDiapos(id) {
+  const m = DIAPOS.find(x => x.id === id); if (!m) return;
+  abrirHoja(m.nombre, `<div class="list dp-menu">
+    <button type="button" class="row-item" data-dpop="inicio"><span><b>▶ Presentar desde el inicio</b><small>Abre el presentador con tus notas</small></span></button>
+    <button type="button" class="row-item" data-dpop="preparar"><span><b>Preparar en la tele</b><small>La tele baja todo antes, para que no haya esperas</small></span></button>
+    <button type="button" class="row-item" data-dpop="bucle"><span><b>Pasar sola en bucle</b><small>Para anuncios antes del culto: cambia sola cada pocos segundos</small></span></button>
+    <button type="button" class="row-item" data-dpop="culto"><span><b>Agregar al orden del culto</b><small>Queda en la lista junto a los cantos y lecturas</small></span></button>
+    <button type="button" class="row-item" data-dpop="editar"><span><b>Ver, ordenar y escribir notas</b><small>Quitá diapositivas, cambialas de orden o escribí lo que vas a decir</small></span></button>
+    <button type="button" class="row-item" data-dpop="agregar"><span><b>Agregar más diapositivas</b><small>Sumale fotos, un video, un PDF u otro PowerPoint</small></span></button>
+    <button type="button" class="row-item" data-dpop="nombre"><span><b>Cambiar nombre</b></span></button>
+    <button type="button" class="row-item" data-dpop="temporal"><span><b>${m.temporal ? "Guardar en la biblioteca" : "Usar y borrar"}</b><small>${m.temporal ? "Para que no se borre sola" : "Que se borre sola 2 días después de usarla"}</small></span></button>
+    <button type="button" class="row-item" data-dpop="borrar" style="border-color:var(--bad)"><span><b style="color:var(--bad)">Borrar</b><small>Libera ${tam(m.tam || 0)}</small></span></button></div><div id="dpMenuBox"></div>`, s => {
+    s.addEventListener("click", async e => {
+      const b = e.target.closest("[data-dpop]"); if (!b) return; const op = b.dataset.dpop;
+      if (op === "inicio") { cerrarHoja(); presentar(id); }
+      else if (op === "preparar") { enviar({ prep: { id, pv: m.pv || 1, ts: Date.now() } }); cerrarHoja(); toast("La tele está bajando las diapositivas. En la tele sale cuando estén listas."); }
+      else if (op === "bucle") {
+        $("#dpMenuBox", s).innerHTML = `<div class="field"><span>Cambiar cada…</span><div class="chips">${[5, 8, 10, 15, 20, 30].map(x => `<button type="button" data-dpcada="${x}">${x} seg</button>`).join("")}</div></div>`;
+        $("#dpMenuBox", s).scrollIntoView({ block: "nearest" });
+      }
+      else if (op === "culto") { CULTO.items = [...CULTO.items, { t: "pres", id }]; await guardarCulto(); cerrarHoja(); toast("Agregada al orden del culto."); }
+      else if (op === "editar") hojaEditarDiapos(id);
+      else if (op === "agregar") hojaSubir(id);
+      else if (op === "nombre") {
+        $("#dpMenuBox", s).innerHTML = `<form class="form" id="dpRen"><label>Nombre<input id="dpRenI" maxlength="80" value="${esc(m.nombre)}"></label><button class="btn" type="submit">Guardar</button></form>`;
+        const i = $("#dpRenI", s); i.focus(); i.select();
+        $("#dpRen", s).onsubmit = async ev => { ev.preventDefault(); const v = i.value.trim(); if (!v) return; try { await updateDoc(doc(db, "proyector_diapos", id), { nombre: v }); cerrarHoja(); toast("Nombre cambiado."); } catch (er) { toast("No se pudo: " + (er.code || er.message)); } };
+      }
+      else if (op === "temporal") { try { await updateDoc(doc(db, "proyector_diapos", id), { temporal: !m.temporal, usado: Date.now() }); cerrarHoja(); toast(m.temporal ? "Guardada en la biblioteca." : "Se borra sola 2 días después de usarla."); } catch (er) { toast("No se pudo: " + (er.code || er.message)); } }
+      else if (op === "borrar") {
+        $("#dpMenuBox", s).innerHTML = `<div class="confirm"><b>¿Borrar «${esc(m.nombre)}»?</b><span style="font-size:14px">Se borra de la biblioteca y del orden del culto. No se puede deshacer.</span><div style="display:flex;gap:8px"><button class="btn danger sm" type="button" id="dpB2">Sí, borrar</button><button class="btn ghost sm" type="button" id="dpB0">Cancelar</button></div></div>`;
+        $("#dpMenuBox", s).scrollIntoView({ block: "nearest" });
+        $("#dpB0", s).onclick = () => $("#dpMenuBox", s).innerHTML = "";
+        $("#dpB2", s).onclick = async () => { try { $("#dpB2", s).disabled = true; await borrarPres(m); cerrarHoja(); } catch (er) { toast("No se pudo borrar: " + (er.code || er.message)); } };
+      }
+    });
+    s.addEventListener("click", e => { const b = e.target.closest("[data-dpcada]"); if (!b) return; cerrarHoja(); presentar(id, { bucle: +b.dataset.dpcada * 1000 }); });
+  });
+}
+
+/* editar: ordenar, quitar diapositivas y escribir notas */
+async function hojaEditarDiapos(id) {
+  const m = DIAPOS.find(x => x.id === id); if (!m) return;
+  abrirHoja("Ordenar y notas", '<p class="muted">Cargando diapositivas…</p>');
+  let sc; try { sc = await escenaDe(m); } catch (er) { toast("No se pudo abrir: " + er.message); return cerrarHoja(); }
+  let orden = sc.slides.map((_, i) => i); const notas = [...(m.notas || [])]; const quitadas = new Set(); let cambio = false;
+  const pintarLista = s => {
+    $("#dpEd", s).innerHTML = orden.map((i, k) => `<div class="dp-ed ${quitadas.has(i) ? "fuera" : ""}" data-edi="${i}"><div class="dp-ed-mini" data-edmini="${i}"><span class="dp-n">${k + 1}</span></div>
+      <div class="dp-ed-der"><div class="dp-ed-bar"><b>${esc(corta((m.titulos || [])[i] || "Diapositiva " + (i + 1), 40))}</b><span><button type="button" class="iconbtn" data-edmov="${k},-1" ${k === 0 ? "disabled" : ""} aria-label="Subir">${IC.arriba}</button><button type="button" class="iconbtn" data-edmov="${k},1" ${k === orden.length - 1 ? "disabled" : ""} aria-label="Bajar">${IC.abajo}</button><button type="button" class="iconbtn" data-edq="${i}" aria-label="${quitadas.has(i) ? "Volver a poner" : "Quitar"}">${quitadas.has(i) ? "↺" : IC.x}</button></span></div>
+      <textarea data-ednota="${i}" rows="2" placeholder="Notas para vos (no salen en la tele)">${esc(notas[i] || "")}</textarea></div></div>`).join("");
+    const obs = new IntersectionObserver(ents => ents.forEach(async en => {
+      if (!en.isIntersecting) return; obs.unobserve(en.target); const i = +en.target.dataset.edmini;
+      await bajarDiapo(sc, i); const c = document.createElement("div"); c.className = "dp-mini"; en.target.prepend(c); miniatura(c, sc, sc.slides[i]);
+    }), { root: s });
+    $$("[data-edmini]", s).forEach(x => obs.observe(x));
+  };
+  abrirHoja("Ordenar y notas", `<p class="muted" style="font-size:13.5px">${m.n} diapositivas. Cambiá el orden con las flechas, quitá las que no vas a usar y escribí tus notas.</p><div id="dpEd" class="dp-edlist"></div>
+    <div class="dp-ed-guardar"><button class="btn wide" type="button" id="dpEdOk">Guardar cambios</button></div>`, s => {
+    pintarLista(s);
+    s.addEventListener("input", e => { const t = e.target.closest("[data-ednota]"); if (t) { notas[+t.dataset.ednota] = t.value; cambio = true; } });
+    s.addEventListener("click", e => {
+      const mv = e.target.closest("[data-edmov]"), q = e.target.closest("[data-edq]");
+      if (mv) { const [k, d] = mv.dataset.edmov.split(",").map(Number); const j = k + d; [orden[k], orden[j]] = [orden[j], orden[k]]; cambio = true; pintarLista(s); }
+      if (q) { const i = +q.dataset.edq; if (quitadas.has(i)) quitadas.delete(i); else { if (orden.length - quitadas.size <= 1) return toast("Tiene que quedar al menos una."); quitadas.add(i); } cambio = true; pintarLista(s); }
+    });
+    $("#dpEdOk", s).onclick = async () => {
+      if (!cambio) return cerrarHoja();
+      const b = $("#dpEdOk", s); b.disabled = true; b.textContent = "Guardando…";
+      try {
+        const final = orden.filter(i => !quitadas.has(i));
+        const reordenado = final.some((i, k) => i !== k) || final.length !== sc.slides.length;
+        const upd = { notas: final.map(i => notas[i] || ""), titulos: final.map(i => (m.titulos || [])[i] || "") };
+        if (reordenado) {
+          const sc2 = Object.assign({}, sc, { slides: final.map(i => sc.slides[i]) });
+          const usados = new Set(archivosEscena(sc2));
+          const sobran = (m.assets || []).filter(a => !usados.has(a.id));
+          const partes = await guardarEscena(id, sc2); const pv = (m.pv || 1) + 1; recordarEscena(id, pv, sc2);
+          Object.assign(upd, { n: sc2.slides.length, pv, partes, partesMax: Math.max(partes, m.partesMax || m.partes || 1), assets: (m.assets || []).filter(a => usados.has(a.id)), tam: Math.max(0, (m.tam || 0) - sobran.reduce((x, a) => x + (a.size || 0), 0)) });
+          if (sobran.length) { await borrarDocs(sobran.flatMap(docsDeArchivo)); sobran.forEach(a => borrarArchivoLocal(a.id)); }
+          if (PRES && PRES.id === id) { PRES = null; if (CTX && CTX.tipo === "pres" && CTX.id === id) { CTX = null; actualizarLive(); } }
+        }
+        await updateDoc(doc(db, "proyector_diapos", id), upd);
+        cerrarHoja(); toast("Cambios guardados.");
+      } catch (er) { toast("No se pudo guardar: " + (er.code || er.message)); b.disabled = false; b.textContent = "Guardar cambios"; }
+    };
+  });
+}
+
+/* presentar */
+async function presentar(id, op = {}) {
+  const m = DIAPOS.find(x => x.id === id); if (!m) return toast("Esa presentación ya no existe.");
+  let sc; try { sc = await escenaDe(m); } catch (er) { return toast("No se pudo abrir: " + (er.message || er)); }
+  PRES = { id, pv: m.pv || 1, sc, meta: m };
+  const n = sc.slides.length;
+  let i = op.i != null ? op.i : 0, ps = op.paso || 0;
+  if (op.alFinal) { i = n - 1; ps = sc.slides[i].pasos || 0; }
+  i = Math.max(0, Math.min(n - 1, i));
+  CTX = { tipo: "pres", id, i, paso: ps, culto: op.culto != null ? op.culto : null };
+  if (op.bucle) { CTX.bucle = op.bucle; }
+  if (!m.usado || Date.now() - m.usado > 3600e3) updateDoc(doc(db, "proyector_diapos", id), { usado: Date.now() }).catch(() => { });
+  irA(i, ps, true);
+  if (op.abrir !== false) abrirPresentador();
+}
+function irA(i, ps, nuevo) {
+  if (!PRES || !CTX || CTX.tipo !== "pres") return;
+  const sc = PRES.sc, sl = sc.slides[i]; if (!sl) return;
+  const otraDiapo = nuevo || CTX.i !== i;
+  CTX = Object.assign({}, CTX, { i, paso: ps });
+  const auto = CTX.bucle ? { cada: CTX.bucle, desde: Date.now(), i0: i } : null;
+  enviar({ modo: "pres", pres: PRES.id, pv: PRES.pv, i, paso: ps, vid: null, auto, texto: "", ref: "", titulo: "", img: null, negro: false, oculto: false });
+  POS[PRES.id] = { i, paso: ps, t: Date.now() }; store.set("pr-pos", POS);
+  // video: el cel calcula por dónde va (la tele no le puede contestar)
+  const medios = mediosDe(sl), arranca = medios.find(x => x.auto === ps);
+  if (otraDiapo) { const m0 = medios[0] || null; Object.assign(VID, { el: m0 ? m0.id : null, dur: m0 ? (m0.dur || duracionDe(m0)) : 0, mudo: false, sonando: false, base: m0 && m0.ini ? m0.ini : 0, desde: Date.now() }); }
+  if (arranca) Object.assign(VID, { el: arranca.id, dur: arranca.dur || duracionDe(arranca), sonando: true, base: arranca.ini || 0, desde: Date.now() });
+  // pasar sola, como venía en PowerPoint
+  clearTimeout(T_AUTO);
+  if (sl.avanzar && ps >= (sl.pasos || 0) && !CTX.bucle) { const yo = CTX; T_AUTO = setTimeout(() => { if (CTX === yo) paso(1); }, sl.avanzar + ((sl.trans && sl.trans.t) || 0)); }
+  bajarDiapo(sc, Math.min(sc.slides.length - 1, i + 1));
+  refrescarPresentador();
+}
+function duracionDe(el) { const a = PRES && (PRES.meta.assets || []).find(x => x.id === el.src); return a && a.dur ? a.dur : 0; }
+function pasoPres(d) {
+  if (!PRES || PRES.id !== CTX.id) { const m = DIAPOS.find(x => x.id === CTX.id); if (!m) return; return presentar(CTX.id, { i: CTX.i, paso: CTX.paso, culto: CTX.culto, abrir: false }).then(() => pasoPres(d)); }
+  const sc = PRES.sc, n = sc.slides.length; let { i, paso: ps } = CTX;
+  if (CTX.bucle) { CTX = Object.assign({}, CTX, { bucle: null }); }
+  if (d > 0) {
+    if (ps < (sc.slides[i].pasos || 0)) ps++;
+    else if (i < n - 1) { i++; ps = 0; }
+    else if (CTX.culto != null && CTX.culto + 1 < slidesCulto().length) { cerrarPresentador(); return proyectarSlide(CTX.culto + 1); }
+    else return toast("Es la última diapositiva.");
+  } else {
+    if (ps > 0) ps--;
+    else if (i > 0) { i--; ps = sc.slides[i].pasos || 0; }
+    else if (CTX.culto != null && CTX.culto > 0) { cerrarPresentador(); return proyectarSlide(CTX.culto - 1, true); }
+    else return;
+  }
+  irA(i, ps);
+}
+let VSEQ = 0;
+function videoEst() { return VID.sonando ? VID.base + (Date.now() - VID.desde) / 1000 : VID.base; }
+function cmdVideo(cmd, t) {
+  if (!VID.el) return;
+  if (t != null) t = Math.max(0, VID.dur ? Math.min(VID.dur - .2, t) : t);
+  VID.base = t != null ? t : videoEst(); VID.desde = Date.now(); VID.sonando = cmd === "play";
+  VSEQ = Math.max(Date.now(), VSEQ + 1);
+  enviar({ vid: { seq: VSEQ, el: VID.el, cmd, t: t != null ? t : VID.base, mudo: VID.mudo } });
+  refrescarPresentador();
+}
+
+/* la pantalla del presentador */
+function abrirPresentador() {
+  if (!PRES) return;
+  if ($("#presentador")) return refrescarPresentador();
+  const ov = document.createElement("div"); ov.id = "presentador";
+  ov.innerHTML = `<div class="pz-top"><button type="button" class="iconbtn" data-pz="cerrar" aria-label="Volver al menú">${IC.prev}</button><div class="pz-tit"><b id="pzNom"></b><small id="pzNum"></small></div>
+      <button type="button" class="pz-reloj" data-pz="crono" title="Tocá para empezar de cero"><span class="lbl">Prédica</span><b id="pzCrono">0:00</b></button><div class="pz-reloj"><span class="lbl">Hora</span><b id="pzHora"></b></div></div>
+    <div class="pz-cuerpo">
+      <div class="pz-izq">
+        <div class="pz-actual" id="pzActual"></div>
+        <div class="pz-vid" id="pzVid" hidden><div class="pz-vbar"><i id="pzVbar"></i></div><div class="pz-vctl"><button type="button" data-pz="v0" aria-label="Desde el inicio">${IC.vInicio}</button><button type="button" data-pz="v-10" aria-label="Atrás 10 segundos">−10s</button><button type="button" data-pz="vplay" id="pzVplay" class="pz-vplay" aria-label="Reproducir">${IC.vPlay}</button><button type="button" data-pz="v+10" aria-label="Adelante 10 segundos">+10s</button><button type="button" data-pz="vmudo" id="pzVmudo" aria-label="Silenciar">${IC.vSonido}</button></div><small class="muted" id="pzVt"></small></div>
+        <div class="pz-sig"><div class="pz-sigmini" id="pzSig"></div><div class="pz-siginfo"><span class="lbl" id="pzSigL">Sigue</span><b id="pzSigT"></b></div></div>
+      </div>
+      <div class="pz-der">
+        <div class="pz-notas"><div class="pz-nh"><span class="lbl">Notas</span><span><button type="button" data-pz="menos" aria-label="Letra más chica">A−</button><button type="button" data-pz="mas" aria-label="Letra más grande">A+</button><button type="button" data-pz="nota">Escribir</button></span></div><div class="pz-nt" id="pzNotas"></div></div>
+        <div class="pz-tira" id="pzTira"></div>
+      </div>
+    </div>
+    <div class="pz-ctl"><button type="button" data-pz="prev" class="pz-g">${IC.prev}Atrás</button><button type="button" data-pz="negro" id="pzNegro">${IC.negro}Negro</button><button type="button" data-pz="ocultar" id="pzOcultar">${IC.ocultar}Ocultar</button><button type="button" data-pz="next" class="pz-g pz-sigue">Sigue${IC.next}</button></div>`;
+  document.body.appendChild(ov);
+  PZ = { esc: crearEscena($("#pzActual", ov)), crono: Date.now(), letra: store.get("pr-pzletra", 19), tira: null, tic: null };
+  pintar(PZ.esc, LIVE, fondoImgActual()); pintarPres(PZ.esc, LIVE, { mini: true });
+  try { navigator.wakeLock && navigator.wakeLock.request("screen").then(l => PZ && (PZ.lock = l)).catch(() => { }); } catch { }
+  PZ.tic = setInterval(relojes, 500); relojes();
+  // deslizar sobre la diapositiva
+  let x0 = null, y0 = null;
+  const act = $("#pzActual", ov);
+  act.addEventListener("touchstart", e => { x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; }, { passive: true });
+  act.addEventListener("touchend", e => { if (x0 == null) return; const dx = e.changedTouches[0].clientX - x0, dy = e.changedTouches[0].clientY - y0; if (Math.abs(dx) > 45 && Math.abs(dx) > Math.abs(dy) * 1.3) paso(dx < 0 ? 1 : -1); x0 = null; }, { passive: true });
+  ov.addEventListener("click", e => {
+    const b = e.target.closest("[data-pz]"); if (!b) { const t = e.target.closest("[data-pzir]"); if (t) { const i = +t.dataset.pzir; CTX = Object.assign({}, CTX, { bucle: null }); irA(i, 0); } return; }
+    const a = b.dataset.pz;
+    if (a === "cerrar") cerrarPresentador();
+    else if (a === "prev") paso(-1); else if (a === "next") paso(1);
+    else if (a === "negro") enviar({ negro: !LIVE.negro }); else if (a === "ocultar") enviar({ oculto: !LIVE.oculto });
+    else if (a === "crono") { PZ.crono = Date.now(); relojes(); toast("Cronómetro en cero."); }
+    else if (a === "menos" || a === "mas") { PZ.letra = Math.max(13, Math.min(34, PZ.letra + (a === "mas" ? 2 : -2))); store.set("pr-pzletra", PZ.letra); $("#pzNotas").style.fontSize = PZ.letra + "px"; }
+    else if (a === "nota") hojaNota();
+    else if (a === "vplay") cmdVideo(VID.sonando ? "pause" : "play", VID.sonando ? null : (VID.dur && videoEst() >= VID.dur - .5 ? 0 : videoEst()));
+    else if (a === "v0") cmdVideo("play", 0);
+    else if (a === "v-10") cmdVideo(VID.sonando ? "play" : "pause", videoEst() - 10);
+    else if (a === "v+10") cmdVideo(VID.sonando ? "play" : "pause", videoEst() + 10);
+    else if (a === "vmudo") { VID.mudo = !VID.mudo; cmdVideo(VID.sonando ? "play" : "pause", null); }
+  });
+  PZ.resize = () => { if (PZ) { reencajarPres(PZ.esc); refrescarPresentador(true); } }; addEventListener("resize", PZ.resize);
+  armarTira();
+  refrescarPresentador();
+}
+function cerrarPresentador() {
+  const ov = $("#presentador"); if (!ov) return;
+  clearInterval(PZ && PZ.tic); removeEventListener("resize", PZ && PZ.resize);
+  try { PZ && PZ.lock && PZ.lock.release(); } catch { }
+  if (PZ && PZ.tira) PZ.tira.disconnect();
+  ov.remove(); PZ = null;
+  if (TAB === "diapos") renderMain();
+}
+function relojes() {
+  if (!PZ) return;
+  const s = Math.floor((Date.now() - PZ.crono) / 1000), h = Math.floor(s / 3600), mi = Math.floor(s / 60) % 60;
+  const c = $("#pzCrono"); if (c) c.textContent = (h ? h + ":" + String(mi).padStart(2, "0") : mi) + ":" + String(s % 60).padStart(2, "0");
+  const hr = $("#pzHora"); if (hr) hr.textContent = new Date().toLocaleTimeString("es", { hour: "numeric", minute: "2-digit" });
+  if (VID.el && !$("#pzVid").hidden) {
+    const t = Math.max(0, videoEst()); const fmt = x => Math.floor(x / 60) + ":" + String(Math.floor(x % 60)).padStart(2, "0");
+    if (VID.dur && t >= VID.dur && VID.sonando) { VID.sonando = false; VID.base = VID.dur; }
+    $("#pzVbar").style.width = VID.dur ? Math.min(100, t / VID.dur * 100) + "%" : "0";
+    $("#pzVt").textContent = VID.dur ? `${fmt(Math.min(t, VID.dur))} de ${fmt(VID.dur)} · aproximado` : (VID.sonando ? "Reproduciendo" : "En pausa");
+    const bp = $("#pzVplay"), quiere = VID.sonando ? "pausa" : "play"; if (bp.dataset.ic !== quiere) { bp.dataset.ic = quiere; bp.innerHTML = VID.sonando ? IC.vPausa : IC.vPlay; bp.setAttribute("aria-label", VID.sonando ? "Pausa" : "Reproducir"); }
+  }
+}
+function armarTira() {
+  const tira = $("#pzTira"); if (!tira || !PRES) return;
+  tira.innerHTML = PRES.sc.slides.map((_, i) => `<button type="button" class="pz-th" data-pzir="${i}" aria-label="Ir a la diapositiva ${i + 1}"><span class="dp-n">${i + 1}</span></button>`).join("");
+  if (PZ.tira) PZ.tira.disconnect();
+  PZ.tira = new IntersectionObserver(ents => ents.forEach(async en => {
+    if (!en.isIntersecting || !PRES) return; PZ.tira.unobserve(en.target); const i = +en.target.dataset.pzir;
+    await bajarDiapo(PRES.sc, i); const c = document.createElement("div"); c.className = "dp-mini"; en.target.prepend(c); miniatura(c, PRES.sc, PRES.sc.slides[i]);
+  }), { root: tira, rootMargin: "0px 200px" });
+  $$(".pz-th", tira).forEach(x => PZ.tira.observe(x));
+}
+async function refrescarPresentador(soloTam) {
+  const ov = $("#presentador"); if (!ov || !PRES || !CTX || CTX.tipo !== "pres") return;
+  const sc = PRES.sc, n = sc.slides.length, { i, paso: ps } = CTX, sl = sc.slides[i];
+  const m = DIAPOS.find(x => x.id === PRES.id) || PRES.meta;
+  $("#pzNom").textContent = m.nombre || "Diapositivas";
+  $("#pzNum").textContent = `Diapositiva ${i + 1} de ${n}` + (sl.pasos ? ` · animación ${ps} de ${sl.pasos}` : "") + (CTX.bucle ? ` · pasa sola cada ${CTX.bucle / 1000} s` : "");
+  const nt = $("#pzNotas"); const nota = (m.notas || [])[i] || "";
+  nt.style.fontSize = PZ.letra + "px";
+  nt.innerHTML = nota ? esc(nota).replace(/\n/g, "<br>") : `<span class="muted" style="font-size:15px">Sin notas para esta diapositiva. Tocá <b>Escribir</b> para agregar.</span>`;
+  $("#pzNegro").classList.toggle("on", !!LIVE.negro); $("#pzOcultar").classList.toggle("on", !!LIVE.oculto);
+  // siguiente
+  let si = i, sp = ps + 1, et = "";
+  if (ps >= (sl.pasos || 0)) { si = i + 1; sp = null; }
+  const sig = $("#pzSig");
+  if (si < n) {
+    $("#pzSigL").textContent = sp != null ? "Sigue: animación " + sp + " de " + sl.pasos : "Sigue: diapositiva " + (si + 1);
+    et = (m.titulos || [])[si] || "";
+    const clave = si + "|" + sp;
+    if (sig._clave !== clave || soloTam) { sig._clave = clave; await bajarDiapo(sc, si); if (sig._clave !== clave) return; sig.innerHTML = ""; miniatura(sig, sc, sc.slides[si], sp != null ? sp : undefined); }
+  } else { sig._clave = null; sig.innerHTML = `<div class="pz-fin">${CTX.culto != null && CTX.culto + 1 < slidesCulto().length ? "Sigue el culto" : "Fin"}</div>`; $("#pzSigL").textContent = CTX.culto != null ? "Después" : "Última diapositiva"; }
+  $("#pzSigT").textContent = et;
+  // tira
+  $$(".pz-th", ov).forEach(b => b.classList.toggle("on", +b.dataset.pzir === i));
+  const on = $(".pz-th.on", ov); if (on && !soloTam) on.scrollIntoView({ block: "nearest", inline: "center", behavior: "smooth" });
+  // video
+  const hayVid = !!VID.el; $("#pzVid").hidden = !hayVid;
+  if (hayVid) { $("#pzVmudo").innerHTML = VID.mudo ? IC.vMudo : IC.vSonido; relojes(); }
+}
+function hojaNota() {
+  if (!PRES || !CTX) return; const id = PRES.id, i = CTX.i; const m = DIAPOS.find(x => x.id === id); if (!m) return;
+  abrirHoja(`Notas · diapositiva ${i + 1}`, `<form class="form" id="ntF"><textarea id="ntT" style="min-height:220px" placeholder="Lo que querés decir en esta diapositiva">${esc((m.notas || [])[i] || "")}</textarea><button class="btn wide" type="submit">Guardar nota</button></form>`, s => {
+    const t = $("#ntT", s); t.focus();
+    $("#ntF", s).onsubmit = async e => { e.preventDefault(); const notas = [...(m.notas || [])]; while (notas.length < (m.n || 0)) notas.push(""); notas[i] = t.value.trim(); try { await updateDoc(doc(db, "proyector_diapos", id), { notas }); m.notas = notas; cerrarHoja(); refrescarPresentador(); toast("Nota guardada."); } catch (er) { toast("No se pudo guardar: " + (er.code || er.message)); } };
+  });
+}
+
 /* ---------- barra en vivo ---------- */
 function montarShell() {
   $("#app").innerHTML = `<div class="live" id="live"><div class="prev" id="prev" title="Agrandar vista previa"><span class="badge">EN VIVO</span></div>
@@ -694,30 +1165,34 @@ function montarShell() {
     <main id="main"></main>`;
   escena = crearEscena($("#prev"));
   $("#prev").appendChild(Object.assign(document.createElement("span"), { className: "badge", textContent: "EN VIVO" }));
-  $("#prev").onclick = () => { $("#live").classList.toggle("grande"); setTimeout(() => { escena.key = null; escena.fondoKey = null; pintar(escena, Object.assign({}, LIVE, { estilo: Object.assign({}, LIVE.estilo, { trans: "ninguna" }) }), fondoImgActual()) }, 30) };
+  $("#prev").onclick = () => { $("#live").classList.toggle("grande"); setTimeout(() => { escena.key = null; escena.fondoKey = null; pintar(escena, Object.assign({}, LIVE, { estilo: Object.assign({}, LIVE.estilo, { trans: "ninguna" }) }), fondoImgActual()); reencajarPres(escena); }, 30) };
   $("#bPrev").onclick = () => paso(-1); $("#bNext").onclick = () => paso(1);
   $("#bOcultar").onclick = () => enviar({ oculto: !LIVE.oculto });
   $("#bNegro").onclick = () => enviar({ negro: !LIVE.negro });
   $("#visorBtn").onclick = hojaVisor;
   $("#tabs").hidden = false;
-  pintar(escena, LIVE, fondoImgActual()); actualizarLive();
+  pintarVistas(); actualizarLive();
 }
 function actualizarLive() {
   const t = $("#nowT"), s = $("#nowS"); if (!t) return;
   if (LIVE.modo === "texto") { t.textContent = LIVE.ref || LIVE.titulo || "Texto"; s.textContent = (LIVE.texto || "").replace(/\n/g, " "); }
   else if (LIVE.modo === "img") { t.textContent = "Imagen"; s.textContent = "Anuncio con imagen"; }
+  else if (LIVE.modo === "pres") { const m = DIAPOS.find(x => x.id === LIVE.pres); t.textContent = `${m ? m.nombre : "Diapositivas"} · ${(LIVE.i || 0) + 1}/${m ? m.n : "?"}`; s.textContent = LIVE.auto ? `Pasa sola cada ${LIVE.auto.cada / 1000} segundos` : (m && (m.titulos || [])[LIVE.i || 0]) || `Diapositiva ${(LIVE.i || 0) + 1}`; }
   else if (LIVE.modo === "cuenta") { const f = new Date(LIVE.fin || 0); t.textContent = "Cuenta regresiva"; s.textContent = `${LIVE.titulo || ""} · termina ${f.toLocaleTimeString("es", { hour: "numeric", minute: "2-digit" })}`; }
   else { t.textContent = "Sólo el fondo"; s.textContent = "Escogé un versículo, canción o anuncio"; }
   if (LIVE.negro) s.textContent = "Pantalla en negro";
   else if (LIVE.oculto) s.textContent = "Texto oculto · se ve sólo el fondo";
   $("#bNegro").classList.toggle("on", !!LIVE.negro); $("#bOcultar").classList.toggle("on", !!LIVE.oculto);
   $("#bPrev").disabled = $("#bNext").disabled = !CTX;
+  if (PZ && (!CTX || CTX.tipo !== "pres")) cerrarPresentador();
+  else if (PZ) refrescarPresentador();
 }
 function paso(d) {
   if (!CTX) return;
+  if (CTX.tipo === "pres") return pasoPres(d);
   if (CTX.tipo === "biblia") pasoBiblia(d);
   else if (CTX.tipo === "cancion") { const i = CTX.i + d; if (i >= 0 && i < CTX.n) proyectarEstrofa(CTX.id, i); }
-  else if (CTX.tipo === "culto") { proyectarSlide(CTX.i + d); return; }
+  else if (CTX.tipo === "culto") { proyectarSlide(CTX.i + d, d < 0); return; }
   else if (CTX.tipo === "pasaje") {
     const i = CTX.i + d;
     if (i >= 0 && i < CTX.n) return proyectarPasaje(CTX.id, i);
@@ -750,7 +1225,7 @@ function modoTele() {
     <div class="mt-bar" hidden><button type="button" data-mt="prev">${IC.prev}Atrás</button><button type="button" data-mt="negro">${IC.negro}Negro</button><button type="button" data-mt="ocultar">${IC.ocultar}Ocultar</button><button type="button" data-mt="next">${IC.next}Sigue</button><button type="button" data-mt="salir" class="mt-salir">${IC.x}Salir</button></div>`;
   document.body.appendChild(ov);
   TELE = crearEscena(ov.querySelector(".mt-esc"));
-  const repintar = () => { if (!TELE) return; TELE.key = null; TELE.fondoKey = null; pintar(TELE, Object.assign({}, LIVE, { estilo: Object.assign({}, LIVE.estilo, { trans: "ninguna" }) }), fondoImgActual()); };
+  const repintar = () => { if (!TELE) return; TELE.key = null; TELE.fondoKey = null; pintar(TELE, Object.assign({}, LIVE, { estilo: Object.assign({}, LIVE.estilo, { trans: "ninguna" }) }), fondoImgActual()); pintarPres(TELE, LIVE); reencajarPres(TELE); };
   requestAnimationFrame(repintar);
   try { const p = ov.requestFullscreen && ov.requestFullscreen({ navigationUI: "hide" }); if (p && p.then) p.then(() => { try { screen.orientation.lock("landscape").catch(() => { }) } catch { } setTimeout(repintar, 300) }).catch(() => { }); } catch { }
   try { navigator.wakeLock && navigator.wakeLock.request("screen").then(l => ov._lock = l).catch(() => { }); } catch { }
@@ -789,14 +1264,14 @@ function cerrarHoja() { $("#sheet").innerHTML = "" }
 
 /* ---------- pestañas ---------- */
 function renderTabs() {
-  const T = [["culto", "Culto"], ["biblia", "Biblia"], ["canciones", "Cantos"], ["anuncios", "Anuncios"], ["fondos", "Fondos"], ["estilo", "Estilo"]];
-  const ic = { culto: IC.culto, biblia: IC.biblia, canciones: IC.cancion, anuncios: IC.anuncio, fondos: IC.fondo, estilo: IC.estilo };
+  const T = [["culto", "Culto"], ["biblia", "Biblia"], ["canciones", "Cantos"], ["diapos", "Diapos"], ["anuncios", "Anuncios"], ["fondos", "Fondos"], ["estilo", "Estilo"]];
+  const ic = { culto: IC.culto, biblia: IC.biblia, canciones: IC.cancion, diapos: IC.diapos, anuncios: IC.anuncio, fondos: IC.fondo, estilo: IC.estilo };
   $("#tabs nav").innerHTML = T.map(t => `<button type="button" data-tab="${t[0]}" ${TAB === t[0] ? 'aria-current="page"' : ""}>${ic[t[0]]}${t[1]}</button>`).join("");
 }
 function renderMain() {
   const m = $("#main"); if (!m) return;
-  m.innerHTML = TAB === "culto" ? vCulto() : TAB === "biblia" ? vBiblia() : TAB === "canciones" ? vCanciones() : TAB === "anuncios" ? vAnuncios() : TAB === "fondos" ? vFondos() : vEstilo();
-  renderTabs(); bindMain(); if (TAB === "biblia") marcarVerso();
+  m.innerHTML = TAB === "culto" ? vCulto() : TAB === "biblia" ? vBiblia() : TAB === "canciones" ? vCanciones() : TAB === "diapos" ? vDiapos() : TAB === "anuncios" ? vAnuncios() : TAB === "fondos" ? vFondos() : vEstilo();
+  renderTabs(); bindMain(); if (TAB === "biblia") marcarVerso(); if (TAB === "diapos") bindDiapos();
 }
 function bindMain() {
   const ir = $("#irForm"); if (ir) ir.onsubmit = e => {
@@ -867,6 +1342,11 @@ document.addEventListener("click", e => {
   if ((x = g("[data-bf]"))) { B.filtro = x.dataset.bf; renderMain(); return; }
   if ((x = g("[data-go]"))) { const [l, c, v] = x.dataset.go.split(",").map(Number); proyectarVerso(B.ver, l, c, v); $$(".v[data-go]").forEach(el => el.classList.toggle("on", el === x)); return; }
   if ((x = g(".v[data-v]"))) { proyectarVerso(B.ver, B.libro, B.cap, +x.dataset.v); return; }
+  // Diapositivas
+  if (g("[data-dpsubir]")) { hojaSubir(); return; }
+  if ((x = g("[data-dppres]"))) { const id = x.dataset.dppres; if (LIVE.modo === "pres" && LIVE.pres === id && CTX && CTX.tipo === "pres") { if (PRES && PRES.id === id) abrirPresentador(); else presentar(id, { i: CTX.i, paso: CTX.paso, culto: CTX.culto }); } else presentar(id); return; }
+  if ((x = g("[data-dpseguir]"))) { const p = POS[x.dataset.dpseguir] || {}; presentar(x.dataset.dpseguir, { i: p.i || 0, paso: p.paso || 0 }); return; }
+  if ((x = g("[data-dpmenu]"))) { hojaMenuDiapos(x.dataset.dpmenu); return; }
   // Canciones
   if ((x = g("[data-cancion]"))) { S.id = x.dataset.cancion; S.vista = "ver"; renderMain(); scrollTo({ top: 0 }); return; }
   if ((x = g("[data-sv]"))) { S.vista = x.dataset.sv; renderMain(); return; }
@@ -890,14 +1370,14 @@ document.addEventListener("click", e => {
 });
 document.addEventListener("keydown", e => {
   if (/INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName || "")) return;
-  if (e.key === "Escape") { if (TELE) return salirTele(); return cerrarHoja(); }
+  if (e.key === "Escape") { if (TELE) return salirTele(); if ($("#sheet .scrim")) return cerrarHoja(); if (PZ) return cerrarPresentador(); return; }
   if ($("#sheet .scrim")) return;
   if (e.key === "ArrowRight" || e.key === "ArrowDown" || e.key === "PageDown") { e.preventDefault(); paso(1) }
   else if (e.key === "ArrowLeft" || e.key === "ArrowUp" || e.key === "PageUp") { e.preventDefault(); paso(-1) }
-  else if (e.key === "b" || e.key === "B") enviar({ negro: !LIVE.negro });
+  else if (e.key === "b" || e.key === "B" || e.key === ".") enviar({ negro: !LIVE.negro });
   else if (e.key === "Enter" && document.activeElement?.dataset) { document.activeElement.click(); }
 });
-let rt; addEventListener("resize", () => { clearTimeout(rt); rt = setTimeout(() => { if (escena) { escena.key = null; pintar(escena, Object.assign({}, LIVE, { estilo: Object.assign({}, LIVE.estilo, { trans: "ninguna" }) }), fondoImgActual()) } }, 150) });
+let rt; addEventListener("resize", () => { clearTimeout(rt); rt = setTimeout(() => { if (escena) { escena.key = null; pintar(escena, Object.assign({}, LIVE, { estilo: Object.assign({}, LIVE.estilo, { trans: "ninguna" }) }), fondoImgActual()); reencajarPres(escena); } }, 150) });
 
 /* ---------- sesión ---------- */
 const esAdmin = u => !!u && !!u.email && u.emailVerified && u.email.toLowerCase() === String(ADMIN_EMAIL).toLowerCase();
@@ -918,6 +1398,17 @@ onAuthStateChanged(auth, async u => {
   stopFns.push(onSnapshot(collection(db, "proyector_pasajes"), s => { PASAJES = s.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (a.creado || 0) - (b.creado || 0)); if (TAB === "biblia") renderMain() }, er => toast("Pasajes: " + (er.code || er.message))));
   stopFns.push(onSnapshot(collection(db, "proyector_anuncios"), s => { ANUNCIOS = s.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (b.creado || 0) - (a.creado || 0)); if (TAB === "anuncios") renderMain() }, er => toast("Anuncios: " + (er.code || er.message))));
   stopFns.push(onSnapshot(query(collection(db, "proyector"), where("tipo", "==", "fondo")), s => { FONDOS_IMG = s.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (a.creado || 0) - (b.creado || 0)); if (TAB === "fondos") renderMain(); pintar(escena, LIVE, fondoImgActual()) }, er => toast("Fondos: " + (er.code || er.message))));
+  stopFns.push(onSnapshot(collection(db, "proyector_diapos"), s => {
+    DIAPOS = s.docs.map(d => ({ id: d.id, ...d.data() }));
+    const primera = !DIAPOS_LISTAS; DIAPOS_LISTAS = true;
+    if (primera) {
+      limpiarVencidas(); limpiarSubidaCortada();
+      if (!CTX && LIVE.modo === "pres" && DIAPOS.some(m => m.id === LIVE.pres)) CTX = { tipo: "pres", id: LIVE.pres, i: LIVE.i || 0, paso: LIVE.paso || 0, culto: null };
+    }
+    if (PRES) { const m = DIAPOS.find(x => x.id === PRES.id); if (m) PRES.meta = m; }
+    actualizarLive();
+    if (TAB === "diapos" || TAB === "culto") renderMain();
+  }, er => toast("Diapositivas: " + (er.code || er.message))));
   const salir = document.createElement("button"); salir.className = "iconbtn"; salir.type = "button"; salir.setAttribute("aria-label", "Cerrar sesión"); salir.innerHTML = IC.out; salir.onclick = () => signOut(auth);
   $("#visorBtn").after(salir);
 });
