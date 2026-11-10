@@ -836,8 +836,8 @@ public class MainActivity extends Activity {
         LinearLayout.LayoutParams pm = new LinearLayout.LayoutParams(-1, 0, 1.4f); pm.topMargin = dp(20); pm.bottomMargin = dp(12);
         h.addView(zonaMedia(true, false), pm);
         if (verBusqueda) h.addView(barraBusqueda(), lp(-1, -2, 0));
-        LinearLayout fila = new LinearLayout(this);
-        fila.setGravity(Gravity.CENTER);
+        GridLayout fila = new GridLayout(this);
+        fila.setColumnCount(5);
         favBox = fila; favModo = "fila";
         h.addView(fila, lp(-1, -2, 14));
         return h;
@@ -1313,9 +1313,9 @@ public class MainActivity extends Activity {
     int maxFavs() {
         switch (estilo) {
             case "revista": return 12;
-            case "reloj": return 5;
+            case "reloj": return 10;
             case "columna": return 12;
-            default: return 8;
+            default: return 12;
         }
     }
 
@@ -1474,7 +1474,12 @@ public class MainActivity extends Activity {
                 for (String k : keys) favBox.addView(vistaFav(k, "lista", s, true), lp(-1, -2, 2));
                 break;
             case "fila":
-                for (String k : keys) favBox.addView(vistaFav(k, "fila", Math.round(s * 0.92f), false), new LinearLayout.LayoutParams(0, -2, 1f));
+                int anchoF = (getResources().getDisplayMetrics().widthPixels - dp(44)) / 5;
+                for (String k : keys) {
+                    GridLayout.LayoutParams p = new GridLayout.LayoutParams();
+                    p.width = anchoF; p.bottomMargin = dp(10);
+                    favBox.addView(vistaFav(k, "fila", Math.min(Math.round(s * 0.92f), anchoF - dp(8)), false), p);
+                }
                 break;
             case "dos":
                 int sd = Math.round(s * 0.82f);
