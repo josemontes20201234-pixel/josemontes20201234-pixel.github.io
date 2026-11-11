@@ -387,6 +387,43 @@ public class Servicio extends AccessibilityService {
         return ok[0];
     }
 
+    static final String[] EXPANDIR = {"expand", "expandir", "ampliar", "mostrar todo", "mostrar mas", "ver todo"};
+    /** Botones que casi siempre están en la cuadrícula: sirven para saber dónde deslizar para pasar de página. */
+    static final String[] CUADRICULA = {"flashlight", "linterna", "airplane mode", "modo avion", "mobile data", "datos moviles", "location", "ubicacion", "power saving", "ahorro de energia"};
+
+    /** Desliza la cuadrícula de botones de Samsung hacia la izquierda, como con el dedo, para ver la página siguiente. */
+    boolean deslizarCuadricula() {
+        if (Build.VERSION.SDK_INT < 24) return false;
+        AccessibilityNodeInfo ref = buscar(CUADRICULA);
+        if (ref == null) return false;
+        Rect r = new Rect(); ref.getBoundsInScreen(r);
+        int ancho = getResources().getDisplayMetrics().widthPixels;
+        android.graphics.Path camino = new android.graphics.Path();
+        camino.moveTo(ancho * 0.85f, r.centerY());
+        camino.lineTo(ancho * 0.15f, r.centerY());
+        try {
+            return dispatchGesture(new android.accessibilityservice.GestureDescription.Builder()
+                    .addStroke(new android.accessibilityservice.GestureDescription.StrokeDescription(camino, 0, 280)).build(), null, null);
+        } catch (Exception e) { return false; }
+    }
+
+    /** El botón que de verdad se toca (el mismo o uno de sus «papás»). */
+    static AccessibilityNodeInfo clicable(AccessibilityNodeInfo n) {
+        AccessibilityNodeInfo x = n;
+        for (int i = 0; i < 6 && x != null; i++) { if (x.isClickable()) return x; x = x.getParent(); }
+        return null;
+    }
+
+    /** Lee si un botón de Samsung está encendido (marcado, o dice On/Off). */
+    static Boolean estadoDeNodo(AccessibilityNodeInfo n) {
+        if (n == null) return null;
+        if (n.isCheckable()) return n.isChecked();
+        String t = limpio(Build.VERSION.SDK_INT >= 30 && n.getStateDescription() != null ? n.getStateDescription() : n.getContentDescription());
+        if (t.endsWith(" on") || t.endsWith(",on") || t.equals("on") || t.contains("encendido") || t.contains("activado") && !t.contains("desactivado")) return true;
+        if (t.endsWith(" off") || t.endsWith(",off") || t.equals("off") || t.contains("apagado") || t.contains("desactivado")) return false;
+        return null;
+    }
+
     static boolean clic(AccessibilityNodeInfo n) {
         AccessibilityNodeInfo x = n;
         for (int i = 0; i < 6 && x != null; i++) {
@@ -415,21 +452,33 @@ public class Servicio extends AccessibilityService {
         anotar("  abrir el panel de Samsung: " + (abrio ? "sí" : "NO") + " · estaba " + (antes == null ? "?" : antes ? "encendido" : "apagado"));
         final long t0 = SystemClock.uptimeMillis();
         ui.postDelayed(new Runnable() {
-            int paginas; long otraPagina = 900; boolean primera = true;
+            int paginas; long otraPagina = 1000; boolean primera = true, expandido, avisado;
             @Override public void run() {
                 if (primera) { primera = false; anotar("  " + resumenVentanas()); }
                 AccessibilityNodeInfo n = buscar(nombres);
                 if (n != null) {
-                    anotar("  encontrado: «" + etiqueta(n) + "»");
-                    if (clic(n)) { final long t1 = SystemClock.uptimeMillis(); ui.postDelayed(() -> verificar(id, antes, t1), 300); return; }
+                    AccessibilityNodeInfo c = clicable(n);
+                    Boolean st = estadoDeNodo(c != null ? c : n);
+                    anotar("  encontrado: «" + etiqueta(n) + "»" + (st == null ? "" : st ? " (encendido)" : " (apagado)"));
+                    if (clic(n)) {
+                        if (st != null) recordar(id, !st);
+                        final long t1 = SystemClock.uptimeMillis(); ui.postDelayed(() -> verificar(id, antes, t1), 300); return;
+                    }
                     anotar("  no se dejó tocar");
                 }
                 long t = SystemClock.uptimeMillis() - t0;
+                if (!expandido && t > 300) {
+                    expandido = true;
+                    AccessibilityNodeInfo e = buscar(EXPANDIR);
+                    if (e != null && clic(e)) { anotar("  toqué «" + etiqueta(e) + "» para ver todos los botones"); ui.postDelayed(this, 450); return; }
+                }
                 if (t > otraPagina && paginas < 5) {
                     if (pasarPagina()) { paginas++; anotar("  pasé a la página " + (paginas + 1)); }
-                    otraPagina = t + 500;
+                    else if (deslizarCuadricula()) { paginas++; anotar("  deslicé a la página " + (paginas + 1)); }
+                    otraPagina = t + 550;
                 }
-                if (t < 4200) { ui.postDelayed(this, 140); return; }
+                if (t > 1000 && !avisado) { avisado = true; if (host != null) host.toast("Buscando el botón en el panel de Samsung…"); }
+                if (t < 5000) { ui.postDelayed(this, 140); return; }
                 anotar("  NO lo encontré. " + resumenVentanas());
                 anotar("  botones que vi: " + android.text.TextUtils.join(" | ", etiquetasSamsung(30)));
                 terminar(true);
@@ -446,17 +495,29 @@ public class Servicio extends AccessibilityService {
         anotar("Revisar botones de Samsung");
         performGlobalAction(GLOBAL_ACTION_QUICK_SETTINGS);
         ui.postDelayed(new Runnable() {
-            int pagina = 1;
+            int paso = 1;
             @Override public void run() {
-                if (pagina == 1) anotar("  " + resumenVentanas());
-                anotar("  página " + pagina + ": " + android.text.TextUtils.join(" | ", etiquetasSamsung(40)));
-                if (pagina < 5 && pasarPagina()) { pagina++; ui.postDelayed(this, 600); return; }
+                if (paso == 1) anotar("  " + resumenVentanas());
+                anotar("  vista " + paso + ": " + android.text.TextUtils.join(" | ", etiquetasSamsung(45)));
+                paso++;
+                if (paso == 2) {
+                    AccessibilityNodeInfo e = buscar(EXPANDIR);
+                    if (e != null && clic(e)) { anotar("  toqué «" + etiqueta(e) + "»"); ui.postDelayed(this, 700); return; }
+                    paso++;
+                }
+                if (paso <= 5) {
+                    if (pasarPagina()) { anotar("  pasé de página"); ui.postDelayed(this, 650); return; }
+                    if (deslizarCuadricula()) { anotar("  deslicé la página"); ui.postDelayed(this, 750); return; }
+                }
                 performGlobalAction(GLOBAL_ACTION_DISMISS_NOTIFICATION_SHADE);
                 ocupado = false;
                 ui.postDelayed(listo, 400);
             }
         }, 800);
     }
+
+    /** Lo último que se supo de un botón (para pintarlo encendido o apagado aunque Android no deje leerlo). */
+    void recordar(String id, boolean on) { if (host != null) host.prefs.edit().putBoolean("conocido_" + id, on).apply(); }
 
     void verificar(final String id, final Boolean antes, final long t1) {
         AccessibilityNodeInfo b = buscarBoton(CONFIRMAR); // algunos Samsung preguntan antes de apagar los datos

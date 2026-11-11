@@ -537,7 +537,7 @@ class Panel {
                 case "nfc": { NfcAdapter n = NfcAdapter.getDefaultAdapter(a); return n != null && n.isEnabled(); }
                 case "tenue":
                     try { return Settings.Secure.getInt(cr, "reduce_bright_colors_activated", 0) == 1; }
-                    catch (SecurityException e) { return null; } // el launcher no lo puede leer; Meraki Panel sí
+                    catch (SecurityException e) { return a.estadoConocido(id); } // Android no deja leerlo: lo último que se vio
                 default: return null;
             }
         } catch (Exception e) { return false; }

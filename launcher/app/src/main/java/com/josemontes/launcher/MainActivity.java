@@ -397,6 +397,7 @@ public class MainActivity extends Activity {
     boolean ajustesRapidos() { return false; }
     /** El launcher no puede prender Wi-Fi ni tocar botones de Samsung; eso lo hace Meraki Panel cuando está activo. */
     boolean alternar(String id, Runnable ventanita) { return false; }
+    Boolean estadoConocido(String id) { return null; }
 
     static final String PANEL_APP = "com.josemontes.panel";
     boolean merakiPanelActivo() {

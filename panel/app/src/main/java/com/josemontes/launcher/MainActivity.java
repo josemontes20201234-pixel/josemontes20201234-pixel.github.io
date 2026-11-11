@@ -264,6 +264,7 @@ class MainActivity extends ContextWrapper {
         startActivity(new Intent(this, Inicio.class).putExtra("editor", true).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
     }
     boolean abrirPanelExterno() { return false; } // aquí el panel ya es este
+    Boolean estadoConocido(String id) { return prefs.contains("conocido_" + id) ? prefs.getBoolean("conocido_" + id, false) : null; }
     void estiloCambiado() { if (Servicio.yo != null && Servicio.yo.host != null) Servicio.yo.host.refrescarEnFondo(); }
 
     /**
