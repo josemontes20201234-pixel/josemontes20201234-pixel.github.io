@@ -313,9 +313,9 @@ public class MainActivity extends Activity {
         }
         // Una sola vez: agregar el botón «Extra tenue» que Jose pidió al final de su panel
         if (!prefs.getBoolean("panel_tenue", false)) {
-            String b = prefs.getString("panel_botones", Panel.POR_DEFECTO);
-            if (!("," + b + ",").contains(",tenue,")) b = b.isEmpty() ? "tenue" : b + ",tenue";
-            prefs.edit().putBoolean("panel_tenue", true).putString("panel_botones", b).apply();
+            String bs = prefs.getString("panel_botones", Panel.POR_DEFECTO);
+            if (!("," + bs + ",").contains(",tenue,")) bs = bs.isEmpty() ? "tenue" : bs + ",tenue";
+            prefs.edit().putBoolean("panel_tenue", true).putString("panel_botones", bs).apply();
             estiloCambiado();
         }
         leerConfig();
