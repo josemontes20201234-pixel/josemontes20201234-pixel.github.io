@@ -290,7 +290,11 @@ class MainActivity extends ContextWrapper {
             case "bt": {
                 android.bluetooth.BluetoothAdapter b = android.bluetooth.BluetoothAdapter.getDefaultAdapter();
                 if (b == null) return false;
-                try { return b.isEnabled() ? b.disable() : b.enable(); } catch (Throwable e) { return false; }
+                boolean prender = !b.isEnabled(), ok;
+                try { ok = prender ? b.enable() : b.disable(); } catch (Throwable e) { ok = false; }
+                // Al prenderlo, abrir la lista de aparatos para escoger cuál conectar (lo que Jose pidió)
+                if (ok && prender && panel != null) ui.postDelayed(() -> panel.abrirIntent(new Intent(android.provider.Settings.ACTION_BLUETOOTH_SETTINGS)), 250);
+                return ok;
             }
             case "datos": case "avion": case "ubicacion": case "ahorro": case "hotspot": case "nfc": case "oscuro": case "tenue": {
                 Servicio s = Servicio.yo;
