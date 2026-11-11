@@ -263,6 +263,7 @@ public class Servicio extends AccessibilityService {
         NOMBRES.put("hotspot", new String[]{"mobile hotspot", "hotspot", "zona wi-fi", "zona wifi", "zona portatil", "punto de acceso"});
         NOMBRES.put("nfc", new String[]{"nfc"});
         NOMBRES.put("oscuro", new String[]{"dark mode", "dark theme", "modo oscuro", "tema oscuro"});
+        NOMBRES.put("tenue", new String[]{"extra dim", "extra tenue", "atenuacion extra", "atenuacion adicional", "reduce bright colors", "reducir colores brillantes", "reducir brillo extra"});
     }
     static final String[] CONFIRMAR = {"turn off", "turn on", "apagar", "desactivar", "activar", "encender", "ok", "aceptar"};
 

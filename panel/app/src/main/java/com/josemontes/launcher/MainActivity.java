@@ -291,7 +291,7 @@ class MainActivity extends ContextWrapper {
                 if (b == null) return false;
                 try { return b.isEnabled() ? b.disable() : b.enable(); } catch (Throwable e) { return false; }
             }
-            case "datos": case "avion": case "ubicacion": case "ahorro": case "hotspot": case "nfc": case "oscuro": {
+            case "datos": case "avion": case "ubicacion": case "ahorro": case "hotspot": case "nfc": case "oscuro": case "tenue": {
                 Servicio s = Servicio.yo;
                 if (s == null || srv == null) return false; // sólo desde el panel que sale encima de todo
                 return s.tocarBotonSamsung(id, ventanita);

@@ -129,7 +129,7 @@ public class Inicio extends Activity {
         LinearLayout c4 = tarjeta("Permisos de los botones", h.acento);
         permiso(c4, "Brillo y rotación", Settings.System.canWrite(this), () -> h.panel().pedirAjustes());
         permiso(c4, "Silencio y No molestar", h.panel().permisoNoMolestar(), () -> h.panel().pedirNoMolestar());
-        nota(c4, "Wi-Fi y Bluetooth se prenden directo. Datos, modo avión, ubicación, ahorro, zona Wi-Fi, NFC y modo oscuro: Meraki Panel toca por vos ese botón en el panel de Samsung (sólo lee ese panel). Si no lo encuentra, abre la ventanita de Android.");
+        nota(c4, "Wi-Fi y Bluetooth se prenden directo. Datos, modo avión, ubicación, ahorro, zona Wi-Fi, NFC, modo oscuro y extra tenue: Meraki Panel toca por vos ese botón en el panel de Samsung (sólo lee ese panel). Si no lo encuentra, abre la ventanita de Android.");
     }
 
     LinearLayout tarjeta(String titulo, int color) {

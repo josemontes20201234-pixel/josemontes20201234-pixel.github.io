@@ -69,7 +69,7 @@ class Panel {
             {"rotacion", "Rotación"}, {"ubicacion", "Ubicación"}, {"ahorro", "Ahorro de batería"}, {"nomolestar", "No molestar"},
             {"apagar", "Apagar pantalla"}, {"samsung", "Panel de Samsung"}, {"ajustes", "Ajustes del cel"}, {"avion", "Modo avión"},
             {"oscuro", "Modo oscuro"}, {"hotspot", "Zona Wi-Fi"}, {"espejo", "Duplicar pantalla"}, {"nfc", "NFC"}, {"volumen", "Volumen"},
-            {"camara", "Cámara"}, {"alarma", "Alarmas"}, {"calc", "Calculadora"}, {"notis", "Notificaciones"}};
+            {"camara", "Cámara"}, {"alarma", "Alarmas"}, {"calc", "Calculadora"}, {"notis", "Notificaciones"}, {"tenue", "Extra tenue"}};
     static final String POR_DEFECTO = "wifi,bt,linterna,datos,sonido,rotacion,ubicacion,ahorro,nomolestar,apagar,notis,ajustes";
     // {nombre, fondo, color encendido, forma, borde, resplandor}
     static final String[][] TEMAS = {
@@ -535,6 +535,9 @@ class Panel {
                 case "avion": return Settings.Global.getInt(cr, Settings.Global.AIRPLANE_MODE_ON, 0) == 1;
                 case "oscuro": return (a.getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES;
                 case "nfc": { NfcAdapter n = NfcAdapter.getDefaultAdapter(a); return n != null && n.isEnabled(); }
+                case "tenue":
+                    try { return Settings.Secure.getInt(cr, "reduce_bright_colors_activated", 0) == 1; }
+                    catch (SecurityException e) { return null; } // el launcher no lo puede leer; Meraki Panel sí
                 default: return null;
             }
         } catch (Exception e) { return false; }
@@ -610,6 +613,7 @@ class Panel {
             case "hotspot": probar(id, () -> abrirIntent(componente("com.android.settings", "com.android.settings.TetherSettings"), componente("com.android.settings", "com.android.settings.Settings$TetherSettingsActivity"), accion(Settings.ACTION_WIRELESS_SETTINGS))); break;
             case "espejo": abrirIntent(a.getPackageManager().getLaunchIntentForPackage("com.samsung.android.smartmirroring"), accion("android.settings.CAST_SETTINGS"), accion(Settings.ACTION_WIRELESS_SETTINGS)); break;
             case "nfc": probar(id, () -> abrirIntent(accion(Settings.ACTION_NFC_SETTINGS), accion(Settings.ACTION_WIRELESS_SETTINGS))); break;
+            case "tenue": probar(id, () -> abrirIntent(accion("android.settings.REDUCE_BRIGHT_COLORS_SETTINGS"), accion(Settings.ACTION_ACCESSIBILITY_SETTINGS))); break;
             case "volumen": abrirIntent(Build.VERSION.SDK_INT >= 29 ? accion(Settings.Panel.ACTION_VOLUME) : null, accion(Settings.ACTION_SOUND_SETTINGS)); break;
             case "camara": cerrar(); abrirIntent(accion(MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA)); break;
             case "alarma": cerrar(); abrirIntent(accion(AlarmClock.ACTION_SHOW_ALARMS)); break;
@@ -628,6 +632,7 @@ class Panel {
             case "sonido": case "volumen": abrirIntent(accion(Settings.ACTION_SOUND_SETTINGS)); break;
             case "nomolestar": abrirIntent(accion("android.settings.ZEN_MODE_SETTINGS"), accion(Settings.ACTION_SOUND_SETTINGS)); break;
             case "rotacion": case "oscuro": abrirIntent(accion(Settings.ACTION_DISPLAY_SETTINGS)); break;
+            case "tenue": abrirIntent(accion("android.settings.REDUCE_BRIGHT_COLORS_SETTINGS"), accion(Settings.ACTION_ACCESSIBILITY_SETTINGS)); break;
             case "ahorro": abrirIntent(accion(Intent.ACTION_POWER_USAGE_SUMMARY), accion(Settings.ACTION_BATTERY_SAVER_SETTINGS)); break;
             default: tocar(id);
         }
@@ -1079,7 +1084,7 @@ class Panel {
         permiso("Brillo y rotación", "Modificar ajustes del sistema", permisoAjustes(), this::pedirAjustes);
         permiso("Silencio y No molestar", "Acceso a No molestar", permisoNoMolestar(), this::pedirNoMolestar);
         permiso("Apagar pantalla", "Administrador del dispositivo", a.puedeApagar(), a::pedirPermisoApagar);
-        nota(a.externo ? "Wi-Fi y Bluetooth se prenden directo. Datos, modo avión, ubicación, ahorro, zona Wi-Fi, NFC y modo oscuro: Meraki Panel toca por vos ese botón en el panel de Samsung."
+        nota(a.externo ? "Wi-Fi y Bluetooth se prenden directo. Datos, modo avión, ubicación, ahorro, zona Wi-Fi, NFC, modo oscuro y extra tenue: Meraki Panel toca por vos ese botón en el panel de Samsung."
                 : "Con la app Meraki Panel activada, Wi-Fi, Bluetooth, datos y los demás se cambian directo. Sin ella, abren la ventanita de Android.");
 
         if (!a.externo) pestanaTiles();
@@ -1194,6 +1199,7 @@ class Panel {
             case "alarma": return "M12 4a9 9 0 1 0 0 18a9 9 0 1 0 0-18 M12 9v4l2 2 M5 3L2 6 M22 6l-3-3";
             case "calc": return "M6 2h12a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z M8 6h8 M8 10h.01 M12 10h.01 M16 10h.01 M8 14h.01 M12 14h.01 M16 14h.01 M8 18h.01 M12 18h.01 M16 18h.01";
             case "notis": return "M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9 M10.3 21a1.94 1.94 0 0 0 3.4 0";
+            case "tenue": return "M12 8a4 4 0 1 0 0 8a4 4 0 1 0 0-8 M12 4h.01 M20 12h.01 M12 20h.01 M4 12h.01 M17.66 6.34h.01 M17.66 17.66h.01 M6.34 17.66h.01 M6.34 6.34h.01";
         }
         return "M12 2a10 10 0 1 0 0 20a10 10 0 1 0 0-20";
     }

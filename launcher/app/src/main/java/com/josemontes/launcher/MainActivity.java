@@ -311,6 +311,13 @@ public class MainActivity extends Activity {
             if ("notificaciones".equals(prefs.getString("g_abajo", "notificaciones"))) e.putString("g_abajo", "panel");
             e.apply();
         }
+        // Una sola vez: agregar el botón «Extra tenue» que Jose pidió al final de su panel
+        if (!prefs.getBoolean("panel_tenue", false)) {
+            String b = prefs.getString("panel_botones", Panel.POR_DEFECTO);
+            if (!("," + b + ",").contains(",tenue,")) b = b.isEmpty() ? "tenue" : b + ",tenue";
+            prefs.edit().putBoolean("panel_tenue", true).putString("panel_botones", b).apply();
+            estiloCambiado();
+        }
         leerConfig();
         awm = AppWidgetManager.getInstance(this);
         host = new Anfitrion(this, 1024);
