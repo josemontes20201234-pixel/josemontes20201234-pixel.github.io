@@ -134,7 +134,7 @@ public class MainActivity extends Activity {
     static final String[][] CAJON_ESTILOS = {{"cuadricula", "Cuadrícula"}, {"lista", "Lista"}};
     static final String[][] CAJON_ORDEN = {{"alfa", "Alfabético"}, {"uso", "Las que más usás primero"}};
     static final String[][] ACCIONES = {{"cajon", "Abrir todas las apps"}, {"notificaciones", "Bajar notificaciones"}, {"buscar", "Buscar"},
-            {"google", "Abrir Google"}, {"ajustes", "Ajustes del launcher"}, {"bloquear", "Apagar la pantalla"}, {"barra", "Mostrar u ocultar la barra de arriba"}, {"app", "Abrir una app…"}, {"nada", "No hacer nada"}};
+            {"panel", "Abrir el Panel Meraki"}, {"google", "Abrir Google"}, {"ajustes", "Ajustes del launcher"}, {"bloquear", "Apagar la pantalla"}, {"barra", "Mostrar u ocultar la barra de arriba"}, {"app", "Abrir una app…"}, {"nada", "No hacer nada"}};
     static final String[][] GESTOS = {{"g_arriba", "Deslizar hacia arriba", "cajon"}, {"g_abajo", "Deslizar hacia abajo", "notificaciones"},
             {"g_doble", "Doble toque", "ajustes"}, {"g_derecha", "Deslizar a la derecha", "nada"}, {"g_izquierda", "Deslizar a la izquierda", "nada"}};
     static final String[][] COLUMNAS = {{"4", "4 columnas"}, {"5", "5 columnas"}};
@@ -340,6 +340,7 @@ public class MainActivity extends Activity {
         if (bat != null) leerBateria(bat);
         if (!diaConstruido.equals(hoyClave())) construirInicio();
         actualizarInfo();
+        if (panel != null && panel.abierto()) panel.refrescar();
         cargarAgenda();
         cargarApps();
         cargarClima(false);
@@ -365,11 +366,55 @@ public class MainActivity extends Activity {
         // Botón de inicio: siempre volver a la pantalla principal
         cerrarAjustes();
         cerrarCajon();
+        if (panel != null) panel.cerrar();
+        if (i != null && i.getBooleanExtra("panel", false)) ui.postDelayed(() -> panel().abrir(), 120);
+        if (i != null && i.getBooleanExtra("pedir_apagar", false)) pedirPermisoApagar();
+        if (i != null && i.getBooleanExtra("ajustes_panel", false)) { abrirAjustes(); ui.postDelayed(this::irAjustesPanel, 250); }
+    }
+
+    // ===== Panel Meraki (ajustes rápidos propios) =====
+    Panel panel;
+    View seccionPanel;
+    Panel panel() { if (panel == null) panel = new Panel(this); return panel; }
+
+    void irAjustesPanel() { if (ajustesScroll != null && seccionPanel != null) ajustesScroll.smoothScrollTo(0, Math.max(0, seccionPanel.getTop() - dp(10))); }
+
+    String gestoDelPanel() {
+        List<String> g = new ArrayList<>();
+        for (String[] x : GESTOS) if ("panel".equals(accionDe(x[0]))) g.add(x[1]);
+        return g.isEmpty() ? "Todavía no tiene gesto · tocá para escoger" : TextUtils.join(" · ", g);
+    }
+
+    void elegirGestoPanel() {
+        String[] nombres = new String[Panel.GESTOS_PANEL.length + 1];
+        for (int k = 0; k < Panel.GESTOS_PANEL.length; k++) nombres[k] = Panel.GESTOS_PANEL[k][1] + (k == 0 ? " (recomendado)" : "");
+        nombres[nombres.length - 1] = "Ninguno";
+        dialogo().setTitle("¿Cómo abrir el Panel Meraki?").setItems(nombres, (d, w) -> {
+            SharedPreferences.Editor e = prefs.edit();
+            for (String[] g : GESTOS) if ("panel".equals(accionDe(g[0]))) e.putString(g[0], g[2]);
+            if (w < Panel.GESTOS_PANEL.length) e.putString(Panel.GESTOS_PANEL[w][0], "panel");
+            e.apply();
+            aplicarTodo();
+            if (w == 0) toast("Listo: deslizá hacia abajo en el inicio. Las notificaciones están dentro del panel.");
+        }).setNegativeButton("Cancelar", null).show();
+    }
+
+    String nombreTile(int n) {
+        String k = prefs.getString("tile_app" + n, "");
+        App ap = k.isEmpty() ? null : porKey.get(k);
+        return ap != null ? ap.label : "Sin escoger · tocá para escoger la app";
+    }
+
+    void explicarTiles() {
+        dialogo().setTitle("Botones Meraki en el panel de Samsung")
+                .setMessage("1. Bajá el panel de Samsung con dos dedos.\n2. Tocá el lápiz ✏️ (arriba).\n3. Buscá los botones de «Meraki Launcher»: Panel Meraki, Apagar pantalla y tus 3 apps.\n4. Mantené presionado uno y arrastralo arriba, donde lo querás.\n\nSamsung les pone su propio color; el nombre y el ícono son de Meraki.")
+                .setPositiveButton("Entendido", null).show();
     }
 
     @Override
     public void onBackPressed() {
-        if (ajustes.getVisibility() == View.VISIBLE) cerrarAjustes();
+        if (panel != null && panel.abierto()) panel.cerrar();
+        else if (ajustes.getVisibility() == View.VISIBLE) cerrarAjustes();
         else if (drawer.getVisibility() == View.VISIBLE) cerrarCajon();
     }
 
@@ -540,6 +585,7 @@ public class MainActivity extends Activity {
         switch (a) {
             case "cajon": abrirCajon(); return true;
             case "notificaciones": bajarNotificaciones(); return true;
+            case "panel": panel().abrir(); return true;
             case "buscar": abrirCajon(); buscar.requestFocus(); mostrarTeclado(); return true;
             case "google": abrirGoogle(); return true;
             case "ajustes": abrirAjustes(); return true;
@@ -1881,6 +1927,31 @@ public class MainActivity extends Activity {
         opcion(l, "Columnas", nombre(COLUMNAS, String.valueOf(columnas)), () -> elegir("Columnas", COLUMNAS, "columnas", String.valueOf(columnas)));
         interruptor(l, "Mostrar «Las que más usás» arriba", verSugeridas, v -> guardar("ver_sugeridas", v));
         opcion(l, "Apps ocultas", ocultas().size() + " oculta" + (ocultas().size() == 1 ? "" : "s"), this::gestionarOcultas);
+
+        seccion(l, "Panel Meraki");
+        seccionPanel = l.getChildAt(l.getChildCount() - 1);
+        opcion(l, "Abrir el Panel Meraki", "Tus ajustes rápidos: Wi-Fi, linterna, brillo, sonido y tus apps, con el estilo Meraki", () -> { cerrarAjustes(); panel().abrir(); });
+        opcion(l, "Cómo se abre", gestoDelPanel(), this::elegirGestoPanel);
+        opcion(l, "Botones", panel().botones().size() + " botones · escogé cuáles, en qué orden y agregá tus apps", () -> panel().editarBotones(this::construirAjustes));
+        opcion(l, "Estilo", nombre(Panel.ESTILOS, prefs.getString("panel_estilo", "meraki")), () -> elegir("Estilo del panel", Panel.ESTILOS, "panel_estilo", prefs.getString("panel_estilo", "meraki")));
+        opcion(l, "Forma de los botones", nombre(Panel.FORMAS, prefs.getString("panel_forma", "circulo")), () -> elegir("Forma de los botones", Panel.FORMAS, "panel_forma", prefs.getString("panel_forma", "circulo")));
+        opcion(l, "Color de los botones encendidos", nombre(Panel.COLORES, prefs.getString("panel_color", "auto")), () -> elegir("Color encendido", Panel.COLORES, "panel_color", prefs.getString("panel_color", "auto")));
+        opcion(l, "Transparencia", nombre(Panel.OPACIDAD, prefs.getString("panel_opacidad", "92")), () -> elegir("Transparencia del panel", Panel.OPACIDAD, "panel_opacidad", prefs.getString("panel_opacidad", "92")));
+        opcion(l, "Botones por fila", nombre(Panel.COLUMNAS, prefs.getString("panel_columnas", "4")), () -> elegir("Botones por fila", Panel.COLUMNAS, "panel_columnas", prefs.getString("panel_columnas", "4")));
+        interruptor(l, "Nombres debajo de los botones", prefs.getBoolean("panel_nombres", true), v -> guardar("panel_nombres", v));
+        interruptor(l, "Hora grande arriba", prefs.getBoolean("panel_reloj", true), v -> guardar("panel_reloj", v));
+        interruptor(l, "Barra de brillo", prefs.getBoolean("panel_brillo", true), v -> guardar("panel_brillo", v));
+        interruptor(l, "Barra de volumen", prefs.getBoolean("panel_volumen", true), v -> guardar("panel_volumen", v));
+        opcion(l, "Restablecer el panel", "Vuelve al estilo y botones de fábrica (no toca lo demás)", () -> dialogo().setTitle("¿Restablecer el Panel Meraki?")
+                .setPositiveButton("Sí", (d, w) -> { SharedPreferences.Editor e = prefs.edit(); for (String k : new String[]{"panel_botones", "panel_estilo", "panel_forma", "panel_color", "panel_opacidad", "panel_columnas", "panel_nombres", "panel_reloj", "panel_brillo", "panel_volumen"}) e.remove(k); e.apply(); aplicarTodo(); })
+                .setNegativeButton("No", null).show());
+
+        seccion(l, "Botones en el panel de Samsung");
+        opcion(l, "Cómo agregarlos", "Panel de Samsung → lápiz ✏️ → arrastrá los botones de Meraki", this::explicarTiles);
+        for (int n = 1; n <= 3; n++) {
+            final int k = n;
+            opcion(l, "Botón de app " + k, nombreTile(k), () -> elegirApp("Botón " + k + " del panel de Samsung", ap -> { prefs.edit().putString("tile_app" + k, ap.key()).apply(); Tiles.actualizar(this); construirAjustes(); }));
+        }
 
         seccion(l, "Gestos");
         for (String[] g : GESTOS) opcion(l, g[1], nombreGesto(g[0]), () -> elegirGesto(g[0], g[1]));
