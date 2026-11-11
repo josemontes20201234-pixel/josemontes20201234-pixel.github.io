@@ -94,7 +94,7 @@ p{margin:0}
 .btn.ghost{background:transparent;border:1px solid var(--line);color:var(--fg)}
 .btn.sm{padding:8px 14px;font-size:14px;border-radius:10px}
 .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
-.shortcuts{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:6px}
+.shortcuts{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-top:6px}
 .shortcut{border:1px solid var(--line);background:var(--surface);border-radius:14px;padding:14px 12px;text-align:left;display:grid;gap:4px}
 .shortcut b{font:800 20px/1 var(--display);text-transform:uppercase}
 .shortcut span{font-size:12.5px;color:var(--muted);line-height:1.35}
@@ -200,6 +200,32 @@ input[type=range]{width:100%;accent-color:var(--brass)}
 .opt:disabled{cursor:default}
 .expl{font-size:15px;color:var(--muted);border-left:3px solid var(--brass);padding-left:12px}
 .score{font:900 80px/0.9 var(--display);color:var(--brass)}
+/* prueba de nivel */
+.sd-tipo{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+.sd-tipo button{border:1px solid var(--line);background:var(--surface);border-radius:16px;padding:16px 14px;text-align:left;display:grid;gap:4px}
+.sd-tipo button b{font:800 24px/1 var(--display);text-transform:uppercase}
+.sd-tipo button span{font-size:13px;color:var(--muted)}
+.sd-tipo button.on{border-color:var(--brass);background:var(--brass-soft)}
+.sd-meta{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.sd-acc{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.sd-acc .btn{justify-content:center}
+.sd-ok{background:var(--ok-soft)!important;color:var(--ok)!important;border-color:transparent!important}
+.sd-bad{background:var(--bad-soft)!important;color:var(--bad)!important;border-color:transparent!important}
+.sd-bars{display:grid;gap:10px}
+.sd-bar{display:grid;gap:6px}
+.sd-bar .row{justify-content:space-between}
+.sd-bar i{display:block;height:10px;border-radius:99px;background:var(--surface-2);overflow:hidden}
+.sd-bar i span{display:block;height:100%;background:var(--brass);border-radius:99px}
+.sd-mods{display:grid;gap:8px}
+.sd-mods div{display:grid;grid-template-columns:28px 1fr auto;gap:10px;align-items:center;border:1px solid var(--line);border-radius:12px;padding:10px 12px;background:var(--surface)}
+.sd-mods .n{font:700 12px var(--mono);color:var(--muted)}
+.sd-miss{display:grid;gap:10px}
+.sd-miss div{border-left:3px solid var(--bad);padding-left:12px}
+.sd-miss small{color:var(--muted);display:block;margin-top:2px}
+.sd-hist{display:grid;gap:8px}
+.sd-hist button{display:grid;grid-template-columns:1fr auto;gap:4px 10px;text-align:left;border:1px solid var(--line);border-radius:12px;padding:12px;background:var(--surface)}
+.sd-hist small{color:var(--muted)}
+.sd-card{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:18px;display:grid;gap:14px}
 .badge{display:grid;justify-items:center;text-align:center;gap:10px;padding-block:10px}
 
 /* glossary */
@@ -573,9 +599,47 @@ const GLOSS=[
 ['Tonsor','Nombre del barbero en la antigua Roma.']
 ];
 
+/* ============ PRUEBA DE NIVEL ============ */
+// Distintas a las de los quizzes: así el alumno no las ve antes. La primera de cada módulo es la de la prueba rápida.
+const SONDEO=[
+ {m:'historia',q:'Antes de ser estilo, ¿qué era la barbería?',o:['Un pasatiempo de reyes','Higiene, estatus y medicina','Sólo un negocio de teñir el pelo','Un oficio de soldados'],a:1,e:'Fue higiene, estatus y hasta medicina: los barberos-cirujanos sacaban muelas y hacían sangrías.'},
+ {m:'historia',q:'¿Qué les pidió Alejandro Magno a sus soldados?',o:['Dejarse la barba larga para intimidar','Raparse por los piojos','Afeitarse para que el enemigo no los agarrara de la barba','Teñirse el pelo de rojo'],a:2,e:'Les pidió afeitarse para que en combate no los pudieran agarrar de la barba.'},
+ {m:'herramientas',q:'¿Cuántos milímetros deja aproximadamente el peine #3?',o:['3 mm','6 mm','10 mm','13 mm'],a:2,e:'#1 ≈ 3 mm, #2 ≈ 6 mm, #3 ≈ 10 mm, #4 ≈ 13 mm.'},
+ {m:'herramientas',q:'Si usás la máquina en cero (zero gap), ¿qué revisás siempre?',o:['Que la cuchilla móvil no pase a la fija','Que tenga peine #4','Que esté bien caliente','Nada, es el ajuste normal'],a:0,e:'Si la cuchilla móvil sobresale de la fija, corta la piel. Se revisa con luz antes de usarla.'},
+ {m:'higiene',q:'¿Qué diferencia hay entre desinfectar y esterilizar?',o:['Son lo mismo','Desinfectar es para la piel; esterilizar para el pelo','Desinfectar elimina la mayoría de microbios; esterilizar los elimina todos','Esterilizar es lavar con agua y jabón'],a:2,e:'Desinfectar (químico) es lo normal entre clientes; esterilizar (autoclave) elimina todo microorganismo.'},
+ {m:'higiene',q:'Granitos rojos después de un corte o afeitado suelen ser…',o:['Tiña','Foliculitis','Caspa','Alergia al champú'],a:1,e:'La foliculitis es la infección del folículo; es común con navajas o máquinas sucias.'},
+ {m:'anatomia',q:'¿Hasta qué zona suele llegar un fade alto?',o:['La nuca','La patilla','La línea parietal','La frente'],a:2,e:'La línea parietal es la parte más ancha de la cabeza; ahí suele terminar un fade alto.'},
+ {m:'anatomia',q:'¿Qué son las esquinas frontales?',o:['Los huesos de la nuca','Donde la frente se convierte en lado; definen contorno y entradas','Las patillas','La coronilla'],a:1,e:'Son las esquinas donde la frente pasa al lado; definen el contorno y las entradas.'},
+ {m:'rostro',q:'¿Qué cuatro medidas comparás para saber la forma del rostro?',o:['Ojos, nariz, boca y orejas','Cuello, hombros, frente y nariz','Frente, pómulos, mandíbula y largo','Sólo el largo de la cara'],a:2,e:'De frente y con el pelo hacia atrás: frente, pómulos, mandíbula y largo.'},
+ {m:'rostro',q:'Cara fina a la que le falta mandíbula. ¿Qué barba le ayuda?',o:['Barba cuadrada','Sin barba','Sólo bigote','Barba larga en punta'],a:0,e:'Una barba cuadrada le da mandíbula; una barba larga en la barbilla alarga una cara redonda.'},
+ {m:'cabello',q:'Pelo fino con entradas. ¿Qué le recomendás arriba?',o:['Raparlo bien corto','Entresacar desde la raíz','Hacerle un diseño','Dejar un poco de largo y textura'],a:3,e:'Un poco de largo con textura disimula más que raparlo; entresacar en la raíz lo hace ver más ralo.'},
+ {m:'cabello',q:'¿Cómo cortás pelo rizado para no quedarte corto?',o:['Mojado y bien estirado','En seco, o calculando que sube al secarse','Sólo con navaja','Con el peine más corto'],a:1,e:'El rizo se encoge al secarse: se corta en seco o calculando que sube varios centímetros.'},
+ {m:'consulta',q:'¿Qué evita la mitad de los malentendidos en la consulta?',o:['Cortar rápido','Cobrar antes','Pedir una foto de referencia','Poner música'],a:2,e:'Una foto de referencia y confirmar con números antes de empezar.'},
+ {m:'consulta',q:'Al terminar el servicio, ¿qué no debería faltar?',o:['Mostrarle la parte de atrás con espejo y agendar la próxima cita','Cobrar propina obligatoria','Cortar más de lo pedido','Nada, sólo despedirlo'],a:0,e:'El cierre: espejo de mano atrás, cómo peinarse en casa, próxima cita y pedir que te etiquete.'},
+ {m:'tecnicas',q:'¿Qué es la elevación?',o:['La altura de la silla','El ángulo al que levantás el pelo antes de cortarlo','El largo del peine guía','El volumen del pelo'],a:1,e:'La elevación cambia todo el resultado: 0° da peso, 90° da capas uniformes.'},
+ {m:'tecnicas',q:'¿Para qué sirve la máquina sobre peine?',o:['Para hacer diseños','Para afeitar','Para quitar peso y difuminar donde la guía no alcanza','Para lavar el pelo'],a:2,e:'Sirve sobre la oreja y en el occipital, donde el peine guía no llega bien.'},
+ {m:'degradados',q:'¿Cuál es el orden para construir un degradado?',o:['Difuminar, marcar la línea base y bajar volumen','Bajar volumen con el número largo, marcar la línea base, subir números y difuminar','Empezar por arriba con tijera y terminar con la nuca','Perfilar primero y después degradar'],a:1,e:'Volumen con el número largo, línea base, subir un número, difuminar con la palanca, borrar líneas y unir arriba.'},
+ {m:'degradados',q:'¿Por qué sale un hueco en el occipital?',o:['Por usar peine #4','Por la curva de la cabeza la máquina entra de más','Porque falta aceite','Porque el cliente tiene remolino'],a:1,e:'En la curva del occipital la máquina entra de más: hay que inclinarla siguiendo la forma.'},
+ {m:'perfilado',q:'¿Qué forma de nuca se ve muy limpia pero se nota cuando crece?',o:['Cuadrada','Redonda','Degradada','Ninguna'],a:0,e:'La cuadrada es un bloque recto: se ve limpia pero marca la línea al crecer. La degradada es la que mejor crece.'},
+ {m:'perfilado',q:'Para un acabado con brillo usás…',o:['Arcilla mate','Polvo texturizante','Pomada','Nada'],a:2,e:'Pomada para brillo; cera o arcilla para mate; polvo texturizante para volumen.'},
+ {m:'barba',q:'¿Cuáles son las dos líneas de una barba bien diseñada?',o:['Bigote y patilla','La del pómulo arriba y la del cuello abajo','Mentón y oreja','Sólo la del cuello'],a:1,e:'Pómulo y cuello. La del cuello va uno o dos dedos arriba de la manzana de Adán.'},
+ {m:'barba',q:'¿Por qué la piel va siempre estirada al pasar la navaja?',o:['Para que el pelo salga más rápido','Porque sobre piel floja la navaja raspa y corta','Para que se vea mejor en fotos','No importa'],a:1,e:'La navaja sobre piel floja es como cortar sobre una sábana arrugada. Ángulo cerca de 30°.'},
+ {m:'texturas',q:'¿Qué técnica quita peso sin escalones deslizando la tijera entreabierta?',o:['Point cut','Buzz cut','Slide cut','Taper'],a:2,e:'Slide cut. El point cut corta con la punta en vertical para romper la línea.'},
+ {m:'texturas',q:'¿Cuánto dura un diseño (hair tattoo) y qué ofrecés?',o:['Una a dos semanas; el retoque como servicio aparte','Un mes; nada más','Seis meses; nada','Un día; un corte gratis'],a:0,e:'Dura una a dos semanas; el retoque se ofrece como servicio aparte.'},
+ {m:'negocio',q:'¿Desde qué ángulos fotografiás un corte para tus redes?',o:['Sólo de frente','Desde arriba','Sólo atrás','Frente, los dos lados y atrás'],a:3,e:'Cuatro ángulos, luz de frente, fondo limpio y antes y después en la misma luz.'},
+ {m:'negocio',q:'¿Qué ayuda más a que el cliente no falte a su cita?',o:['Recordatorio por WhatsApp un día antes','Cobrarle doble si falta','No dar citas','Llamarle a medianoche'],a:0,e:'Agenda con citas y recordatorio un día antes. La consistencia es la marca.'}
+];
+const NIVELES=[
+ ['Principiante','Le conviene empezar desde el módulo 1. Todavía no domina los fundamentos.'],
+ ['Fundamentos sólidos','Domina historia, herramientas, higiene y anatomía. Puede arrancar en Diagnóstico.'],
+ ['Diagnóstico sólido','Sabe leer rostro, cabello y cliente. Puede arrancar en Técnica.'],
+ ['Técnica sólida','Domina técnicas base, degradados y perfilado. Puede arrancar en Maestría.'],
+ ['Avanzado','Domina la teoría de todos los niveles. A reforzar sólo lo que falló y a practicar.']
+];
+
 /* ============ ESTADO ============ */
 const KEY='meraki-academy-v1';
-let P={done:{},name:'',seen:{}};
+let P={done:{},name:'',seen:{},sondeos:[]};
 try{const s=JSON.parse(localStorage.getItem(KEY)||'null');if(s)P=Object.assign(P,s)}catch(e){}
 const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(P))}catch(e){}};
 let S={view:'home',mod:null,sec:0};
@@ -846,6 +910,71 @@ function quiz(el,qs,onEnd){
  q();
 }
 
+/* ============ PRUEBA DE NIVEL (el instructor pregunta, el alumno contesta) ============ */
+let SD={fase:'inicio',tipo:'completa',nombre:''};
+function sdPreguntas(tipo){const r=[];MODULES.forEach(m=>{const qs=SONDEO.filter(x=>x.m===m.id);(tipo==='rapida'?qs.slice(0,1):qs).forEach(q=>r.push(q))});return r}
+function sdCalcular(res){
+ const porMod=MODULES.map(m=>{const r=res.filter(x=>x.m===m.id);return {id:m.id,ok:r.filter(x=>x.ok).length,tot:r.length}}).filter(x=>x.tot);
+ const porNivel=LEVELS.map(L=>{const r=res.filter(x=>modById(x.m).lv===L.n);return {n:L.n,t:L.t,ok:r.filter(x=>x.ok).length,tot:r.length}});
+ let nivel=0;for(const x of porNivel){if(x.tot&&x.ok/x.tot>=0.7)nivel=x.n;else break}
+ const ok=res.filter(x=>x.ok).length,pc=res.length?Math.round(ok/res.length*100):0;
+ const inicio=porMod.find(x=>x.ok<x.tot);
+ return {porMod,porNivel,nivel,ok,tot:res.length,pc,inicio:inicio?inicio.id:null};
+}
+function sdTexto(r){const c=sdCalcular(r.res),f=new Date(r.fecha);
+ const L=[`*Prueba de nivel · Meraki Academy*`,`Alumno: ${r.nombre||'—'}`,`Fecha: ${f.toLocaleDateString('es')} · ${r.tipo==='rapida'?'Rápida':'Completa'}`,`Resultado: ${c.ok} de ${c.tot} (${c.pc}%)`,`Nivel: ${NIVELES[c.nivel][0]}`,'',...c.porNivel.map(x=>`${x.t}: ${x.ok}/${x.tot}`)];
+ const rep=c.porMod.filter(x=>x.ok<x.tot).map(x=>modById(x.id).t);
+ if(rep.length)L.push('',`Reforzar: ${rep.join(', ')}`);
+ if(c.inicio)L.push(`Empezar en: Módulo ${pad(MODULES.indexOf(modById(c.inicio))+1)} · ${modById(c.inicio).t}`);
+ return L.join('\n')}
+function sondeo(el){
+ const pinta=()=>{
+  if(SD.fase==='inicio'){
+   const hist=(P.sondeos||[]).slice().reverse();
+   el.innerHTML=`<div class="sd-card"><p class="muted" style="margin:0">Leéle cada pregunta al alumno. Si escoge una opción, tocala. Si contesta con sus palabras, tocá <b>Acertó</b> o <b>Falló</b>. Al final te digo su nivel, qué reforzar y en qué módulo empezar.</p>
+    <div class="namebox"><input id="sdn" placeholder="Nombre del alumno" aria-label="Nombre del alumno" maxlength="40" value="${(SD.nombre||'').replace(/"/g,'&quot;')}"></div>
+    <div class="sd-tipo"><button type="button" data-t="rapida" class="${SD.tipo==='rapida'?'on':''}"><b>Rápida</b><span>13 preguntas · unos 7 min · una por módulo</span></button><button type="button" data-t="completa" class="${SD.tipo==='completa'?'on':''}"><b>Completa</b><span>26 preguntas · unos 15 min · dos por módulo</span></button></div>
+    <button class="btn full" type="button" id="sdgo">Empezar la prueba</button></div>
+    ${hist.length?`<section class="section"><h2 style="font-size:22px">Pruebas anteriores</h2><div class="sd-hist">${hist.map((h,k)=>{const c=sdCalcular(h.res);return `<button type="button" data-h="${hist.length-1-k}"><b>${h.nombre||'Sin nombre'}</b><span class="pill ${c.pc>=70?'ok':'go'}">${c.pc}%</span><small>${new Date(h.fecha).toLocaleDateString('es')} · ${h.tipo==='rapida'?'Rápida':'Completa'}</small><small>${NIVELES[c.nivel][0]}</small></button>`}).join('')}</div></section>`:''}`;
+   $$('.sd-tipo button',el).forEach(b=>b.onclick=()=>{SD.tipo=b.dataset.t;SD.nombre=$('#sdn',el).value;pinta()});
+   $('#sdgo',el).onclick=()=>{SD.nombre=$('#sdn',el).value.trim();SD.qs=sdPreguntas(SD.tipo);SD.i=0;SD.res=[];SD.marcada=null;SD.fase='pregunta';pinta();window.scrollTo({top:0})};
+   $$('[data-h]',el).forEach(b=>b.onclick=()=>{SD.ver=P.sondeos[+b.dataset.h];SD.fase='resultado';pinta();window.scrollTo({top:0})});
+   return}
+  if(SD.fase==='pregunta'){
+   const Q=SD.qs[SD.i],m=modById(Q.m),L='ABCD',hecho=SD.marcada!==null&&SD.marcada!==undefined;
+   el.innerHTML=`<div class="quiz"><div class="sd-meta"><span class="qn">Pregunta ${SD.i+1} / ${SD.qs.length}</span><span class="pill">${m.t}</span><span class="pill go">Nivel ${m.lv}</span></div><h3>${Q.q}</h3>
+    <div class="opts">${Q.o.map((o,k)=>`<button type="button" class="opt${hecho&&k===Q.a?' right':''}${hecho&&SD.marcada===k&&k!==Q.a?' wrong':''}" data-l="${L[k]}" data-k="${k}" ${hecho?'disabled':''}>${o}</button>`).join('')}</div>
+    ${hecho?`<p class="expl"><b style="color:${SD.res[SD.i].ok?'var(--ok)':'var(--bad)'}">${SD.res[SD.i].ok?'Acertó.':(SD.res[SD.i].nosabia?'No sabía.':'Falló.')}</b> ${Q.e}</p><div class="row" style="justify-content:space-between"><button class="btn ghost" type="button" id="sdcambiar">Corregir</button><button class="btn" type="button" id="sdsig">${SD.i<SD.qs.length-1?'Siguiente →':'Ver resultado'}</button></div>`
+    :`<div class="sd-acc"><button class="btn ghost sd-ok" type="button" data-r="1">✓ Acertó</button><button class="btn ghost sd-bad" type="button" data-r="0">✗ Falló</button><button class="btn ghost" type="button" data-r="ns">No sabía</button></div><details><summary class="muted" style="cursor:pointer">Ver la respuesta (sólo vos)</summary><p class="expl" style="margin-top:8px"><b>${L[Q.a]}) ${Q.o[Q.a]}</b> · ${Q.e}</p></details>`}
+    <div class="row" style="justify-content:space-between"><button class="btn ghost sm" type="button" id="sdatras" ${SD.i===0?'disabled style="visibility:hidden"':''}>← Anterior</button><span class="qn">${SD.res.filter(x=>x.ok).length} correctas</span><button class="btn ghost sm" type="button" id="sdsalir">Terminar aquí</button></div></div>`;
+   const marcar=(ok,k,ns)=>{SD.res[SD.i]={m:Q.m,q:SONDEO.indexOf(Q),ok,k,nosabia:!!ns};SD.marcada=k===undefined?(ok?Q.a:-1):k;pinta()};
+   $$('.opt',el).forEach(b=>b.onclick=()=>{const k=+b.dataset.k;marcar(k===Q.a,k)});
+   $$('[data-r]',el).forEach(b=>b.onclick=()=>{const r=b.dataset.r;marcar(r==='1',undefined,r==='ns')});
+   const sig=$('#sdsig',el);if(sig)sig.onclick=()=>{if(SD.i<SD.qs.length-1){SD.i++;SD.marcada=null;pinta();window.scrollTo({top:0})}else terminar()};
+   const cam=$('#sdcambiar',el);if(cam)cam.onclick=()=>{SD.res.length=SD.i;SD.marcada=null;pinta()};
+   const at=$('#sdatras',el);if(at)at.onclick=()=>{if(SD.i>0){SD.i--;SD.res.length=SD.i;SD.marcada=null;pinta()}};
+   $('#sdsalir',el).onclick=()=>{if(SD.res.filter(Boolean).length)terminar();else{SD.fase='inicio';pinta()}};
+   return}
+  if(SD.fase==='resultado'){
+   const r=SD.ver,c=sdCalcular(r.res),ini=c.inicio?modById(c.inicio):null;
+   const est=x=>x.ok===x.tot?'<span class="pill ok">Domina</span>':(x.ok>0?'<span class="pill go">Repasar</span>':'<span class="pill" style="color:var(--bad)">Desde cero</span>');
+   const fallas=r.res.filter(x=>!x.ok&&SONDEO[x.q]).map(x=>SONDEO[x.q]);
+   el.innerHTML=`<div class="quiz badge"><span class="lbl">${r.nombre||'Alumno'} · ${new Date(r.fecha).toLocaleDateString('es')} · ${r.tipo==='rapida'?'Rápida':'Completa'}</span><div class="score">${c.pc}%</div><p style="margin:0">${c.ok} de ${c.tot} correctas</p><h3 style="margin:0">${NIVELES[c.nivel][0]}</h3><p class="muted" style="margin:0">${NIVELES[c.nivel][1]}</p></div>
+    <section class="section"><h2 style="font-size:22px">Por nivel</h2><div class="sd-bars">${c.porNivel.map(x=>`<div class="sd-bar"><div class="row"><b>${x.n}. ${x.t}</b><span class="qn">${x.ok}/${x.tot}</span></div><i><span style="width:${x.tot?Math.round(x.ok/x.tot*100):0}%"></span></i></div>`).join('')}</div></section>
+    <section class="section"><h2 style="font-size:22px">Por módulo</h2><div class="sd-mods">${c.porMod.map(x=>{const m=modById(x.id);return `<div><span class="n">${pad(MODULES.indexOf(m)+1)}</span><span>${m.t} <small class="muted">${x.ok}/${x.tot}</small></span>${est(x)}</div>`}).join('')}</div></section>
+    ${fallas.length?`<section class="section"><h2 style="font-size:22px">Lo que falló (para explicarle)</h2><div class="sd-miss">${fallas.map(q=>`<div><b>${q.q}</b><small><b style="color:var(--ok)">${q.o[q.a]}</b> · ${q.e}</small></div>`).join('')}</div></section>`:''}
+    <div class="sd-card">${ini?`<p style="margin:0"><b>Empezar en:</b> Módulo ${pad(MODULES.indexOf(ini)+1)} · ${ini.t}</p><button class="btn full" type="button" data-stage="${ini.id}">Presentar ese módulo</button>`:'<p style="margin:0"><b>Acertó todo.</b> A practicar con clientes.</p>'}
+    <div class="row"><button class="btn ghost" type="button" id="sdcomp">Compartir resultado</button><button class="btn ghost" type="button" id="sdnueva">Nueva prueba</button></div></div>`;
+   $('#sdnueva',el).onclick=()=>{SD={fase:'inicio',tipo:SD.tipo,nombre:''};pinta();window.scrollTo({top:0})};
+   $('#sdcomp',el).onclick=()=>{const t=sdTexto(r);if(navigator.share){navigator.share({text:t}).catch(()=>{})}else{location.href='https://wa.me/?text='+encodeURIComponent(t)}};
+   return}
+ };
+ const terminar=()=>{const res=SD.res.filter(Boolean);if(!res.length){SD.fase='inicio';pinta();return}
+  const r={nombre:SD.nombre,tipo:SD.tipo,fecha:Date.now(),res:res.map(x=>({m:x.m,q:x.q,ok:x.ok,nosabia:x.nosabia}))};
+  P.sondeos=(P.sondeos||[]).concat([r]).slice(-30);save();SD.ver=r;SD.fase='resultado';pinta();window.scrollTo({top:0})};
+ pinta();
+}
+
 /* ============ VISTAS ============ */
 function ring(pc){const r=34,c=2*Math.PI*r;return `<svg class="ring" viewBox="0 0 84 84"><circle cx="42" cy="42" r="${r}" fill="none" stroke="var(--surface-2)" stroke-width="8"/><circle cx="42" cy="42" r="${r}" fill="none" stroke="var(--brass)" stroke-width="8" stroke-linecap="round" stroke-dasharray="${c}" stroke-dashoffset="${c*(1-pc/100)}" transform="rotate(-90 42 42)"/><text x="42" y="49" text-anchor="middle">${pc}%</text></svg>`}
 
@@ -858,7 +987,7 @@ home(){const d=doneCount(),pc=Math.round(d/MODULES.length*100);const next=MODULE
  <div class="progress-card">${ring(pc)}<div style="min-width:0"><b>${P.name?'Hola, '+P.name:'Tu progreso'}</b><div class="muted" style="font-size:14px">${d} de ${MODULES.length} módulos aprobados</div></div>
   ${P.name?'':`<div class="namebox full"><input id="nm" placeholder="Tu nombre" aria-label="Tu nombre" maxlength="30"><button class="btn sm" id="nmb" type="button">Guardar</button></div>`}
   <button class="btn full" type="button" data-open="${next.id}">${d? 'Continuar':'Empezar'}: ${next.t}</button></div>
- <div class="shortcuts"><button type="button" class="shortcut" data-go="clase"><b>Modo clase</b><span>Presentá un módulo en pantalla grande</span></button><button type="button" class="shortcut" data-go="exam"><b>Examen</b><span>12 preguntas de todo el curso</span></button><button type="button" class="shortcut" data-go="gloss"><b>Glosario</b><span>${GLOSS.length} términos del oficio</span></button></div></section>
+ <div class="shortcuts"><button type="button" class="shortcut" data-go="clase"><b>Modo clase</b><span>Presentá un módulo en pantalla grande</span></button><button type="button" class="shortcut" data-go="exam"><b>Examen</b><span>12 preguntas de todo el curso</span></button><button type="button" class="shortcut" data-go="gloss"><b>Glosario</b><span>${GLOSS.length} términos del oficio</span></button><button type="button" class="shortcut" data-go="sondeo"><b>Prueba de nivel</b><span>Para el instructor: sondeo a un alumno nuevo</span></button></div></section>
  ${LEVELS.map(L=>`<section class="level"><div class="level-head"><span class="level-num">${L.n}</span><h2>${L.t}</h2><p>${L.d}</p></div><div class="mods">${MODULES.filter(m=>m.lv===L.n).map(modRow).join('')}</div></section>`).join('')}
  <div class="install" id="inst"><b>Instalala en tu celular</b><span>En Chrome de Android abrí el menú ⋮ y tocá <b>Agregar a la pantalla principal</b>. Queda con su ícono como una app. Tu progreso se guarda en tu propio teléfono.</span></div>`},
 module(){const m=modById(S.mod),i=MODULES.indexOf(m)+1,n=m.sec.length,isQ=S.sec>=n;
@@ -867,8 +996,9 @@ module(){const m=modById(S.mod),i=MODULES.indexOf(m)+1,n=m.sec.length,isQ=S.sec>
  const body=isQ?`<div class="section"><h2>Quiz del módulo</h2><p class="muted">Necesitás 70% para aprobar. ${P.done[m.id]?'Tu mejor resultado: '+P.done[m.id]+'%':''}</p><div id="qz"></div></div>`:`<div class="section"><h2>${m.sec[S.sec].h}</h2>${blocks(m.sec[S.sec].b)}</div>`;
  return `<header class="modhead"><button class="back" type="button" data-go="home">← Módulos</button><span class="lbl">Módulo ${pad(i)} · Nivel ${m.lv} · ${LEVELS[m.lv-1].t}</span><h1>${m.t}</h1><div class="dots">${dots}</div></header>${body}
  <nav class="modnav"><button class="btn ghost" type="button" data-sec="${S.sec-1}" ${S.sec===0?'disabled style="visibility:hidden"':''}>← Anterior</button>${isQ?`<button class="btn ghost" type="button" data-stage="${m.id}">Presentar en clase</button>`:`<button class="btn" type="button" data-sec="${S.sec+1}">${S.sec===n-1?'Hacer el quiz →':'Siguiente →'}</button>`}</nav>`},
-clase(){return `<header class="modhead"><span class="lbl">Para el instructor</span><h1>Modo clase</h1><p class="muted">Elegí un módulo para presentarlo en pantalla completa. Pasá con las flechas, deslizando o con los botones. Al final vienen las preguntas para la clase con respuesta oculta.</p></header><div class="mods">${MODULES.map(m=>`<button type="button" class="mod" data-stage="${m.id}"><span class="n">${pad(MODULES.indexOf(m)+1)}</span><span><h3>${m.t}</h3><small>${m.sec.length} láminas + ${m.q.length} preguntas</small></span><span class="pill go">Presentar</span></button>`).join('')}</div>`},
+clase(){return `<header class="modhead"><span class="lbl">Para el instructor</span><h1>Modo clase</h1><p class="muted">Elegí un módulo para presentarlo en pantalla completa. Pasá con las flechas, deslizando o con los botones. Al final vienen las preguntas para la clase con respuesta oculta.</p></header><button type="button" class="mod" data-go="sondeo" style="margin-bottom:14px"><span class="n">?</span><span><h3>Prueba de nivel</h3><small>Sondeo teórico para un alumno nuevo · rápida o completa</small></span><span class="pill go">Empezar</span></button><div class="mods">${MODULES.map(m=>`<button type="button" class="mod" data-stage="${m.id}"><span class="n">${pad(MODULES.indexOf(m)+1)}</span><span><h3>${m.t}</h3><small>${m.sec.length} láminas + ${m.q.length} preguntas</small></span><span class="pill go">Presentar</span></button>`).join('')}</div>`},
 exam(){return `<header class="modhead"><span class="lbl">Evaluación general</span><h1>Examen Meraki</h1><p class="muted">12 preguntas al azar de todos los módulos. Con 80% o más ganás la insignia de barbero Meraki.${P.exam?' Tu mejor resultado: '+P.exam+'%':''}</p></header><div id="ex"></div>`},
+sondeo(){return `<header class="modhead"><button class="back" type="button" data-go="clase">← Clase</button><span class="lbl">Para el instructor</span><h1>Prueba de nivel</h1></header><div id="sd"></div>`},
 gloss(){return `<header class="modhead"><span class="lbl">Referencia rápida</span><h1>Glosario</h1></header><input class="search" id="gq" type="search" placeholder="Buscar término…" aria-label="Buscar término"><div class="gloss" id="gl"></div>`}
 };
 
@@ -880,11 +1010,12 @@ function render(){
  mount(app);
  // tabs
  const T=[['home','Inicio'],['clase','Clase'],['exam','Examen'],['gloss','Glosario']];
- $('#tabs').innerHTML=T.map(t=>`<button type="button" data-go="${t[0]}" ${(S.view===t[0]||(S.view==='module'&&t[0]==='home'))?'aria-current="page"':''}>${IC[t[0]]}${t[1]}</button>`).join('');
+ $('#tabs').innerHTML=T.map(t=>`<button type="button" data-go="${t[0]}" ${(S.view===t[0]||(S.view==='module'&&t[0]==='home')||(S.view==='sondeo'&&t[0]==='clase'))?'aria-current="page"':''}>${IC[t[0]]}${t[1]}</button>`).join('');
  // vista específica
  if(S.view==='module'&&S.sec>=modById(S.mod).sec.length){const m=modById(S.mod);quiz($('#qz'),m.q,pc=>{P.done[m.id]=Math.max(P.done[m.id]||0,pc);save()})}
  if(S.view==='exam'){const all=MODULES.flatMap(m=>m.q);const pick=all.map(q=>[Math.random(),q]).sort((a,b)=>a[0]-b[0]).slice(0,12).map(x=>x[1]);
   quiz($('#ex'),pick,pc=>{P.exam=Math.max(P.exam||0,pc);save();setTimeout(()=>{if(pc>=80){const b=$('#ex .badge');if(b)b.insertAdjacentHTML('afterbegin',`<svg viewBox="0 0 120 120" width="110" aria-hidden="true"><circle cx="60" cy="60" r="54" fill="var(--brass-soft)" stroke="var(--brass)" stroke-width="3"/><circle cx="60" cy="60" r="44" fill="none" stroke="var(--brass)" stroke-dasharray="2 4"/><text x="60" y="56" text-anchor="middle" font-family="var(--display)" font-weight="900" font-size="22" fill="var(--brass)">MERAKI</text><text x="60" y="76" text-anchor="middle" font-family="var(--mono)" font-size="9" fill="var(--fg)">BARBERO ${P.name?P.name.toUpperCase().slice(0,14):'CERTIFICADO'}</text></svg>`)}},0)})}
+ if(S.view==='sondeo')sondeo($('#sd'));
  if(S.view==='gloss'){const draw=t=>{t=(t||'').toLowerCase();$('#gl').innerHTML=GLOSS.filter(g=>(g[0]+g[1]).toLowerCase().includes(t)).map(g=>`<div><b>${g[0]}</b><span>${g[1]}</span></div>`).join('')||'<p class="muted" style="padding:12px 0">No encontré ese término. Probá con otra palabra.</p>'};$('#gq').oninput=e=>draw(e.target.value);draw('')}
  const nmb=$('#nmb');if(nmb)nmb.onclick=()=>{const v=$('#nm').value.trim();if(v){P.name=v;save();render()}};
 }
