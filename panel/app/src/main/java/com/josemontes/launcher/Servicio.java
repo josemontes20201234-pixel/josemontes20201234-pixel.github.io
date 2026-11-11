@@ -433,25 +433,51 @@ public class Servicio extends AccessibilityService {
         return true;
     }
 
-    /** Tocar un botón de Samsung: primero «por dentro»; si no se deja, moverlo a la vista y tocarlo con el dedo. */
+    /** Tocar un botón de Samsung: primero «por dentro»; si no se deja, traerlo a la vista y tocarlo con el dedo. */
     String comoToque = "";
+    int intentosMover;
+    android.graphics.Point pantalla() {
+        android.graphics.Point p = new android.graphics.Point();
+        try { wm.getDefaultDisplay().getRealSize(p); } catch (Exception e) { }
+        if (p.x <= 0 || p.y <= 0) { android.util.DisplayMetrics dm = getResources().getDisplayMetrics(); p.set(dm.widthPixels, dm.heightPixels); }
+        return p;
+    }
     boolean tocarNodo(AccessibilityNodeInfo n) {
         if (clic(n)) { comoToque = "por dentro"; return true; }
         AccessibilityNodeInfo c = clicable(n);
         AccessibilityNodeInfo blanco = c != null ? c : n;
         Rect r = new Rect(); blanco.getBoundsInScreen(r);
-        android.util.DisplayMetrics dm = getResources().getDisplayMetrics();
-        boolean enPantalla = blanco.isVisibleToUser() && r.width() > 0 && r.height() > 0 && r.top >= 0 && r.bottom <= dm.heightPixels && r.left >= 0 && r.right <= dm.widthPixels;
+        android.graphics.Point real = pantalla();
+        int abajo = real.y - dp(56); // dejar libre la barra de abajo
+        boolean visible = blanco.isVisibleToUser();
+        String donde = "[" + r.toShortString() + (visible ? "" : " oculto") + " de " + real.x + "x" + real.y + "]";
+        boolean enPantalla = visible && r.width() > 0 && r.height() > 0 && r.centerX() > 0 && r.centerX() < real.x && r.centerY() > dp(40) && r.centerY() < abajo;
         if (!enPantalla) {
-            boolean movio = blanco.performAction(AccessibilityNodeInfo.AccessibilityAction.ACTION_SHOW_ON_SCREEN.getId()) || n.performAction(AccessibilityNodeInfo.AccessibilityAction.ACTION_SHOW_ON_SCREEN.getId());
-            comoToque = movio ? "lo moví para que se vea" : "no está a la vista (" + r.toShortString() + ")";
+            intentosMover++;
+            // 1) pedirle a Samsung que lo muestre; 2) mover la lista que lo contiene; 3) deslizar la lista hacia arriba con el dedo
+            if (intentosMover == 1 && blanco.performAction(AccessibilityNodeInfo.AccessibilityAction.ACTION_SHOW_ON_SCREEN.getId())) { comoToque = "le pedí a Samsung que lo muestre " + donde; return false; }
+            AccessibilityNodeInfo x = blanco.getParent();
+            for (int i = 0; i < 10 && x != null; i++) {
+                if (x.isScrollable() && x.performAction(AccessibilityNodeInfo.ACTION_SCROLL_FORWARD)) { comoToque = "bajé la lista " + intentosMover + " " + donde; return false; }
+                x = x.getParent();
+            }
+            if (intentosMover <= 6) {
+                android.graphics.Path p = new android.graphics.Path();
+                float desde = r.top > abajo ? real.y * 0.78f : real.y * 0.45f, hasta = r.top > abajo ? real.y * 0.42f : real.y * 0.80f; // si está abajo, la lista sube; si está arriba, baja
+                p.moveTo(real.x * 0.5f, desde);
+                p.lineTo(real.x * 0.5f, hasta);
+                gesto(p, 420);
+                comoToque = "deslicé la lista con el dedo " + intentosMover + " " + donde;
+                return false;
+            }
+            comoToque = "no lo pude traer a la vista " + donde;
             return false;
         }
         android.graphics.Path p = new android.graphics.Path();
         p.moveTo(r.centerX(), r.centerY());
         p.lineTo(r.centerX() + 1, r.centerY() + 1);
         gesto(p, 60);
-        comoToque = "con el dedo en " + r.centerX() + "," + r.centerY();
+        comoToque = "con el dedo " + donde;
         return true;
     }
 
@@ -495,6 +521,7 @@ public class Servicio extends AccessibilityService {
         if (nombres == null || Build.VERSION.SDK_INT < 31) { anotar("  este Android no lo permite"); return false; }
         if (ocupado) { anotar("  ya estaba ocupado con otro"); if (host != null) host.toast("Un momentito…"); return true; }
         ocupado = true;
+        intentosMover = 0;
         final Boolean antes = estadoDe(id);
         boolean abrio = performGlobalAction(GLOBAL_ACTION_QUICK_SETTINGS);
         anotar("  abrir el panel de Samsung: " + (abrio ? "sí" : "NO") + " · estaba " + (antes == null ? "?" : antes ? "encendido" : "apagado"));
@@ -515,7 +542,7 @@ public class Servicio extends AccessibilityService {
                         final long t1 = SystemClock.uptimeMillis(); ui.postDelayed(() -> verificar(id, antes, t1, nombres, st), 450); return;
                     }
                     if (!comoToque.equals(ultimo)) { ultimo = comoToque; anotar("  todavía no: " + comoToque); }
-                    if (t < 5000) { ui.postDelayed(this, 220); return; }
+                    if (t < 7500) { ui.postDelayed(this, 600); return; }
                 }
                 if (!expandido && t > 300) {
                     expandido = true;
