@@ -40,6 +40,14 @@ import java.util.Map;
 public class Servicio extends AccessibilityService {
     static Servicio yo;
     static final String SYSTEMUI = "com.android.systemui";
+
+    // ===== registro de lo que hace (se ve en la app, para encontrar fallas sin adivinar)
+    static final java.util.LinkedList<String> REGISTRO = new java.util.LinkedList<>();
+    static void anotar(String t) {
+        String h = new java.text.SimpleDateFormat("HH:mm:ss", Locale.ROOT).format(new java.util.Date());
+        synchronized (REGISTRO) { REGISTRO.add(h + "  " + t); while (REGISTRO.size() > 60) REGISTRO.removeFirst(); }
+    }
+    static String registro() { synchronized (REGISTRO) { return android.text.TextUtils.join("\n", REGISTRO); } }
     final Handler ui = new Handler(Looper.getMainLooper());
     WindowManager wm;
     View franja;
@@ -273,18 +281,56 @@ public class Servicio extends AccessibilityService {
         return s.toLowerCase(Locale.ROOT).replace(' ', ' ').trim().replaceAll("\\s+", " ");
     }
 
-    /** 3 = es exactamente ese nombre; 2 = empieza con ese nombre («Mobile data, On»); 0 = no. */
-    static int puntos(AccessibilityNodeInfo n, String[] nombres) {
+    /** 3 = es exactamente ese nombre; 2 = empieza con ese nombre («Mobile data, On»); 1 = lo contiene (botón chico); 0 = no. */
+    int puntos(AccessibilityNodeInfo n, String[] nombres) {
         int mejor = 0;
-        for (CharSequence c : new CharSequence[]{n.getContentDescription(), n.getText()}) {
+        CharSequence[] textos = Build.VERSION.SDK_INT >= 30
+                ? new CharSequence[]{n.getContentDescription(), n.getText(), n.getStateDescription()}
+                : new CharSequence[]{n.getContentDescription(), n.getText()};
+        for (CharSequence c : textos) {
             String t = limpio(c);
             if (t.isEmpty()) continue;
             for (String x : nombres) {
                 if (t.equals(x)) return 3;
-                if (t.startsWith(x + ",") || t.startsWith(x + " ") || t.startsWith(x + ".")) mejor = Math.max(mejor, 2);
+                if (t.startsWith(x + ",") || t.startsWith(x + " ") || t.startsWith(x + ".") || t.startsWith(x + ":")) mejor = Math.max(mejor, 2);
+                else if (t.contains(x) && esChico(n)) mejor = Math.max(mejor, 1);
             }
         }
         return mejor;
+    }
+    final Rect cuadro = new Rect();
+    boolean esChico(AccessibilityNodeInfo n) {
+        n.getBoundsInScreen(cuadro);
+        return cuadro.width() > 0 && cuadro.width() < getResources().getDisplayMetrics().widthPixels * 0.6f;
+    }
+    static String etiqueta(AccessibilityNodeInfo n) {
+        CharSequence c = n.getContentDescription();
+        if (c == null || c.length() == 0) c = n.getText();
+        return c == null ? "" : c.toString().replace('\n', ' ');
+    }
+    /** Nombres de los botones que se ven en el panel de Samsung (para revisar). */
+    List<String> etiquetasSamsung(final int max) {
+        final java.util.LinkedHashSet<String> l = new java.util.LinkedHashSet<>();
+        recorrerSamsung(n -> {
+            if (n.isClickable()) {
+                String t = etiqueta(n).trim();
+                if (t.isEmpty()) for (int i = 0; i < n.getChildCount() && t.isEmpty(); i++) { AccessibilityNodeInfo c = n.getChild(i); if (c != null) t = etiqueta(c).trim(); }
+                if (!t.isEmpty()) l.add(t.length() > 40 ? t.substring(0, 40) + "…" : t);
+            }
+            return l.size() >= max;
+        });
+        return new java.util.ArrayList<>(l);
+    }
+    String resumenVentanas() {
+        int total = 0, samsung = 0;
+        try {
+            for (AccessibilityWindowInfo w : getWindows()) {
+                total++;
+                AccessibilityNodeInfo r = w.getRoot();
+                if (r != null && r.getPackageName() != null && SYSTEMUI.contentEquals(r.getPackageName())) samsung++;
+            }
+        } catch (Exception e) { return "no pude ver las ventanas: " + e.getClass().getSimpleName(); }
+        return "ventanas: " + total + ", de Samsung: " + samsung;
     }
 
     /** Recorre sólo las ventanas de Samsung (systemui). */
@@ -308,7 +354,7 @@ public class Servicio extends AccessibilityService {
 
     AccessibilityNodeInfo buscar(final String[] nombres) {
         final AccessibilityNodeInfo[] mejor = {null};
-        final int[] pts = {1};
+        final int[] pts = {0};
         recorrerSamsung(n -> {
             int p = puntos(n, nombres);
             if (p > pts[0]) { pts[0] = p; mejor[0] = n; }
@@ -329,12 +375,16 @@ public class Servicio extends AccessibilityService {
         return r[0];
     }
 
-    void pasarPagina() {
+    boolean pasarPagina() {
+        final boolean[] ok = {false};
+        // primero un paginador (las páginas de botones); si no hay, cualquier cosa de Samsung que se pueda mover
         recorrerSamsung(n -> {
             CharSequence cls = n.getClassName();
-            if (n.isScrollable() && cls != null && cls.toString().contains("Pager")) { n.performAction(AccessibilityNodeInfo.ACTION_SCROLL_FORWARD); return true; }
+            if (n.isScrollable() && cls != null && cls.toString().contains("Pager")) { ok[0] = n.performAction(AccessibilityNodeInfo.ACTION_SCROLL_FORWARD); return ok[0]; }
             return false;
         });
+        if (!ok[0]) recorrerSamsung(n -> { if (n.isScrollable() && esChico(n) == false) { ok[0] = n.performAction(AccessibilityNodeInfo.ACTION_SCROLL_FORWARD); return ok[0]; } return false; });
+        return ok[0];
     }
 
     static boolean clic(AccessibilityNodeInfo n) {
@@ -356,34 +406,67 @@ public class Servicio extends AccessibilityService {
      */
     boolean tocarBotonSamsung(final String id, final Runnable ventanita) {
         final String[] nombres = NOMBRES.get(id);
-        if (nombres == null || Build.VERSION.SDK_INT < 31) return false;
-        if (ocupado) { if (host != null) host.toast("Un momentito…"); return true; }
+        anotar("Tocar «" + id + "»");
+        if (nombres == null || Build.VERSION.SDK_INT < 31) { anotar("  este Android no lo permite"); return false; }
+        if (ocupado) { anotar("  ya estaba ocupado con otro"); if (host != null) host.toast("Un momentito…"); return true; }
         ocupado = true;
         final Boolean antes = estadoDe(id);
-        performGlobalAction(GLOBAL_ACTION_QUICK_SETTINGS);
+        boolean abrio = performGlobalAction(GLOBAL_ACTION_QUICK_SETTINGS);
+        anotar("  abrir el panel de Samsung: " + (abrio ? "sí" : "NO") + " · estaba " + (antes == null ? "?" : antes ? "encendido" : "apagado"));
         final long t0 = SystemClock.uptimeMillis();
         ui.postDelayed(new Runnable() {
-            boolean paso;
+            int paginas; long otraPagina = 900; boolean primera = true;
             @Override public void run() {
+                if (primera) { primera = false; anotar("  " + resumenVentanas()); }
                 AccessibilityNodeInfo n = buscar(nombres);
-                if (n != null && clic(n)) { final long t1 = SystemClock.uptimeMillis(); ui.postDelayed(() -> verificar(id, antes, t1), 300); return; }
+                if (n != null) {
+                    anotar("  encontrado: «" + etiqueta(n) + "»");
+                    if (clic(n)) { final long t1 = SystemClock.uptimeMillis(); ui.postDelayed(() -> verificar(id, antes, t1), 300); return; }
+                    anotar("  no se dejó tocar");
+                }
                 long t = SystemClock.uptimeMillis() - t0;
-                if (!paso && t > 800) { paso = true; pasarPagina(); }
-                if (t < 2400) { ui.postDelayed(this, 130); return; }
+                if (t > otraPagina && paginas < 5) {
+                    if (pasarPagina()) { paginas++; anotar("  pasé a la página " + (paginas + 1)); }
+                    otraPagina = t + 500;
+                }
+                if (t < 4200) { ui.postDelayed(this, 140); return; }
+                anotar("  NO lo encontré. " + resumenVentanas());
+                anotar("  botones que vi: " + android.text.TextUtils.join(" | ", etiquetasSamsung(30)));
                 terminar(true);
                 ui.postDelayed(ventanita, 250);
             }
-        }, 220);
+        }, 250);
         return true;
+    }
+
+    /** Para revisar: abre el panel de Samsung, anota cómo se llaman sus botones (todas las páginas) y lo cierra. */
+    void revisarBotones(final Runnable listo) {
+        if (Build.VERSION.SDK_INT < 31 || ocupado) { anotar("Revisar: ahora no se puede"); listo.run(); return; }
+        ocupado = true;
+        anotar("Revisar botones de Samsung");
+        performGlobalAction(GLOBAL_ACTION_QUICK_SETTINGS);
+        ui.postDelayed(new Runnable() {
+            int pagina = 1;
+            @Override public void run() {
+                if (pagina == 1) anotar("  " + resumenVentanas());
+                anotar("  página " + pagina + ": " + android.text.TextUtils.join(" | ", etiquetasSamsung(40)));
+                if (pagina < 5 && pasarPagina()) { pagina++; ui.postDelayed(this, 600); return; }
+                performGlobalAction(GLOBAL_ACTION_DISMISS_NOTIFICATION_SHADE);
+                ocupado = false;
+                ui.postDelayed(listo, 400);
+            }
+        }, 800);
     }
 
     void verificar(final String id, final Boolean antes, final long t1) {
         AccessibilityNodeInfo b = buscarBoton(CONFIRMAR); // algunos Samsung preguntan antes de apagar los datos
         if (b != null) clic(b);
         Boolean ahora = estadoDe(id);
-        if (antes == null || ahora == null || !antes.equals(ahora)) { terminar(true); return; }
+        if (b != null) anotar("  confirmé «" + limpio(b.getText()) + "»");
+        if (antes == null || ahora == null || !antes.equals(ahora)) { anotar("  listo: ahora está " + (ahora == null ? "?" : ahora ? "encendido" : "apagado")); terminar(true); return; }
         if (SystemClock.uptimeMillis() - t1 < 2600) { ui.postDelayed(() -> verificar(id, antes, t1), 160); return; }
         // No cambió: puede que Samsung esté pidiendo algo. Se quita el Panel Meraki para que lo veás.
+        anotar("  lo toqué pero no cambió; dejo el de Samsung a la vista");
         terminar(false);
         if (host != null && host.panel != null) host.panel.cerrar();
     }

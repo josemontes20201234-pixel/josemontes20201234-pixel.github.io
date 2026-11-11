@@ -130,6 +130,22 @@ public class Inicio extends Activity {
         permiso(c4, "Brillo y rotación", Settings.System.canWrite(this), () -> h.panel().pedirAjustes());
         permiso(c4, "Silencio y No molestar", h.panel().permisoNoMolestar(), () -> h.panel().pedirNoMolestar());
         nota(c4, "Wi-Fi y Bluetooth se prenden directo. Datos, modo avión, ubicación, ahorro, zona Wi-Fi, NFC, modo oscuro y extra tenue: Meraki Panel toca por vos ese botón en el panel de Samsung (sólo lee ese panel). Si no lo encuentra, abre la ventanita de Android.");
+
+        LinearLayout c5 = tarjeta("Revisar", h.acento);
+        String ver = "?";
+        try { ver = getPackageManager().getPackageInfo(getPackageName(), 0).versionName; } catch (Exception e) { }
+        nota(c5, "Meraki Panel " + ver + " · servicio " + (Servicio.yo != null ? "activo" : "apagado") + ". Si un botón abre la ventanita en vez de cambiar, tocá «Ver los botones de Samsung» y mandale captura de esto a Claude.");
+        c5.addView(boton("Ver los botones de Samsung", true, () -> {
+            if (Servicio.yo == null) { h.toast("Primero activá Meraki Panel en Accesibilidad."); return; }
+            Servicio.yo.revisarBotones(this::construir);
+        }), h.lp(-1, -2, 12));
+        String reg = Servicio.registro();
+        TextView log = h.texto(reg.isEmpty() ? "Todavía no hay nada anotado. Tocá un botón en tu panel y volvé aquí." : reg, 12, EF, android.graphics.Typeface.MONOSPACE);
+        log.setTextIsSelectable(true);
+        log.setPadding(h.dp(12), h.dp(10), h.dp(12), h.dp(10));
+        log.setBackground(h.caja(0x33000000, 12, 0));
+        c5.addView(log, h.lp(-1, -2, 12));
+        c5.addView(boton("Borrar lo anotado", false, () -> { synchronized (Servicio.REGISTRO) { Servicio.REGISTRO.clear(); } construir(); }), h.lp(-1, -2, 10));
     }
 
     LinearLayout tarjeta(String titulo, int color) {

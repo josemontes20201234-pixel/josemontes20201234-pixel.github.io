@@ -293,7 +293,7 @@ class MainActivity extends ContextWrapper {
             }
             case "datos": case "avion": case "ubicacion": case "ahorro": case "hotspot": case "nfc": case "oscuro": case "tenue": {
                 Servicio s = Servicio.yo;
-                if (s == null || srv == null) return false; // sólo desde el panel que sale encima de todo
+                if (s == null || srv == null) { Servicio.anotar("«" + id + "»: " + (s == null ? "el servicio no está activo" : "el panel no está encima de todo") + " → ventanita"); return false; }
                 return s.tocarBotonSamsung(id, ventanita);
             }
         }
