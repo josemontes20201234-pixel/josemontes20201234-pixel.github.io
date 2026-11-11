@@ -53,6 +53,7 @@ public class Servicio extends AccessibilityService {
     View franja;
     FrameLayout raiz;
     boolean raizPuesta;
+    WindowManager.LayoutParams lpRaiz;
     MainActivity host;
     boolean pausada, tocando, ocupado;
 
@@ -241,7 +242,7 @@ public class Servicio extends AccessibilityService {
                     WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN | WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS | WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED,
                     PixelFormat.TRANSLUCENT);
             lp.layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
-            try { wm.addView(raiz, lp); raizPuesta = true; } catch (Exception e) { return false; }
+            try { wm.addView(raiz, lp); raizPuesta = true; lpRaiz = lp; } catch (Exception e) { return false; }
         }
         if (siguiendo) host.panel().abrirSiguiendo(); else host.panel().abrir();
         return true;
@@ -393,7 +394,6 @@ public class Servicio extends AccessibilityService {
 
     /** Desliza la cuadrícula de botones de Samsung hacia la izquierda, como con el dedo, para ver la página siguiente. */
     boolean deslizarCuadricula() {
-        if (Build.VERSION.SDK_INT < 24) return false;
         AccessibilityNodeInfo ref = buscar(CUADRICULA);
         if (ref == null) return false;
         Rect r = new Rect(); ref.getBoundsInScreen(r);
@@ -401,10 +401,58 @@ public class Servicio extends AccessibilityService {
         android.graphics.Path camino = new android.graphics.Path();
         camino.moveTo(ancho * 0.85f, r.centerY());
         camino.lineTo(ancho * 0.15f, r.centerY());
-        try {
-            return dispatchGesture(new android.accessibilityservice.GestureDescription.Builder()
-                    .addStroke(new android.accessibilityservice.GestureDescription.StrokeDescription(camino, 0, 280)).build(), null, null);
-        } catch (Exception e) { return false; }
+        return gesto(camino, 280);
+    }
+
+    /** Mientras el «dedo» de Meraki Panel toca el panel de Samsung, el Panel Meraki deja pasar los toques. */
+    void atravesar(boolean si) {
+        if (!raizPuesta || lpRaiz == null) return;
+        int f = si ? lpRaiz.flags | WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE : lpRaiz.flags & ~WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE;
+        if (f == lpRaiz.flags) return;
+        lpRaiz.flags = f;
+        try { wm.updateViewLayout(raiz, lpRaiz); } catch (Exception e) { }
+    }
+    final Runnable devolverToques = () -> atravesar(false);
+
+    boolean gesto(final android.graphics.Path camino, final long ms) {
+        atravesar(true);
+        ui.removeCallbacks(devolverToques);
+        ui.postDelayed(() -> {
+            boolean ok;
+            try {
+                ok = dispatchGesture(new android.accessibilityservice.GestureDescription.Builder()
+                        .addStroke(new android.accessibilityservice.GestureDescription.StrokeDescription(camino, 0, ms)).build(),
+                        new GestureResultCallback() {
+                            @Override public void onCompleted(android.accessibilityservice.GestureDescription g) { ui.postDelayed(devolverToques, 150); }
+                            @Override public void onCancelled(android.accessibilityservice.GestureDescription g) { ui.postDelayed(devolverToques, 150); }
+                        }, null);
+            } catch (Exception e) { ok = false; }
+            if (!ok) atravesar(false);
+        }, 90);
+        ui.postDelayed(devolverToques, ms + 900); // por si acaso, nunca se queda sin poder tocarse
+        return true;
+    }
+
+    /** Tocar un botón de Samsung: primero «por dentro»; si no se deja, moverlo a la vista y tocarlo con el dedo. */
+    String comoToque = "";
+    boolean tocarNodo(AccessibilityNodeInfo n) {
+        if (clic(n)) { comoToque = "por dentro"; return true; }
+        AccessibilityNodeInfo c = clicable(n);
+        AccessibilityNodeInfo blanco = c != null ? c : n;
+        Rect r = new Rect(); blanco.getBoundsInScreen(r);
+        android.util.DisplayMetrics dm = getResources().getDisplayMetrics();
+        boolean enPantalla = blanco.isVisibleToUser() && r.width() > 0 && r.height() > 0 && r.top >= 0 && r.bottom <= dm.heightPixels && r.left >= 0 && r.right <= dm.widthPixels;
+        if (!enPantalla) {
+            boolean movio = blanco.performAction(AccessibilityNodeInfo.AccessibilityAction.ACTION_SHOW_ON_SCREEN.getId()) || n.performAction(AccessibilityNodeInfo.AccessibilityAction.ACTION_SHOW_ON_SCREEN.getId());
+            comoToque = movio ? "lo moví para que se vea" : "no está a la vista (" + r.toShortString() + ")";
+            return false;
+        }
+        android.graphics.Path p = new android.graphics.Path();
+        p.moveTo(r.centerX(), r.centerY());
+        p.lineTo(r.centerX() + 1, r.centerY() + 1);
+        gesto(p, 60);
+        comoToque = "con el dedo en " + r.centerX() + "," + r.centerY();
+        return true;
     }
 
     /** El botón que de verdad se toca (el mismo o uno de sus «papás»). */
@@ -452,21 +500,23 @@ public class Servicio extends AccessibilityService {
         anotar("  abrir el panel de Samsung: " + (abrio ? "sí" : "NO") + " · estaba " + (antes == null ? "?" : antes ? "encendido" : "apagado"));
         final long t0 = SystemClock.uptimeMillis();
         ui.postDelayed(new Runnable() {
-            int paginas; long otraPagina = 1000; boolean primera = true, expandido, avisado;
+            int paginas; long otraPagina = 1000; boolean primera = true, expandido, avisado, visto; String ultimo = "";
             @Override public void run() {
                 if (primera) { primera = false; anotar("  " + resumenVentanas()); }
                 AccessibilityNodeInfo n = buscar(nombres);
+                long t = SystemClock.uptimeMillis() - t0;
                 if (n != null) {
                     AccessibilityNodeInfo c = clicable(n);
-                    Boolean st = estadoDeNodo(c != null ? c : n);
-                    anotar("  encontrado: «" + etiqueta(n) + "»" + (st == null ? "" : st ? " (encendido)" : " (apagado)"));
-                    if (clic(n)) {
+                    final Boolean st = estadoDeNodo(c != null ? c : n);
+                    if (!visto) { visto = true; anotar("  encontrado: «" + etiqueta(n) + "»" + (st == null ? "" : st ? " (encendido)" : " (apagado)")); }
+                    if (tocarNodo(n)) {
+                        anotar("  lo toqué " + comoToque);
                         if (st != null) recordar(id, !st);
-                        final long t1 = SystemClock.uptimeMillis(); ui.postDelayed(() -> verificar(id, antes, t1), 300); return;
+                        final long t1 = SystemClock.uptimeMillis(); ui.postDelayed(() -> verificar(id, antes, t1, nombres, st), 450); return;
                     }
-                    anotar("  no se dejó tocar");
+                    if (!comoToque.equals(ultimo)) { ultimo = comoToque; anotar("  todavía no: " + comoToque); }
+                    if (t < 5000) { ui.postDelayed(this, 220); return; }
                 }
-                long t = SystemClock.uptimeMillis() - t0;
                 if (!expandido && t > 300) {
                     expandido = true;
                     AccessibilityNodeInfo e = buscar(EXPANDIR);
@@ -519,13 +569,27 @@ public class Servicio extends AccessibilityService {
     /** Lo último que se supo de un botón (para pintarlo encendido o apagado aunque Android no deje leerlo). */
     void recordar(String id, boolean on) { if (host != null) host.prefs.edit().putBoolean("conocido_" + id, on).apply(); }
 
-    void verificar(final String id, final Boolean antes, final long t1) {
+    void verificar(final String id, final Boolean antes, final long t1, final String[] nombres, final Boolean antesBoton) {
         AccessibilityNodeInfo b = buscarBoton(CONFIRMAR); // algunos Samsung preguntan antes de apagar los datos
         if (b != null) clic(b);
-        Boolean ahora = estadoDe(id);
         if (b != null) anotar("  confirmé «" + limpio(b.getText()) + "»");
-        if (antes == null || ahora == null || !antes.equals(ahora)) { anotar("  listo: ahora está " + (ahora == null ? "?" : ahora ? "encendido" : "apagado")); terminar(true); return; }
-        if (SystemClock.uptimeMillis() - t1 < 2600) { ui.postDelayed(() -> verificar(id, antes, t1), 160); return; }
+        Boolean ahora = estadoDe(id);
+        Boolean ahoraBoton = null;
+        if ((antes == null || ahora == null) && antesBoton != null) {
+            AccessibilityNodeInfo n = buscar(nombres);
+            if (n != null) { AccessibilityNodeInfo c = clicable(n); ahoraBoton = estadoDeNodo(c != null ? c : n); }
+        }
+        boolean cambio;
+        if (antes != null && ahora != null) cambio = !antes.equals(ahora);
+        else if (antesBoton != null && ahoraBoton != null) cambio = !antesBoton.equals(ahoraBoton);
+        else cambio = true; // no hay cómo saberlo: se da por hecho
+        if (cambio) {
+            Boolean fin = ahora != null ? ahora : ahoraBoton;
+            if (fin != null) recordar(id, fin);
+            anotar("  listo: ahora está " + (fin == null ? "?" : fin ? "encendido" : "apagado"));
+            terminar(true); return;
+        }
+        if (SystemClock.uptimeMillis() - t1 < 2600) { ui.postDelayed(() -> verificar(id, antes, t1, nombres, antesBoton), 160); return; }
         // No cambió: puede que Samsung esté pidiendo algo. Se quita el Panel Meraki para que lo veás.
         anotar("  lo toqué pero no cambió; dejo el de Samsung a la vista");
         terminar(false);
