@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="acc_desc">Pone una franja invisible arriba de la pantalla para que, al deslizar hacia abajo, salga el Panel Meraki en vez del panel de Samsung. También lo usa para apagar la pantalla y abrir las notificaciones desde el panel. No lee lo que hay en tu pantalla ni lo que escribís.</string>
+</resources>

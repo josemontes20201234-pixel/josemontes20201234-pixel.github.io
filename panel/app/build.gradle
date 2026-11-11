@@ -1,0 +1,35 @@
+plugins { id 'com.android.application' }
+def build = (System.getenv("GITHUB_RUN_NUMBER") ?: "1") as Integer
+// El panel es el mismo del launcher: se copia de ahí para que los dos siempre sean iguales
+def gen = "$buildDir/generated/panelsrc"
+tasks.register('copiarPanel', Copy) {
+    from '../../launcher/app/src/main/java/com/josemontes/launcher/Panel.java'
+    into "$gen/com/josemontes/launcher"
+}
+android {
+    namespace 'com.josemontes.panel'
+    compileSdk 34
+    defaultConfig {
+        applicationId 'com.josemontes.panel'
+        minSdk 28
+        targetSdk 34
+        versionCode build
+        versionName "1.0." + build
+    }
+    sourceSets { main { java.srcDirs += gen } }
+    signingConfigs {
+        release {
+            // Misma llave que el launcher: así se pueden compartir el estilo del panel
+            storeFile file('meraki-launcher.jks')
+            storePassword 'merakilauncher'
+            keyAlias 'meraki'
+            keyPassword 'merakilauncher'
+        }
+    }
+    buildTypes {
+        release { minifyEnabled false; signingConfig signingConfigs.release }
+    }
+    lint { checkReleaseBuilds false; abortOnError false }
+    compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
+}
+preBuild.dependsOn 'copiarPanel'

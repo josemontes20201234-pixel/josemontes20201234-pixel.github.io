@@ -1,0 +1,31 @@
+name: Meraki Panel APK
+on:
+  push:
+    branches: [main]
+    paths: ['panel/**', 'launcher/app/src/main/java/com/josemontes/launcher/Panel.java', '.github/workflows/panel.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
+      - name: Compilar APK
+        run: gradle -p panel assembleRelease --no-daemon --stacktrace
+      - name: Publicar APK
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cp panel/app/build/outputs/apk/release/app-release.apk meraki-panel.apk
+          # Siempre en la misma entrega «meraki-panel» (sin quitarle «la última» al launcher)
+          gh release view meraki-panel >/dev/null 2>&1 || gh release create meraki-panel --title "Meraki Panel" --notes "Descargá meraki-panel.apk e instalalo en tu Android." --latest=false
+          gh release upload meraki-panel meraki-panel.apk --clobber
+          gh release edit meraki-panel --notes "Meraki Panel 1.0.${GITHUB_RUN_NUMBER}. Descargá meraki-panel.apk e instalalo en tu Android." --latest=false

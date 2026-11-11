@@ -324,6 +324,7 @@ class Panel {
 
     /** La rayita arriba del inicio: un toque o deslizar hacia abajo abre el panel. */
     void actualizarAsa() {
+        if (a.externo) return;
         boolean ver = prefB("panel_asa", true);
         if (!ver) { if (asa != null && asa.getParent() != null) a.root.removeView(asa); return; }
         if (asa == null) {
@@ -373,7 +374,7 @@ class Panel {
             fecha.setText(bat > 0 && bm != null ? f + "  ·  " + bat + "%" + (bm.isCharging() ? " ⚡" : "") : f);
         };
         rh.run(); if (!vista) refrescos.add(rh);
-        cab.addView(iconoBoton("M12 20h9 M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z", "Personalizar el panel", () -> { cerrar(); a.ui.postDelayed(() -> abrirEditor("temas"), 200); }, vista));
+        cab.addView(iconoBoton("M12 20h9 M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z", "Personalizar el panel", () -> { cerrar(); a.ui.postDelayed(a::personalizarPanel, 200); }, vista));
         cab.addView(iconoBoton("M18 6L6 18 M6 6l12 12", "Cerrar", this::cerrar, vista));
         h.addView(cab);
 
@@ -504,6 +505,7 @@ class Panel {
 
     // ================================================================ acciones
     boolean abrirIntent(Intent... opciones) {
+        if (a.externo) cerrar(); // la ventana del panel queda encima de todo: hay que quitarla primero
         for (Intent i : opciones) {
             if (i == null) continue;
             try { i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK); a.startActivity(i); return true; } catch (Exception e) { }
@@ -592,6 +594,7 @@ class Panel {
     }
 
     void expandirAjustesSamsung() {
+        if (a.ajustesRapidos()) return;
         try {
             @SuppressWarnings("WrongConstant") Object sb = a.getSystemService("statusbar");
             Class.forName("android.app.StatusBarManager").getMethod("expandSettingsPanel").invoke(sb);
@@ -1002,6 +1005,15 @@ class Panel {
     }
 
     void pestanaMas() {
+        if (a.externo) {
+            titulo("Desde dónde se baja");
+            contenido.addView(filaChips(new String[][]{{"derecha", "Mitad derecha"}, {"izquierda", "Mitad izquierda"}, {"toda", "Todo arriba"}}, pref("zona", "derecha"), v -> { poner("zona", v); a.actualizarTiles(); construirPestanas(); }));
+            nota("Deslizá hacia abajo desde arriba de la pantalla en ese lado. Del otro lado siguen saliendo las notificaciones de Samsung.");
+        } else pestanaMasLauncher();
+        pestanaMasComun();
+    }
+
+    void pestanaMasLauncher() {
         titulo("Cómo se abre el panel");
         String actual = "";
         for (String[] g : MainActivity.GESTOS) if ("panel".equals(a.accionDe(g[0]))) { actual = g[0]; break; }
@@ -1014,6 +1026,9 @@ class Panel {
         }));
         nota("Deslizá desde la mitad de la pantalla de inicio. Si deslizás desde el borde de arriba, Samsung abre el suyo.");
         interruptorSinVista("Rayita arriba en el inicio para abrirlo", prefB("panel_asa", true), v -> { poner("panel_asa", v); actualizarAsa(); });
+    }
+
+    void pestanaMasComun() {
         titulo("Qué mostrar");
         interruptor("Hora grande", prefB("panel_reloj", true), v -> poner("panel_reloj", v));
         interruptor("Barra de brillo", prefB("panel_brillo", true), v -> poner("panel_brillo", v));
@@ -1025,6 +1040,11 @@ class Panel {
         permiso("Apagar pantalla", "Administrador del dispositivo", a.puedeApagar(), a::pedirPermisoApagar);
         nota("Wi-Fi, Bluetooth y datos abren la ventanita de Android: desde Android 10, ninguna app los puede prender sola.");
 
+        if (!a.externo) pestanaTiles();
+        pestanaFinal();
+    }
+
+    void pestanaTiles() {
         titulo("Botones Meraki en el panel de Samsung");
         nota("Bajá el panel de Samsung → lápiz ✏️ → arrastrá los de Meraki: Panel Meraki, Apagar pantalla y estas 3 apps:");
         for (int n = 1; n <= 3; n++) {
@@ -1034,11 +1054,15 @@ class Panel {
             TextView t = a.texto("Botón " + k + ":  " + (ap != null ? ap.label : "escoger app"), 15, ap != null ? EF : a.acento, a.tf(false));
             t.setPadding(a.dp(12), a.dp(12), a.dp(12), a.dp(12));
             t.setBackground(a.caja(0x14FFFFFF, 12, 0));
-            t.setOnClickListener(v -> a.elegirApp("Botón " + k + " del panel de Samsung", x -> { poner("tile_app" + k, x.key()); Tiles.actualizar(a); construirPestanas(); }));
+            t.setOnClickListener(v -> a.elegirApp("Botón " + k + " del panel de Samsung", x -> { poner("tile_app" + k, x.key()); a.actualizarTiles(); construirPestanas(); }));
             contenido.addView(t, a.lp(-1, -2, 6));
         }
+    }
+
+    void pestanaFinal() {
         titulo("El panel de Samsung");
-        nota("Ninguna app instalada aparte puede cambiar el diseño del panel de Samsung. Lo que sí podés: con su lápiz ✏️ quitar Smart View, Modes y lo que no usés; y con QuickStar (de Good Lock, gratis) cambiarle colores y transparencia.");
+        nota(a.externo ? "Esta app tapa el panel de Samsung con el tuyo. El de Samsung lo podés seguir arreglando con su lápiz ✏️ y con QuickStar (de Good Lock, gratis)."
+                : "Para que el Panel Meraki salga al bajar desde arriba en cualquier pantalla, instalá la app «Meraki Panel». El de Samsung lo podés arreglar con su lápiz ✏️ y con QuickStar (de Good Lock, gratis).");
         TextView gl = a.texto("Abrir Good Lock en la Galaxy Store", 14, a.acento, a.tf(true));
         gl.setPadding(0, a.dp(10), 0, a.dp(4));
         gl.setOnClickListener(v -> abrirIntent(new Intent(Intent.ACTION_VIEW, Uri.parse("samsungapps://ProductDetail/com.samsung.android.goodlock")), new Intent(Intent.ACTION_VIEW, Uri.parse("https://galaxystore.samsung.com/detail/com.samsung.android.goodlock"))));

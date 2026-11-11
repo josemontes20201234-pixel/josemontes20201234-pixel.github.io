@@ -321,6 +321,7 @@ public class MainActivity extends Activity {
         construirInicio();
         cargarApps();
         cargarPaquete();
+        if (getIntent() != null && getIntent().getBooleanExtra("editor_panel", false)) ui.postDelayed(() -> panel().abrirEditor("temas"), 400);
     }
 
     @Override
@@ -375,6 +376,7 @@ public class MainActivity extends Activity {
         if (panel != null) panel.cerrar();
         if (i != null && i.getBooleanExtra("panel", false)) ui.postDelayed(() -> panel().abrir(), 120);
         if (i != null && i.getBooleanExtra("pedir_apagar", false)) pedirPermisoApagar();
+        if (i != null && i.getBooleanExtra("editor_panel", false)) ui.postDelayed(() -> panel().abrirEditor("temas"), 150);
         if (i != null && i.getBooleanExtra("ajustes_panel", false)) { abrirAjustes(); ui.postDelayed(this::irAjustesPanel, 250); }
     }
 
@@ -382,6 +384,10 @@ public class MainActivity extends Activity {
     Panel panel;
     View seccionPanel;
     Panel panel() { if (panel == null) panel = new Panel(this); return panel; }
+    final boolean externo = false;
+    void personalizarPanel() { panel().abrirEditor("temas"); }
+    void actualizarTiles() { Tiles.actualizar(this); }
+    boolean ajustesRapidos() { return false; }
 
     void irAjustesPanel() { if (ajustesScroll != null && seccionPanel != null) ajustesScroll.smoothScrollTo(0, Math.max(0, seccionPanel.getTop() - dp(10))); }
 
