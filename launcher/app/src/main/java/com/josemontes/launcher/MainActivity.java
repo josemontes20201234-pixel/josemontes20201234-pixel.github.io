@@ -388,6 +388,24 @@ public class MainActivity extends Activity {
     void personalizarPanel() { panel().abrirEditor("temas"); }
     void actualizarTiles() { Tiles.actualizar(this); }
     boolean ajustesRapidos() { return false; }
+    /** El launcher no puede prender Wi-Fi ni tocar botones de Samsung; eso lo hace Meraki Panel cuando está activo. */
+    boolean alternar(String id, Runnable ventanita) { return false; }
+
+    static final String PANEL_APP = "com.josemontes.panel";
+    boolean merakiPanelActivo() {
+        try {
+            String s = Settings.Secure.getString(getContentResolver(), Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES);
+            return s != null && s.contains(PANEL_APP + "/");
+        } catch (Exception e) { return false; }
+    }
+    /** Si Meraki Panel está activo, le pide que abra su panel (encima de todo, con los botones directos). */
+    boolean abrirPanelExterno() {
+        if (!merakiPanelActivo()) return false;
+        try { sendBroadcast(new Intent(PANEL_APP + ".ABRIR").setPackage(PANEL_APP)); return true; } catch (Exception e) { return false; }
+    }
+    void estiloCambiado() {
+        try { sendBroadcast(new Intent(PANEL_APP + ".ESTILO").setPackage(PANEL_APP)); } catch (Exception e) { }
+    }
 
     void irAjustesPanel() { if (ajustesScroll != null && seccionPanel != null) ajustesScroll.smoothScrollTo(0, Math.max(0, seccionPanel.getTop() - dp(10))); }
 

@@ -10,7 +10,10 @@
     <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
     <uses-permission android:name="android.permission.NFC" />
     <permission android:name="com.josemontes.launcher.permission.PANEL" android:protectionLevel="signature" />
+    <uses-permission android:name="com.josemontes.launcher.permission.PANEL" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <queries>
+        <package android:name="com.josemontes.panel" />
         <intent>
             <action android:name="android.intent.action.MAIN" />
             <category android:name="android.intent.category.LAUNCHER" />

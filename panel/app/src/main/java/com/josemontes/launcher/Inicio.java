@@ -83,7 +83,7 @@ public class Inicio extends Activity {
 
         boolean ok = activo();
         LinearLayout c1 = tarjeta(ok ? "✓  Está funcionando" : "1.  Activalo", ok ? 0xFF3DB46D : h.acento);
-        if (ok) nota(c1, "Si algún día deja de salir, revisá que siga activado en Accesibilidad.");
+        if (ok) nota(c1, "Deslizá hacia abajo desde arriba en el lado que escogiste. Si después de actualizar deja de salir, revisá que siga activado en Accesibilidad.");
         else {
             nota(c1, "Ajustes → Accesibilidad → Apps instaladas → «Meraki Panel» → activalo y aceptá.");
             c1.addView(boton("Abrir Accesibilidad", true, () -> MainActivity.abrirAccesibilidad(this)), h.lp(-1, -2, 12));
@@ -122,14 +122,14 @@ public class Inicio extends Activity {
                 : "Escogé tema, fondo, formas y botones viendo cómo queda.");
         c3.addView(boton("Personalizar el panel", true, () -> { if (hay) h.personalizarPanel(); else h.panel().abrirEditor("temas"); }), h.lp(-1, -2, 12));
         c3.addView(boton("Probar el panel", false, () -> {
-            if (Servicio.yo != null) { moveTaskToBack(true); h.ui.postDelayed(() -> { if (Servicio.yo != null) Servicio.yo.abrirPanel(); }, 350); }
+            if (Servicio.yo != null) { moveTaskToBack(true); h.ui.postDelayed(() -> { if (Servicio.yo != null) Servicio.yo.abrirPanel(false); }, 350); }
             else h.panel().abrir();
         }), h.lp(-1, -2, 10));
 
         LinearLayout c4 = tarjeta("Permisos de los botones", h.acento);
         permiso(c4, "Brillo y rotación", Settings.System.canWrite(this), () -> h.panel().pedirAjustes());
         permiso(c4, "Silencio y No molestar", h.panel().permisoNoMolestar(), () -> h.panel().pedirNoMolestar());
-        nota(c4, "Wi-Fi, Bluetooth y datos abren la ventanita de Android: desde Android 10 ninguna app los puede prender sola.");
+        nota(c4, "Wi-Fi y Bluetooth se prenden directo. Datos, modo avión, ubicación, ahorro, zona Wi-Fi, NFC y modo oscuro: Meraki Panel toca por vos ese botón en el panel de Samsung (sólo lee ese panel). Si no lo encuentra, abre la ventanita de Android.");
     }
 
     LinearLayout tarjeta(String titulo, int color) {

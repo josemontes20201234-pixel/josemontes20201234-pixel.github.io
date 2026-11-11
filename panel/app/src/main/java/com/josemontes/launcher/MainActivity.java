@@ -59,8 +59,8 @@ class MainActivity extends ContextWrapper {
     int acento = 0xFFD9B55C, FG = 0xFFF5F1E8;
     boolean claro;
     String letra = "moderna";
-    final Map<String, App> porKey = new HashMap<>();
-    final List<App> apps = new ArrayList<>();
+    Map<String, App> porKey = new HashMap<>();
+    List<App> apps = new ArrayList<>();
     Panel panel;
 
     static class App {
@@ -77,9 +77,22 @@ class MainActivity extends ContextWrapper {
         int nb = getResources().getIdentifier("navigation_bar_height", "dimen", "android");
         insetArriba = sb > 0 ? getResources().getDimensionPixelSize(sb) : dp(28);
         insetAbajo = nb > 0 ? getResources().getDimensionPixelSize(nb) : dp(16);
-        sincronizar();
         leerConfig();
-        cargarApps();
+        if (act != null) { sincronizar(); leerConfig(); cargarApps(); }
+        else refrescarEnFondo(); // en el servicio nada pesado al abrir: se prepara antes, en segundo plano
+    }
+
+    final java.util.concurrent.atomic.AtomicBoolean refrescando = new java.util.concurrent.atomic.AtomicBoolean();
+    /** Copia el estilo del launcher y la lista de apps sin trabar la pantalla. */
+    void refrescarEnFondo() {
+        if (!refrescando.compareAndSet(false, true)) return;
+        new Thread(() -> {
+            try {
+                sincronizar();
+                final List<App> l = leerApps();
+                ui.post(() -> { setApps(l); leerConfig(); refrescando.set(false); });
+            } catch (Throwable t) { refrescando.set(false); }
+        }).start();
     }
 
     Panel panel() { if (panel == null) panel = new Panel(this); return panel; }
@@ -127,17 +140,24 @@ class MainActivity extends ContextWrapper {
         FG = claro ? 0xFF141414 : 0xFFF5F1E8;
     }
 
-    void cargarApps() {
-        apps.clear(); porKey.clear();
+    void cargarApps() { setApps(leerApps()); }
+    List<App> leerApps() {
+        List<App> l = new ArrayList<>();
         PackageManager pm = getPackageManager();
         Intent i = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER);
         for (ResolveInfo r : pm.queryIntentActivities(i, 0)) {
             App a = new App();
             a.pkg = r.activityInfo.packageName; a.cls = r.activityInfo.name;
-            CharSequence l = r.loadLabel(pm); a.label = l == null ? a.pkg : l.toString();
-            apps.add(a); porKey.put(a.key(), a);
+            CharSequence t = r.loadLabel(pm); a.label = t == null ? a.pkg : t.toString();
+            l.add(a);
         }
-        Collections.sort(apps, (x, y) -> x.label.compareToIgnoreCase(y.label));
+        Collections.sort(l, (x, y) -> x.label.compareToIgnoreCase(y.label));
+        return l;
+    }
+    void setApps(List<App> l) {
+        Map<String, App> m = new HashMap<>();
+        for (App a : l) m.put(a.key(), a);
+        apps = l; porKey = m;
     }
 
     // ================================================================ utilidades (iguales a las del launcher)
@@ -195,6 +215,7 @@ class MainActivity extends ContextWrapper {
 
     void bajarNotificaciones() {
         Servicio s = Servicio.yo;
+        if (s != null) s.pausarFranja();
         if (s != null && s.performGlobalAction(AccessibilityService.GLOBAL_ACTION_NOTIFICATIONS)) return;
         try {
             @SuppressWarnings("WrongConstant") Object sb = getSystemService("statusbar");
@@ -242,6 +263,43 @@ class MainActivity extends ContextWrapper {
         }
         startActivity(new Intent(this, Inicio.class).putExtra("editor", true).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
     }
+    boolean abrirPanelExterno() { return false; } // aquí el panel ya es este
+    void estiloCambiado() { if (Servicio.yo != null && Servicio.yo.host != null) Servicio.yo.host.refrescarEnFondo(); }
+
+    /**
+     * Cambiar algo sin abrir la ventanita de Android. Wi-Fi y Bluetooth se cambian directo (la app está hecha
+     * en modo Android 9, que todavía lo permite). Lo demás lo toca el servicio en el panel de Samsung.
+     */
+    boolean alternar(String id, Runnable ventanita) {
+        switch (id) {
+            case "wifi": {
+                final android.net.wifi.WifiManager w = (android.net.wifi.WifiManager) getApplicationContext().getSystemService(WIFI_SERVICE);
+                if (w == null) return false;
+                final boolean on = w.isWifiEnabled();
+                boolean ok;
+                try { ok = w.setWifiEnabled(!on); } catch (Throwable e) { ok = false; }
+                if (!ok) return false;
+                if (!on) ui.postDelayed(() -> {
+                    // Si Android pidió permiso para prenderlo, el aviso queda debajo del panel: se cierra para que se vea
+                    int st = w.getWifiState();
+                    if (st != android.net.wifi.WifiManager.WIFI_STATE_ENABLED && st != android.net.wifi.WifiManager.WIFI_STATE_ENABLING && panel != null) panel.cerrar();
+                }, 1800);
+                return true;
+            }
+            case "bt": {
+                android.bluetooth.BluetoothAdapter b = android.bluetooth.BluetoothAdapter.getDefaultAdapter();
+                if (b == null) return false;
+                try { return b.isEnabled() ? b.disable() : b.enable(); } catch (Throwable e) { return false; }
+            }
+            case "datos": case "avion": case "ubicacion": case "ahorro": case "hotspot": case "nfc": case "oscuro": {
+                Servicio s = Servicio.yo;
+                if (s == null || srv == null) return false; // sólo desde el panel que sale encima de todo
+                return s.tocarBotonSamsung(id, ventanita);
+            }
+        }
+        return false;
+    }
+
     void actualizarTiles() { if (Servicio.yo != null) Servicio.yo.actualizarFranja(); }
 
     void startActivityForResult(Intent i, int rc) {

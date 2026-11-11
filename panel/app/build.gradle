@@ -12,7 +12,9 @@ android {
     defaultConfig {
         applicationId 'com.josemontes.panel'
         minSdk 28
-        targetSdk 34
+        // Modo Android 9 a propósito: es el último en el que Android deja que una app prenda y apague
+        // el Wi-Fi y el Bluetooth directo. Android 15 instala apps desde el modo 7 (API 24) en adelante.
+        targetSdk 28
         versionCode build
         versionName "1.0." + build
     }

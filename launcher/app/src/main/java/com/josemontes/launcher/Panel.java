@@ -281,10 +281,19 @@ class Panel {
 
     // ================================================================ abrir y cerrar
     void abrir() {
-        if (abierto()) return;
+        if (a.abrirPanelExterno()) return; // con Meraki Panel activo, sale ese (encima de todo y con los botones directos)
+        if (!montar()) return;
+        hoja.setTranslationY(-a.dp(500)); hoja.setAlpha(0f); capa.setAlpha(0f);
+        capa.animate().alpha(1f).setDuration(150).start();
+        hoja.animate().translationY(0).alpha(1f).setDuration(200).setInterpolator(new android.view.animation.DecelerateInterpolator(2f)).start();
+    }
+
+    boolean montar() {
+        if (abierto()) return false;
+        siguiendo = false;
         a.cerrarCajon();
         capa = new FrameLayout(a);
-        capa.setBackgroundColor(0x73000000);
+        capa.setBackgroundColor(a.externo ? 0x9E000000 : 0x73000000);
         capa.setClickable(true);
         capa.setOnClickListener(v -> cerrar());
         hoja = crearHoja(false);
@@ -293,11 +302,36 @@ class Panel {
         capa.addView(hoja, lh);
         cerrarDeslizando(hoja);
         a.root.addView(capa, new FrameLayout.LayoutParams(-1, -1));
-        hoja.setTranslationY(-a.dp(500)); hoja.setAlpha(0f); capa.setAlpha(0f);
-        capa.animate().alpha(1f).setDuration(160).start();
-        hoja.animate().translationY(0).alpha(1f).setDuration(240).setInterpolator(new android.view.animation.DecelerateInterpolator(2f)).start();
         prepararLinterna();
         a.ui.removeCallbacks(tic); a.ui.post(tic);
+        return true;
+    }
+
+    // ===== abrir siguiendo el dedo (desde la franja de arriba de Meraki Panel)
+    boolean siguiendo;
+    float alto() { return hoja.getHeight() > 0 ? hoja.getHeight() + a.insetArriba + a.dp(8) : a.getResources().getDisplayMetrics().heightPixels; }
+    void abrirSiguiendo() {
+        if (!montar()) return;
+        siguiendo = true;
+        hoja.setAlpha(1f);
+        hoja.setTranslationY(-a.getResources().getDisplayMetrics().heightPixels);
+        capa.setAlpha(0f);
+    }
+    void seguir(float dy) {
+        if (!siguiendo || hoja == null || hoja.getHeight() == 0) return;
+        float h = alto(), d = Math.max(0f, Math.min(h, dy * 1.15f));
+        hoja.setTranslationY(d - h);
+        capa.setAlpha(Math.min(1f, d / h * 1.8f));
+    }
+    void soltar(float dy, float vy) {
+        if (!siguiendo || hoja == null) return;
+        siguiendo = false;
+        float h = alto(), d = Math.max(0f, Math.min(h, dy * 1.15f));
+        if (vy > a.dp(350) || d > h * 0.3f || vy > -a.dp(150) && d > h * 0.15f) {
+            int ms = Math.max(110, Math.min(220, Math.round((h - d) / h * 260)));
+            capa.animate().alpha(1f).setDuration(ms).start();
+            hoja.animate().translationY(0).setDuration(ms).setInterpolator(new android.view.animation.DecelerateInterpolator(1.6f)).start();
+        } else cerrar();
     }
 
     void cerrar() {
@@ -466,7 +500,7 @@ class Panel {
         pintar.run();
         if (!vista) {
             refrescos.add(pintar);
-            cont.setOnClickListener(v -> { tocar(id); a.ui.postDelayed(this::refrescar, 300); a.ui.postDelayed(this::refrescar, 1200); });
+            cont.setOnClickListener(v -> { tocar(id); a.ui.postDelayed(this::refrescar, 300); a.ui.postDelayed(this::refrescar, 1200); a.ui.postDelayed(this::refrescar, 2600); });
             cont.setOnLongClickListener(v -> { mantener(id); return true; });
         }
         cont.setContentDescription(nombreBoton(id));
@@ -489,7 +523,10 @@ class Panel {
                 case "wifi": { WifiManager w = (WifiManager) a.getApplicationContext().getSystemService(Context.WIFI_SERVICE); return w != null && w.isWifiEnabled(); }
                 case "bt": { BluetoothAdapter b = BluetoothAdapter.getDefaultAdapter(); return b != null && b.isEnabled(); }
                 case "linterna": return linternaOn;
-                case "datos": return Settings.Global.getInt(cr, "mobile_data", 0) == 1;
+                case "datos": {
+                    try { android.telephony.TelephonyManager tm = (android.telephony.TelephonyManager) a.getSystemService(Context.TELEPHONY_SERVICE); if (tm != null) return tm.isDataEnabled(); } catch (Exception e) { }
+                    return Settings.Global.getInt(cr, "mobile_data", 0) == 1;
+                }
                 case "sonido": { AudioManager am = (AudioManager) a.getSystemService(Context.AUDIO_SERVICE); return am.getRingerMode() == AudioManager.RINGER_MODE_NORMAL; }
                 case "rotacion": return Settings.System.getInt(cr, Settings.System.ACCELEROMETER_ROTATION, 0) == 1;
                 case "ubicacion": { LocationManager lm = (LocationManager) a.getSystemService(Context.LOCATION_SERVICE); return Build.VERSION.SDK_INT >= 28 && lm != null && lm.isLocationEnabled(); }
@@ -537,10 +574,10 @@ class Panel {
         ContentResolver cr = a.getContentResolver();
         if (id.startsWith("app:")) { MainActivity.App ap = a.porKey.get(id.substring(4)); cerrar(); if (ap != null) a.lanzar(ap); else a.toast("Esa app ya no está."); return; }
         switch (id) {
-            case "wifi": abrirIntent(Build.VERSION.SDK_INT >= 29 ? accion(Settings.Panel.ACTION_WIFI) : null, accion(Settings.ACTION_WIFI_SETTINGS)); break;
-            case "bt": abrirIntent(accion(Settings.ACTION_BLUETOOTH_SETTINGS)); break;
+            case "wifi": probar(id, () -> abrirIntent(Build.VERSION.SDK_INT >= 29 ? accion(Settings.Panel.ACTION_WIFI) : null, accion(Settings.ACTION_WIFI_SETTINGS))); break;
+            case "bt": probar(id, () -> abrirIntent(accion(Settings.ACTION_BLUETOOTH_SETTINGS))); break;
             case "linterna": cambiarLinterna(); break;
-            case "datos": abrirIntent(Build.VERSION.SDK_INT >= 29 ? accion(Settings.Panel.ACTION_INTERNET_CONNECTIVITY) : null, accion(Settings.ACTION_WIRELESS_SETTINGS)); break;
+            case "datos": probar(id, () -> abrirIntent(Build.VERSION.SDK_INT >= 29 ? accion(Settings.Panel.ACTION_INTERNET_CONNECTIVITY) : null, accion(Settings.ACTION_WIRELESS_SETTINGS))); break;
             case "sonido": {
                 AudioManager am = (AudioManager) a.getSystemService(Context.AUDIO_SERVICE);
                 int m = am.getRingerMode();
@@ -554,8 +591,8 @@ class Panel {
             case "rotacion":
                 if (necesitaAjustes()) { boolean r = Settings.System.getInt(cr, Settings.System.ACCELEROMETER_ROTATION, 0) == 1; Settings.System.putInt(cr, Settings.System.ACCELEROMETER_ROTATION, r ? 0 : 1); a.toast(r ? "Rotación bloqueada" : "Rotación automática"); }
                 break;
-            case "ubicacion": abrirIntent(accion(Settings.ACTION_LOCATION_SOURCE_SETTINGS)); break;
-            case "ahorro": abrirIntent(accion(Settings.ACTION_BATTERY_SAVER_SETTINGS), accion(Settings.ACTION_SETTINGS)); break;
+            case "ubicacion": probar(id, () -> abrirIntent(accion(Settings.ACTION_LOCATION_SOURCE_SETTINGS))); break;
+            case "ahorro": probar(id, () -> abrirIntent(accion(Settings.ACTION_BATTERY_SAVER_SETTINGS), accion(Settings.ACTION_SETTINGS))); break;
             case "nomolestar":
                 if (necesitaNoMolestar()) {
                     NotificationManager nm = (NotificationManager) a.getSystemService(Context.NOTIFICATION_SERVICE);
@@ -568,17 +605,20 @@ class Panel {
             case "samsung": cerrar(); expandirAjustesSamsung(); break;
             case "notis": cerrar(); a.bajarNotificaciones(); break;
             case "ajustes": abrirIntent(accion(Settings.ACTION_SETTINGS)); break;
-            case "avion": abrirIntent(accion(Settings.ACTION_AIRPLANE_MODE_SETTINGS)); break;
-            case "oscuro": abrirIntent(accion(Settings.ACTION_DISPLAY_SETTINGS)); break;
-            case "hotspot": abrirIntent(componente("com.android.settings", "com.android.settings.TetherSettings"), componente("com.android.settings", "com.android.settings.Settings$TetherSettingsActivity"), accion(Settings.ACTION_WIRELESS_SETTINGS)); break;
+            case "avion": probar(id, () -> abrirIntent(accion(Settings.ACTION_AIRPLANE_MODE_SETTINGS))); break;
+            case "oscuro": probar(id, () -> abrirIntent(accion(Settings.ACTION_DISPLAY_SETTINGS))); break;
+            case "hotspot": probar(id, () -> abrirIntent(componente("com.android.settings", "com.android.settings.TetherSettings"), componente("com.android.settings", "com.android.settings.Settings$TetherSettingsActivity"), accion(Settings.ACTION_WIRELESS_SETTINGS))); break;
             case "espejo": abrirIntent(a.getPackageManager().getLaunchIntentForPackage("com.samsung.android.smartmirroring"), accion("android.settings.CAST_SETTINGS"), accion(Settings.ACTION_WIRELESS_SETTINGS)); break;
-            case "nfc": abrirIntent(accion(Settings.ACTION_NFC_SETTINGS), accion(Settings.ACTION_WIRELESS_SETTINGS)); break;
+            case "nfc": probar(id, () -> abrirIntent(accion(Settings.ACTION_NFC_SETTINGS), accion(Settings.ACTION_WIRELESS_SETTINGS))); break;
             case "volumen": abrirIntent(Build.VERSION.SDK_INT >= 29 ? accion(Settings.Panel.ACTION_VOLUME) : null, accion(Settings.ACTION_SOUND_SETTINGS)); break;
             case "camara": cerrar(); abrirIntent(accion(MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA)); break;
             case "alarma": cerrar(); abrirIntent(accion(AlarmClock.ACTION_SHOW_ALARMS)); break;
             case "calc": cerrar(); abrirIntent(Intent.makeMainSelectorActivity(Intent.ACTION_MAIN, Intent.CATEGORY_APP_CALCULATOR), a.getPackageManager().getLaunchIntentForPackage("com.sec.android.app.popupcalculator")); break;
         }
     }
+
+    /** Primero intenta cambiarlo sin salir del panel; si no se puede, abre la ventanita de Android. */
+    void probar(String id, Runnable ventanita) { if (!a.alternar(id, ventanita)) ventanita.run(); }
 
     void mantener(String id) {
         switch (id) {
@@ -755,6 +795,7 @@ class Panel {
         ed = null;
         e.animate().alpha(0f).setDuration(140).withEndAction(() -> { if (e.getParent() != null) ((ViewGroup) e.getParent()).removeView(e); }).start();
         actualizarAsa();
+        a.estiloCambiado();
     }
 
     void cambio() { repintarVista(); construirPestanas(); }
@@ -1038,7 +1079,8 @@ class Panel {
         permiso("Brillo y rotación", "Modificar ajustes del sistema", permisoAjustes(), this::pedirAjustes);
         permiso("Silencio y No molestar", "Acceso a No molestar", permisoNoMolestar(), this::pedirNoMolestar);
         permiso("Apagar pantalla", "Administrador del dispositivo", a.puedeApagar(), a::pedirPermisoApagar);
-        nota("Wi-Fi, Bluetooth y datos abren la ventanita de Android: desde Android 10, ninguna app los puede prender sola.");
+        nota(a.externo ? "Wi-Fi y Bluetooth se prenden directo. Datos, modo avión, ubicación, ahorro, zona Wi-Fi, NFC y modo oscuro: Meraki Panel toca por vos ese botón en el panel de Samsung."
+                : "Con la app Meraki Panel activada, Wi-Fi, Bluetooth, datos y los demás se cambian directo. Sin ella, abren la ventanita de Android.");
 
         if (!a.externo) pestanaTiles();
         pestanaFinal();
