@@ -1,5 +1,5 @@
 // Meraki Academy: guarda la app para que abra sin internet.
-const CACHE = "meraki-academy-v7";
+const CACHE = "meraki-academy-v8";
 const SHELL = ["./", "./index.html", "./manifest.json", "./icon-192.png", "./icon-512.png", "./maskable-512.png"];
 
 self.addEventListener("install", e => {
