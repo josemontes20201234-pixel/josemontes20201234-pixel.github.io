@@ -146,7 +146,9 @@ class Barberia {
         }
         // apps de trabajo en modo barbería
         if (modo) {
-            List<MainActivity.App> apps = appsTrabajo();
+            List<MainActivity.App> apps = new ArrayList<>(appsTrabajo());
+            // las que ya están en la fila de accesos grandes no se repiten aquí
+            if (a.prefs.getBoolean("ver_accesos", true)) apps.removeAll(a.accesos());
             if (!apps.isEmpty()) {
                 LinearLayout fa = new LinearLayout(a);
                 for (MainActivity.App ap : apps) {

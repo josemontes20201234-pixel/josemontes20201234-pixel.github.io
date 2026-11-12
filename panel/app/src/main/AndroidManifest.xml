@@ -45,5 +45,23 @@
             </intent-filter>
             <meta-data android:name="android.accessibilityservice" android:resource="@xml/accesibilidad" />
         </service>
+        <!-- Música: sólo lee los reproductores (Spotify, YouTube Music…) para el panel y el inicio -->
+        <service
+            android:name="com.josemontes.launcher.Oyente"
+            android:exported="true"
+            android:label="Meraki Panel · música"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
+        <receiver
+            android:name="com.josemontes.launcher.ReceptorMusica"
+            android:exported="true"
+            android:permission="com.josemontes.launcher.permission.PANEL">
+            <intent-filter>
+                <action android:name="com.josemontes.panel.MUSICA" />
+            </intent-filter>
+        </receiver>
     </application>
 </manifest>

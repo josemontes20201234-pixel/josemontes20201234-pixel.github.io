@@ -317,6 +317,12 @@ class MainActivity extends ContextWrapper {
 
     void actualizarTiles() { if (Servicio.yo != null) Servicio.yo.actualizarFranja(); }
 
+    /** Controles de la música del panel: aquí mismo está el que la lee (Oyente). */
+    void musicaControl(String c) {
+        if ("abrir".equals(c) && panel != null) panel.cerrar();
+        Oyente.control(this, c);
+    }
+
     void startActivityForResult(Intent i, int rc) {
         if (act != null) act.startActivityForResult(i, rc); else toast("Abrí Meraki Panel para escoger la foto.");
     }

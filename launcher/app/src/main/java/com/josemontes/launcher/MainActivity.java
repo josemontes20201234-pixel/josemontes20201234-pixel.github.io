@@ -324,6 +324,7 @@ public class MainActivity extends Activity {
         awm = AppWidgetManager.getInstance(this);
         host = new Anfitrion(this, 1024);
         Insignias.alCambiar = () -> { adapter.notifyDataSetChanged(); pintarFavoritos(); pintarSugeridas(); };
+        Musica.oyentes.add(oyenteMusica);
         construir();
         aplicarFondo();
         estilizarCajon();
@@ -331,6 +332,12 @@ public class MainActivity extends Activity {
         cargarApps();
         cargarPaquete();
         if (getIntent() != null && getIntent().getBooleanExtra("editor_panel", false)) ui.postDelayed(() -> panel().abrirEditor("temas"), 400);
+    }
+
+    @Override
+    protected void onDestroy() {
+        Musica.oyentes.remove(oyenteMusica);
+        super.onDestroy();
     }
 
     @Override
@@ -359,6 +366,7 @@ public class MainActivity extends Activity {
         if (panel != null && panel.abierto()) panel.refrescar();
         barberia().pintarTarjeta();
         barberia().cargarTarjetaMeraki(false);
+        musicaControl("pedir"); // que Meraki Panel diga qué suena
         cargarAgenda();
         cargarApps();
         cargarClima(false);
@@ -811,6 +819,7 @@ public class MainActivity extends Activity {
         homeBox.removeAllViews();
         infoViews.clear(); diales.clear(); fechas.clear();
         agendaLista = null; agendaCaja = null; agendaTitulo = null; widgetBox = null; scrollMedio = null; dockScroll = null; puntosDock = null;
+        accesosCaja = null; musicaCaja = null;
         diaConstruido = hoyClave();
         View v;
         switch (estilo) {
@@ -837,6 +846,21 @@ public class MainActivity extends Activity {
         if (prefs.getBoolean("ver_barberia", true)) {
             LinearLayout.LayoutParams pb = lp(-1, -2, 0); pb.bottomMargin = dp(12);
             c.addView(barberia().tarjetaHoy(), pb);
+        }
+        // accesos Meraki en grande, la música que suena y el versículo del día
+        if (prefs.getBoolean("ver_accesos", true)) {
+            accesosCaja = new LinearLayout(this);
+            LinearLayout.LayoutParams pa = lp(-1, -2, 0); pa.bottomMargin = dp(12);
+            c.addView(accesosCaja, pa);
+            pintarAccesos();
+        }
+        musicaCaja = new FrameLayout(this);
+        LinearLayout.LayoutParams pmu = lp(-1, -2, 0); pmu.bottomMargin = dp(12);
+        c.addView(musicaCaja, pmu);
+        pintarMusica();
+        if (prefs.getBoolean("ver_versiculo", true)) {
+            LinearLayout.LayoutParams pv = lp(-1, -2, 0); pv.bottomMargin = dp(12);
+            c.addView(tarjetaVersiculo(), pv);
         }
         if (conAgenda && verAgenda) c.addView(tarjetaAgenda(agendaCompacta), lp(-1, -2, 0));
         widgetBox = columnaBase();
@@ -1730,7 +1754,161 @@ public class MainActivity extends Activity {
         guardarFavs(favs);
     }
 
+    // =====================================================================
+    // accesos Meraki en grande
+    // =====================================================================
+    LinearLayout accesosCaja;
+    static final String[] ACCESOS_INICIALES = {"io.github.josemontes20201234_pixel.twa", "com.josemontes.academy", "com.josemontes.alumnos", "com.josemontes.proyector"};
+
+    /** Las apps de la fila grande: las que Jose escogió o, si no, Tarjeta Meraki, Academy, Alumnos y Proyector. */
+    List<App> accesos() {
+        List<App> r = new ArrayList<>();
+        String g = prefs.getString("accesos_apps", null);
+        if (g != null) { for (String k : g.split(",")) { App ap = porKey.get(k); if (ap != null) r.add(ap); } return r; }
+        for (String pkg : ACCESOS_INICIALES) for (App ap : todas) if (ap.pkg.equals(pkg)) { r.add(ap); break; }
+        if (r.size() < 4) for (App ap : todas) {
+            String l = ap.label == null ? "" : ap.label.toLowerCase(Locale.ROOT);
+            if (r.size() >= 4) break;
+            if (l.contains("meraki") && !r.contains(ap) && !ap.pkg.equals(getPackageName()) && !ap.pkg.equals(PANEL_APP)) r.add(ap);
+        }
+        return r;
+    }
+
+    String nombreCorto(App ap) {
+        if (ap.pkg.equals("io.github.josemontes20201234_pixel.twa")) return "Tarjeta";
+        String l = ap.label == null ? "" : ap.label;
+        return l.toLowerCase(Locale.ROOT).startsWith("meraki ") && l.length() > 7 ? l.substring(7) : l;
+    }
+
+    void pintarAccesos() {
+        if (accesosCaja == null) return;
+        accesosCaja.removeAllViews();
+        List<App> l = accesos();
+        accesosCaja.setVisibility(l.isEmpty() ? View.GONE : View.VISIBLE);
+        for (int i = 0; i < l.size(); i++) {
+            final App ap = l.get(i);
+            LinearLayout t = columnaBase();
+            t.setGravity(Gravity.CENTER_HORIZONTAL);
+            t.setBackground(caja(CARD, 18, LINEA));
+            t.setPadding(dp(4), dp(12), dp(4), dp(10));
+            ImageView iv = new ImageView(this);
+            iv.setImageDrawable(icono(ap, dp(52)));
+            t.addView(iv, new LinearLayout.LayoutParams(dp(46), dp(46)));
+            TextView n = texto(nombreCorto(ap), 12.5f, FG, tf(true));
+            n.setGravity(Gravity.CENTER); n.setMaxLines(1); n.setEllipsize(TextUtils.TruncateAt.END);
+            t.addView(n, lp(-1, -2, 8));
+            t.setContentDescription(ap.label);
+            t.setOnClickListener(v -> lanzar(ap));
+            t.setOnLongClickListener(v -> { elegirAccesos(); return true; });
+            LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(0, -2, 1f);
+            if (i > 0) p.leftMargin = dp(8);
+            accesosCaja.addView(t, p);
+        }
+    }
+
+    void elegirAccesos() {
+        final List<App> lista = new ArrayList<>(todas);
+        final List<App> act = accesos();
+        String[] n = new String[lista.size()];
+        boolean[] sel = new boolean[lista.size()];
+        for (int i = 0; i < lista.size(); i++) { n[i] = lista.get(i).label; sel[i] = act.contains(lista.get(i)); }
+        dialogo().setTitle("Accesos grandes (hasta 4)").setMultiChoiceItems(n, sel, (d, w, c) -> sel[w] = c).setPositiveButton("Guardar", (d, w) -> {
+            List<String> k = new ArrayList<>();
+            // primero las que ya estaban, en su orden; después las nuevas
+            for (App ap : act) { int i = lista.indexOf(ap); if (i >= 0 && sel[i]) k.add(ap.key()); }
+            for (int i = 0; i < lista.size(); i++) if (sel[i] && !k.contains(lista.get(i).key())) k.add(lista.get(i).key());
+            if (k.size() > 4) { toast("Caben 4: se quedan las primeras 4."); k = new ArrayList<>(k.subList(0, 4)); }
+            prefs.edit().putString("accesos_apps", TextUtils.join(",", k)).apply();
+            pintarAccesos();
+            barberia().pintarTarjeta();
+            if (ajustes.getVisibility() == View.VISIBLE) construirAjustes();
+        }).setNegativeButton("Cancelar", null).show();
+    }
+
+    // =====================================================================
+    // versículo del día (Reina-Valera 1960)
+    // =====================================================================
+    View tarjetaVersiculo() {
+        final String[] v = Versiculos.deHoy(0);
+        LinearLayout c = columnaBase();
+        c.setBackground(caja(CARD, 18, LINEA));
+        c.setPadding(dp(18), dp(14), dp(18), dp(14));
+        c.addView(etiqueta("Versículo del día", acento));
+        TextView t = texto("«" + v[1] + "»", 15.5f, FG, "clasica".equals(letra) ? tf(false) : Typeface.create(Typeface.SERIF, Typeface.NORMAL));
+        t.setLineSpacing(dp(3), 1f);
+        t.setMaxLines(7); t.setEllipsize(TextUtils.TruncateAt.END);
+        c.addView(t, lp(-1, -2, 10));
+        c.addView(texto(v[0] + "  ·  RVR1960", 12.5f, MUTED, tf(false)), lp(-1, -2, 8));
+        c.setOnClickListener(x -> verVersiculo(v));
+        return c;
+    }
+
+    void verVersiculo(String[] v) {
+        TextView t = texto("«" + v[1] + "»\n\n" + v[0] + " (RVR1960)", 17, FG, Typeface.create(Typeface.SERIF, Typeface.NORMAL));
+        t.setLineSpacing(dp(4), 1f);
+        t.setTextIsSelectable(true);
+        TextView aviso = texto(Versiculos.AVISO, 11, MUTED, tf(false));
+        LinearLayout col = columnaBase();
+        col.setPadding(dp(24), dp(12), dp(24), 0);
+        col.addView(t);
+        col.addView(aviso, lp(-1, -2, 18));
+        ScrollView sv = new ScrollView(this); sv.addView(col);
+        final String compartido = "«" + v[1] + "»\n— " + v[0] + " (RVR1960)";
+        dialogo().setTitle("Versículo del día").setView(sv)
+                .setPositiveButton("Compartir", (d, w) -> {
+                    Intent i = new Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, compartido);
+                    try { startActivity(Intent.createChooser(i, "Compartir versículo")); } catch (Exception e) { }
+                })
+                .setNeutralButton("Copiar", (d, w) -> {
+                    ((android.content.ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE)).setPrimaryClip(android.content.ClipData.newPlainText("versículo", compartido));
+                    toast("Versículo copiado");
+                })
+                .setNegativeButton("Cerrar", null).show();
+    }
+
+    // =====================================================================
+    // música que suena (la lee Meraki Panel y la manda aquí)
+    // =====================================================================
+    FrameLayout musicaCaja;
+    final Runnable oyenteMusica = this::pintarMusica;
+
+    void pintarMusica() {
+        if (musicaCaja == null) return;
+        musicaCaja.removeAllViews();
+        Musica.Estado e = Musica.actual;
+        boolean ver = e != null && prefs.getBoolean("ver_musica", true);
+        musicaCaja.setVisibility(ver ? View.VISIBLE : View.GONE);
+        if (ver) musicaCaja.addView(Musica.tarjeta(this, e, FG, MUTED, CARD, LINEA, acento, null));
+    }
+
+    /** Controles de la tarjetita: los cumple Meraki Panel, que es el que tiene acceso a la música. */
+    void musicaControl(String c) {
+        Musica.Estado e = Musica.actual;
+        if ("abrir".equals(c)) {
+            if (e == null || e.pkg.isEmpty()) return;
+            Intent i = getPackageManager().getLaunchIntentForPackage(e.pkg);
+            if (i != null) abrir(i, "No se pudo abrir " + (e.app.isEmpty() ? "la música" : e.app) + ".");
+            return;
+        }
+        if (e != null && ("play".equals(c) || "pausa".equals(c))) e.sonando = "play".equals(c);
+        try { sendBroadcast(new Intent(Musica.ACCION_CONTROL).setPackage(Musica.PANEL).putExtra("c", c), Musica.PERMISO); } catch (Exception x) { }
+    }
+
+    String estadoMusica() {
+        boolean hay = false;
+        try { getPackageManager().getPackageInfo(PANEL_APP, 0); hay = true; } catch (Exception e) { }
+        if (!hay) return "Necesita la app Meraki Panel";
+        if (!prefs.getBoolean("musica_acceso", false)) return "Falta activar «Acceso a notificaciones» en Meraki Panel · tocá para abrirla";
+        return Musica.actual == null ? "Listo · sale cuando suena algo" : "Sonando: " + Musica.actual.titulo;
+    }
+
+    void abrirMerakiPanel() {
+        Intent i = getPackageManager().getLaunchIntentForPackage(PANEL_APP);
+        if (i != null) abrir(i, "No se pudo abrir Meraki Panel."); else toast("Instalá Meraki Panel primero.");
+    }
+
     void pintarFavoritos() {
+        pintarAccesos();
         if (favBox == null) return;
         favBox.removeAllViews();
         List<String> keys = new ArrayList<>();
@@ -2097,6 +2275,11 @@ public class MainActivity extends Activity {
         opcion(l, "Fondo de pantalla del teléfono", "Abre el selector de fondos de tu cel", this::cambiarFondoPantalla);
 
         seccion(l, "Qué mostrar");
+        interruptor(l, "Accesos Meraki en grande", prefs.getBoolean("ver_accesos", true), v -> guardar("ver_accesos", v));
+        opcion(l, "Accesos grandes: escoger apps", accesos().size() + " apps · también manteniendo presionado uno", this::elegirAccesos);
+        interruptor(l, "Versículo del día (RVR1960)", prefs.getBoolean("ver_versiculo", true), v -> guardar("ver_versiculo", v));
+        interruptor(l, "Música que suena", prefs.getBoolean("ver_musica", true), v -> guardar("ver_musica", v));
+        opcion(l, "Música: cómo va", estadoMusica(), this::abrirMerakiPanel);
         interruptor(l, "Clima de Apopa", verClima, v -> { guardar("ver_clima", v); if (v) cargarClima(true); });
         interruptor(l, "Batería", verBateria, v -> guardar("ver_bateria", v));
         interruptor(l, "Agenda de hoy", verAgenda, v -> guardar("ver_agenda", v));

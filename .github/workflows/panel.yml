@@ -2,7 +2,7 @@ name: Meraki Panel APK
 on:
   push:
     branches: [main]
-    paths: ['panel/**', 'launcher/app/src/main/java/com/josemontes/launcher/Panel.java', '.github/workflows/panel.yml']
+    paths: ['panel/**', 'launcher/app/src/main/java/com/josemontes/launcher/Panel.java', 'launcher/app/src/main/java/com/josemontes/launcher/Musica.java', '.github/workflows/panel.yml']
   workflow_dispatch:
 permissions:
   contents: write

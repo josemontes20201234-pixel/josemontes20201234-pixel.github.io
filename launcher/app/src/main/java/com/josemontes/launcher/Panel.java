@@ -334,8 +334,11 @@ class Panel {
         } else cerrar();
     }
 
+    Runnable oyenteMusica;
+
     void cerrar() {
         if (!abierto()) return;
+        if (oyenteMusica != null) { Musica.oyentes.remove(oyenteMusica); oyenteMusica = null; }
         a.ui.removeCallbacks(tic);
         final FrameLayout c = capa;
         capa = null;
@@ -429,6 +432,22 @@ class Panel {
 
         if (prefB("panel_brillo", true)) h.addView(barraBrillo(vista), A.lp(-1, -2, 16));
         if (prefB("panel_volumen", true)) h.addView(barraVolumen(vista), A.lp(-1, -2, 10));
+
+        // la música que suena (la lee Meraki Panel); se esconde cuando no suena nada
+        if (!vista && prefB("panel_musica", true)) {
+            final FrameLayout mus = new FrameLayout(a);
+            h.addView(mus, A.lp(-1, -2, 14));
+            Runnable pm = () -> {
+                mus.removeAllViews();
+                Musica.Estado e = Musica.actual;
+                mus.setVisibility(e == null ? View.GONE : View.VISIBLE);
+                if (e != null) mus.addView(Musica.tarjeta(a, e, fg(), muted(), botonApagado(), 0, colorOn(), this::cerrar));
+            };
+            pm.run();
+            if (oyenteMusica != null) Musica.oyentes.remove(oyenteMusica);
+            oyenteMusica = pm;
+            Musica.oyentes.add(pm);
+        }
 
         View raya = new View(a); raya.setBackground(A.caja(MainActivity.conAlpha(fg(), 0x55), 9, 0));
         LinearLayout.LayoutParams lr = new LinearLayout.LayoutParams(a.dp(42), a.dp(4)); lr.gravity = Gravity.CENTER_HORIZONTAL; lr.topMargin = a.dp(14);

@@ -131,6 +131,14 @@ public class Inicio extends Activity {
         permiso(c4, "Silencio y No molestar", h.panel().permisoNoMolestar(), () -> h.panel().pedirNoMolestar());
         nota(c4, "Wi-Fi y Bluetooth se prenden directo. Datos, modo avión, ubicación, ahorro, zona Wi-Fi, NFC, modo oscuro y extra tenue: Meraki Panel toca por vos ese botón en el panel de Samsung (sólo lee ese panel). Si no lo encuentra, abre la ventanita de Android.");
 
+        boolean mus = Oyente.tieneAcceso(this);
+        LinearLayout c6 = tarjeta(mus ? "✓  Música lista" : "Música que suena", mus ? 0xFF3DB46D : h.acento);
+        nota(c6, "La canción que suena (Spotify, YouTube Music…) sale con ⏮ ⏯ ⏭ en tu panel y en el inicio del launcher. Sólo mira los reproductores: no lee ni guarda tus notificaciones.");
+        if (!mus) {
+            c6.addView(boton("Activar acceso a notificaciones", true, this::abrirAccesoNotis), h.lp(-1, -2, 12));
+            nota(c6, "Buscá «Meraki Panel» y activalo. Si sale gris o «Ajuste restringido»: botón «Abrir info de la app» de arriba → ⋮ → «Permitir ajustes restringidos».");
+        } else if (Musica.actual != null) nota(c6, "Sonando ahora: " + Musica.actual.titulo + (Musica.actual.app.isEmpty() ? "" : " · " + Musica.actual.app));
+
         LinearLayout c5 = tarjeta("Revisar", h.acento);
         String ver = "?";
         try { ver = getPackageManager().getPackageInfo(getPackageName(), 0).versionName; } catch (Exception e) { }
@@ -146,6 +154,18 @@ public class Inicio extends Activity {
         log.setBackground(h.caja(0x33000000, 12, 0));
         c5.addView(log, h.lp(-1, -2, 12));
         c5.addView(boton("Borrar lo anotado", false, () -> { synchronized (Servicio.REGISTRO) { Servicio.REGISTRO.clear(); } construir(); }), h.lp(-1, -2, 10));
+    }
+
+    void abrirAccesoNotis() {
+        try {
+            if (android.os.Build.VERSION.SDK_INT >= 30) {
+                Intent i = new Intent("android.settings.NOTIFICATION_LISTENER_DETAIL_SETTINGS");
+                i.putExtra("android.provider.extra.NOTIFICATION_LISTENER_COMPONENT_NAME", new ComponentName(this, Oyente.class).flattenToString());
+                startActivity(i);
+                return;
+            }
+        } catch (Exception e) { }
+        try { startActivity(new Intent("android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS")); } catch (Exception e) { h.toast("Buscalo en Ajustes → Notificaciones → Acceso a notificaciones."); }
     }
 
     LinearLayout tarjeta(String titulo, int color) {

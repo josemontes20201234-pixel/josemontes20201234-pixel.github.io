@@ -4,6 +4,7 @@ def build = (System.getenv("GITHUB_RUN_NUMBER") ?: "1") as Integer
 def gen = "$buildDir/generated/panelsrc"
 tasks.register('copiarPanel', Copy) {
     from '../../launcher/app/src/main/java/com/josemontes/launcher/Panel.java'
+    from '../../launcher/app/src/main/java/com/josemontes/launcher/Musica.java'
     into "$gen/com/josemontes/launcher"
 }
 android {

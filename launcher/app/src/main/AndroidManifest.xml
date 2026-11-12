@@ -53,6 +53,14 @@
             </intent-filter>
         </activity>
         <receiver
+            android:name=".ReceptorMusica"
+            android:exported="true"
+            android:permission="com.josemontes.launcher.permission.PANEL">
+            <intent-filter>
+                <action android:name="com.josemontes.launcher.MUSICA" />
+            </intent-filter>
+        </receiver>
+        <receiver
             android:name=".ReceptorModo"
             android:exported="true"
             android:permission="com.josemontes.launcher.permission.PANEL">
