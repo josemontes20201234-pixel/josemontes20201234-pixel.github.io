@@ -12,13 +12,15 @@ final class Categorias {
     private Categorias() { }
 
     static final String[][] LISTA = {
-            {"meraki", "Meraki"}, {"redes", "Mensajes y redes"}, {"trabajo", "Trabajo"}, {"dinero", "Dinero"},
+            {"meraki", "Meraki"}, {"fe", "Fe"}, {"redes", "Mensajes y redes"}, {"trabajo", "Trabajo"}, {"dinero", "Dinero"},
             {"fotos", "Fotos"}, {"musica", "Música y video"}, {"compras", "Compras"}, {"viajes", "Mapas y viajes"},
             {"juegos", "Juegos"}, {"herramientas", "Herramientas"}, {"otras", "Otras"}};
 
     static String nombre(String id) { for (String[] c : LISTA) if (c[0].equals(id)) return c[1]; return "Todas"; }
 
     // palabras que delatan la categoría (en el paquete o en el nombre, sin tildes y en minúscula)
+    static final String[] FE = {"bible", "biblia", "youversion", "devocional", "devotional", "iglesia", "church", "worship", "alabanza", "himnario", "hymn",
+            "oracion", "prayer", "sermon", "cristian", "christian", "jesus", "cbn", "gospel", "evangel", "logos", "olive tree", "blue letter", "lifechurch"};
     static final String[] DINERO = {"bank", "banco", "banca", "agricola", "cuscatlan", "davivienda", "promerica", "hipotecario", "baccredomatic", "chivo",
             "binance", "paypal", "wallet", "samsung pay", "samsungpay", "money", "cash", "coinbase", "bybit", "tradingview", "investing", "crypto", "western union", "remitly"};
     static final String[] REDES = {"whatsapp", "telegram", "facebook", "messenger", "instagram", "tiktok", "musically", "twitter", "snapchat", "discord",
@@ -43,6 +45,8 @@ final class Categorias {
     static String de(MainActivity.App a, JSONObject manual) {
         if (manual != null) { String m = manual.optString(a.key(), ""); if (!m.isEmpty()) return m; }
         String l = MainActivity.sinAcentos(a.label), p = a.pkg.toLowerCase(java.util.Locale.ROOT), s = p + " " + l;
+        // Proyector (para la Biblia en la iglesia) va con las de fe, no con las de Meraki
+        if (p.equals("com.josemontes.proyector") || tiene(s, FE)) return "fe";
         if (l.contains("meraki") || p.startsWith("com.josemontes.") || p.contains("josemontes20201234")) return "meraki";
         if (a.cat == ApplicationInfo.CATEGORY_GAME) return "juegos";
         if (tiene(s, DINERO)) return "dinero";

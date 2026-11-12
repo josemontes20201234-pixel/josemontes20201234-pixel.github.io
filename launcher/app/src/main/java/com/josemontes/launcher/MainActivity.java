@@ -281,7 +281,7 @@ public class MainActivity extends Activity {
         MUTED = claro ? 0xFF6E685E : 0xFF9A948A;
         CARD = claro ? 0xB3FFFFFF : 0x99141210;
         LINEA = claro ? 0x22000000 : conAlpha(acento, 0x40);
-        CAJON = claro ? 0xF5F4F1EA : 0xF20B0A08;
+        CAJON = claro ? 0xFFF4F1EA : 0xFF0B0A08; // sólido: que no se vea el inicio detrás de las apps
     }
 
     void guardar(String k, String v) { prefs.edit().putString(k, v).apply(); aplicarTodo(); }
