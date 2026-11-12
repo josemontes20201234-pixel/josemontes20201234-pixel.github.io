@@ -402,7 +402,8 @@ public class MainActivity extends Activity {
     void alternarModoBarberia() { barberia().alternarConPermisos(); }
     void abrirCaja() { ui.postDelayed(() -> barberia().abrirCaja("hoy"), 150); }
     void ayudaTarjetaMeraki() {
-        if (!"permiso".equals(prefs.getString("tm_error", ""))) { barberia().cargarTarjetaMeraki(true); toast("Actualizando…"); return; }
+        barberia().cargarTarjetaMeraki(true);
+        if (!"permiso".equals(prefs.getString("tm_error", ""))) { toast("Actualizando…"); return; }
         TextView t = texto("En Firebase → Firestore → Rules, pegá esto justo debajo de la línea «match /databases/{database}/documents {» y tocá Publish:\n\n" + Barberia.REGLA + "\n\nSólo deja leer los números (cuántos inactivos, premios), nunca nombres ni teléfonos.", 13.5f, FG, Typeface.MONOSPACE);
         t.setTextIsSelectable(true);
         FrameLayout f = new FrameLayout(this); f.setPadding(dp(22), dp(8), dp(22), 0); f.addView(t);

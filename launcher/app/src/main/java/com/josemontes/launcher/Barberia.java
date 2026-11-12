@@ -190,7 +190,8 @@ class Barberia {
         String err = a.prefs.getString("tm_error", "");
         try {
             String s = a.prefs.getString("tm_resumen", "");
-            if (s.isEmpty()) return "permiso".equals(err) ? "Tarjeta Meraki: falta un permiso en Firebase (Ajustes → Barbería)" : null;
+            if (s.isEmpty()) return "permiso".equals(err) ? "Tarjeta Meraki: falta un permiso en Firebase (Ajustes → Barbería)"
+                    : "vacio".equals(err) ? "👥 Abrí Tarjeta Meraki una vez para ver aquí tus clientes" : null;
             JSONObject o = new JSONObject(s);
             int in = o.optInt("inactivos"), pr = o.optInt("premio"), cu = o.optInt("cumple");
             List<String> p = new ArrayList<>();
@@ -210,7 +211,9 @@ class Barberia {
     /** Lee los números que publica Tarjeta Meraki (cada 10 minutos como mucho). */
     void cargarTarjetaMeraki(boolean forzar) {
         long ult = a.prefs.getLong("tm_leido", 0);
-        if (!forzar && System.currentTimeMillis() - ult < 10 * 60 * 1000) return;
+        // Si la última vez falló, se reintenta al minuto; si salió bien, cada 10 minutos
+        long espera = a.prefs.getString("tm_error", "").isEmpty() && !a.prefs.getString("tm_resumen", "").isEmpty() ? 10 * 60 * 1000 : 60 * 1000;
+        if (!forzar && System.currentTimeMillis() - ult < espera) return;
         a.prefs.edit().putLong("tm_leido", System.currentTimeMillis()).apply();
         new Thread(() -> {
             String err = "";
