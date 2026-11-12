@@ -67,23 +67,38 @@ class Noticias {
 
     // ================================================================ fuentes
     static final String GN = "https://news.google.com/rss/search?";
+    static final String BING = "https://www.bing.com/news/search?format=rss&count=30&qft=sortbydate%3d%221%22&";
     static class Fuente {
-        final String id, nombre, corto; final int color; final String[] urls;
-        Fuente(String id, String nombre, String corto, int color, String... urls) { this.id = id; this.nombre = nombre; this.corto = corto; this.color = color; this.urls = urls; }
+        final String id, nombre, corto, dominio; final int color; final String[] urls;
+        Fuente(String id, String nombre, String corto, String dominio, int color, String... urls) { this.id = id; this.nombre = nombre; this.corto = corto; this.dominio = dominio; this.color = color; this.urls = urls; }
+        /** Bing a veces mete notas de otros sitios: sólo se quedan las del medio. */
+        boolean esDelMedio(String link) {
+            if (dominio == null || link == null) return true;
+            String h = Uri.parse(link).getHost();
+            if (h == null) return false;
+            h = h.toLowerCase(Locale.ROOT);
+            if (h.contains("news.google.com")) return true;
+            if ("cnn".equals(id) && h.contains("cnnespanol")) return false;
+            return h.equals(dominio) || h.endsWith("." + dominio);
+        }
     }
     /** CNN ya no tiene canal propio que funcione: se lee por Google Noticias filtrado a su sitio. Forbes y CBN sí tienen el suyo. */
     static final Fuente[] FUENTES = {
-            new Fuente("cnne", "CNN en Español", "CNN en Español", 0xFFE5483F,
+            new Fuente("cnne", "CNN en Español", "CNN en Español", "cnnespanol.cnn.com", 0xFFE5483F,
+                    BING + "q=site%3acnnespanol.cnn.com&mkt=es-US&setlang=es",
                     GN + "q=when:2d+site:cnnespanol.cnn.com&hl=es-419&gl=US&ceid=US:es-419"),
-            new Fuente("cnn", "CNN (inglés)", "CNN", 0xFFE5483F,
+            new Fuente("cnn", "CNN (inglés)", "CNN", "cnn.com", 0xFFE5483F,
+                    BING + "q=site%3acnn.com&mkt=en-US&setlang=en",
                     GN + "q=when:1d+site:cnn.com+-site:cnnespanol.cnn.com+-intitle:sitemap&hl=en-US&gl=US&ceid=US:en"),
-            new Fuente("forbesca", "Forbes Centroamérica", "Forbes Centroamérica", 0xFF5B8DEF,
+            new Fuente("forbesca", "Forbes Centroamérica", "Forbes Centroamérica", "forbescentroamerica.com", 0xFF5B8DEF,
                     "https://forbescentroamerica.com/feed/",
+                    BING + "q=site%3aforbescentroamerica.com&mkt=es-US&setlang=es",
                     GN + "q=when:7d+site:forbescentroamerica.com&hl=es-419&gl=US&ceid=US:es-419"),
-            new Fuente("forbes", "Forbes (EE. UU.)", "Forbes", 0xFF5B8DEF,
+            new Fuente("forbes", "Forbes (EE. UU.)", "Forbes", "forbes.com", 0xFF5B8DEF,
                     "https://www.forbes.com/business/feed/",
+                    BING + "q=site%3aforbes.com&mkt=en-US&setlang=en",
                     GN + "q=when:2d+site:forbes.com&hl=en-US&gl=US&ceid=US:en"),
-            new Fuente("mc", "Mundo Cristiano (CBN)", "Mundo Cristiano", 0,
+            new Fuente("mc", "Mundo Cristiano (CBN)", "Mundo Cristiano", null, 0,
                     "https://podcast.cbn.com/CBN_Video_Podcast_Mundo_Cristiano.aspx",
                     "http://podcast.cbn.com/CBN_Video_Podcast_Mundo_Cristiano.aspx"),
     };
@@ -118,6 +133,7 @@ class Noticias {
     static class Nota {
         String fuente, titulo, link, img, resumen, video, dur;
         long fecha;
+        boolean probada; // ya se buscó la foto en la página de la noticia
         JSONObject json() throws Exception {
             JSONObject o = new JSONObject();
             o.put("t", titulo); o.put("l", link); o.put("f", fecha);
@@ -125,6 +141,7 @@ class Noticias {
             if (resumen != null) o.put("r", resumen);
             if (video != null) o.put("v", video);
             if (dur != null) o.put("d", dur);
+            if (probada) o.put("x", 1);
             return o;
         }
         static Nota de(String fuente, JSONObject o) {
@@ -132,12 +149,16 @@ class Noticias {
             n.fuente = fuente; n.titulo = o.optString("t"); n.link = o.optString("l"); n.fecha = o.optLong("f");
             n.img = o.has("i") ? o.optString("i") : null; n.resumen = o.has("r") ? o.optString("r") : null;
             n.video = o.has("v") ? o.optString("v") : null; n.dur = o.has("d") ? o.optString("d") : null;
+            n.probada = o.optInt("x") == 1;
             return n;
         }
     }
 
     final Map<String, List<Nota>> porFuente = new HashMap<>();
     final Set<String> fallaron = new HashSet<>();
+    /** Cómo cargó cada fuente la última vez (para «Revisar fuentes»). */
+    final Map<String, String> diag = new HashMap<>();
+    final List<String> diagFotos = Collections.synchronizedList(new ArrayList<>());
     boolean cacheLeida, cargando;
 
     File archivo() { return new File(a.getFilesDir(), "noticias.json"); }
@@ -176,6 +197,8 @@ class Noticias {
         if (cargando) return;
         leerCache();
         long ult = a.prefs.getLong("noticias_leido", 0);
+        // Versión 2: las noticias guardadas por la versión anterior venían sin foto
+        if (a.prefs.getInt("noticias_v", 0) < 2) { forzar = true; a.prefs.edit().putInt("noticias_v", 2).apply(); }
         if (!forzar && System.currentTimeMillis() - ult < 15 * 60_000L && !porFuente.isEmpty()) return;
         cargando = true;
         pintarEstado();
@@ -208,25 +231,38 @@ class Noticias {
     }
 
     List<Nota> bajarFuente(Fuente f) {
+        StringBuilder d = new StringBuilder();
         for (String u : f.urls) {
+            String via = u.contains("news.google.com") ? "Google Noticias" : u.contains("bing.com") ? "Bing Noticias" : "su página";
             try {
                 List<Nota> l = parsear(bajar(u, 4_000_000), f.id);
-                if (l.isEmpty()) continue;
-                Collections.sort(l, (x, y) -> Long.compare(y.fecha, x.fecha));
-                return l.size() > POR_FUENTE ? new ArrayList<>(l.subList(0, POR_FUENTE)) : l;
-            } catch (Exception e) { }
+                int total = l.size();
+                List<Nota> buenas = new ArrayList<>();
+                for (Nota n : l) if (f.esDelMedio(n.link)) buenas.add(n);
+                if (buenas.isEmpty()) { d.append(via).append(": ").append(total == 0 ? "vacío" : total + " notas de otros sitios").append("\n"); continue; }
+                Collections.sort(buenas, (x, y) -> Long.compare(y.fecha, x.fecha));
+                List<Nota> r = buenas.size() > POR_FUENTE ? new ArrayList<>(buenas.subList(0, POR_FUENTE)) : buenas;
+                int conFoto = 0; for (Nota n : r) if (n.img != null && !n.img.isEmpty()) conFoto++;
+                d.append("✓ ").append(via).append(": ").append(r.size()).append(" notas, ").append(conFoto).append(" con foto");
+                synchronized (diag) { diag.put(f.id, d.toString()); }
+                return r;
+            } catch (Exception e) { d.append(via).append(": ").append(e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage()).append("\n"); }
         }
+        synchronized (diag) { diag.put(f.id, d.toString().trim()); }
         return null;
     }
 
     static final String UA = "Mozilla/5.0 (Linux; Android 14; SM-A346M) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Mobile Safari/537.36";
 
-    static byte[] bajar(String u, int max) throws IOException {
+    static byte[] bajar(String u, int max) throws IOException { return bajar(u, max, null); }
+
+    static byte[] bajar(String u, int max, String accept) throws IOException {
         for (int i = 0; i < 6; i++) {
             HttpURLConnection c = (HttpURLConnection) new URL(u).openConnection();
             c.setConnectTimeout(9000); c.setReadTimeout(15000);
             c.setInstanceFollowRedirects(false);
             c.setRequestProperty("User-Agent", UA);
+            if (accept != null) c.setRequestProperty("Accept", accept);
             c.setRequestProperty("Accept-Language", "es-419,es;q=0.9,en;q=0.8");
             int code = c.getResponseCode();
             if (code >= 300 && code < 400) {
@@ -293,6 +329,7 @@ class Noticias {
                         case "itunes:duration": n.dur = texto(p).trim(); break;
                         case "itunes:summary": case "itunes:subtitle": if (n.resumen == null || n.resumen.isEmpty()) n.resumen = limpio(texto(p)); break;
                         case "source": medio = texto(p).trim(); break;
+                        case "news:image": if (n.img == null) { String s = texto(p).trim(); if (!s.isEmpty()) n.img = s.startsWith("/") ? "https://www.bing.com" + s : s; } break;
                     }
                 } else if (ev == XmlPullParser.END_TAG && n != null) {
                     String t = p.getName() == null ? "" : p.getName().toLowerCase(Locale.ROOT);
@@ -301,6 +338,9 @@ class Noticias {
                             // Google Noticias pone « - CNN en Español» al final del título
                             if (medio != null && n.titulo.endsWith(" - " + medio)) n.titulo = n.titulo.substring(0, n.titulo.length() - medio.length() - 3).trim();
                             if (n.link.contains("news.google.com")) n.resumen = null; // su resumen sólo repite el título
+                            // Bing manda el enlace por su contador: se saca la dirección real de la noticia
+                            if (n.link.contains("bing.com/news/apiclick")) { try { String real = Uri.parse(n.link).getQueryParameter("url"); if (real != null && real.startsWith("http")) n.link = real; } catch (Exception e) { } }
+                            if (n.img != null && n.img.contains("bing.com/th") && !n.img.contains("&w=")) n.img += "&w=240&h=240&c=7";
                             if (n.fecha == 0) { Matcher m = FECHA_TITULO.matcher(n.titulo); if (m.find()) n.fecha = fechaTitulo(m); }
                             if (n.resumen != null && n.resumen.length() > 400) n.resumen = n.resumen.substring(0, 400).trim() + "…";
                             if (vistos.add(n.titulo.toLowerCase(Locale.ROOT))) r.add(n);
@@ -389,7 +429,7 @@ class Noticias {
                 File f = new File(carpetaFotos(), Integer.toHexString(url.hashCode()) + "_" + url.length());
                 byte[] d = f.exists() ? leer(f) : null;
                 if (d == null || d.length == 0) {
-                    d = bajar(url, 3_000_000);
+                    d = bajar(url, 3_000_000, "image/webp,image/jpeg,image/png,image/*;q=0.8");
                     try (FileOutputStream out = new FileOutputStream(f)) { out.write(d); }
                 }
                 BitmapFactory.Options o = new BitmapFactory.Options();
@@ -400,7 +440,8 @@ class Noticias {
                 BitmapFactory.Options o2 = new BitmapFactory.Options();
                 o2.inSampleSize = s;
                 bm = BitmapFactory.decodeByteArray(d, 0, d.length, o2);
-            } catch (Exception e) { }
+                if (bm == null) { anotarFoto(url, "no se pudo leer (" + d.length + " bytes)"); new File(carpetaFotos(), Integer.toHexString(url.hashCode()) + "_" + url.length()).delete(); }
+            } catch (Exception e) { anotarFoto(url, e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage()); }
             final Bitmap fb = bm;
             if (fb != null) fotos.put(url, fb);
             a.ui.post(() -> {
@@ -410,6 +451,71 @@ class Noticias {
                 iv.setAlpha(0f); iv.animate().alpha(1f).setDuration(160).start();
             });
         });
+    }
+
+    void anotarFoto(String url, String que) {
+        String h = Uri.parse(url).getHost();
+        diagFotos.add((h == null ? url : h) + ": " + que);
+        while (diagFotos.size() > 8) diagFotos.remove(0);
+    }
+
+    // ================================================================ foto de la página de la noticia (og:image)
+    static final Pattern OG1 = Pattern.compile("<meta[^>]+(?:property|name)=[\"'](?:og:image|twitter:image)(?::src)?[\"'][^>]*content=[\"']([^\"']+)[\"']", Pattern.CASE_INSENSITIVE);
+    static final Pattern OG2 = Pattern.compile("<meta[^>]+content=[\"']([^\"']+)[\"'][^>]*(?:property|name)=[\"'](?:og:image|twitter:image)(?::src)?[\"']", Pattern.CASE_INSENSITIVE);
+    boolean guardarPendiente;
+
+    /** Si la noticia vino sin foto pero el enlace es directo, busca la foto que el medio pone para compartirla. */
+    void buscarFotoDePagina(Nota n, ImageView iv, int lado) {
+        n.probada = true;
+        final String link = n.link;
+        hilos.execute(() -> {
+            String img = null;
+            try {
+                String html = new String(bajar(link, 250_000, "text/html"), "UTF-8");
+                Matcher m = OG1.matcher(html);
+                if (m.find()) img = m.group(1); else { m = OG2.matcher(html); if (m.find()) img = m.group(1); }
+                if (img != null) { img = Html.fromHtml(img, Html.FROM_HTML_MODE_LEGACY).toString().trim(); if (img.startsWith("//")) img = "https:" + img; if (!img.startsWith("http")) img = null; }
+            } catch (Exception e) { anotarFoto(link, "página: " + (e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage())); }
+            final String fin = img;
+            a.ui.post(() -> {
+                if (fin != null) {
+                    n.img = fin;
+                    if (link.equals(iv.getTag(R_ENLACE))) { iv.setVisibility(View.VISIBLE); cargarFoto(iv, fin, lado); }
+                }
+                if (!guardarPendiente) { guardarPendiente = true; a.ui.postDelayed(() -> { guardarPendiente = false; guardarCache(); }, 4000); }
+            });
+        });
+    }
+    static final int R_ENLACE = 0x7f0b0101;
+
+    int fotosDePagina;
+    boolean medidos() {
+        try { return ((android.net.ConnectivityManager) a.getSystemService(android.content.Context.CONNECTIVITY_SERVICE)).isActiveNetworkMetered(); }
+        catch (Exception e) { return true; }
+    }
+
+    static boolean enlaceDirecto(String l) { return l != null && l.startsWith("http") && !l.contains("news.google.com") && !l.contains("bing.com"); }
+
+    void revisarFuentes() {
+        StringBuilder sb = new StringBuilder();
+        Set<String> act = activas();
+        for (Fuente f : FUENTES) {
+            if (!act.contains(f.id)) continue;
+            String d; synchronized (diag) { d = diag.get(f.id); }
+            List<Nota> l = porFuente.get(f.id);
+            int n = l == null ? 0 : l.size(), c = 0;
+            if (l != null) for (Nota x : l) if (x.img != null && !x.img.isEmpty()) c++;
+            sb.append(f.nombre).append("\n").append(d == null ? "(todavía no se ha actualizado desde que abriste el launcher)" : d)
+              .append("\nEn pantalla: ").append(n).append(" notas, ").append(c).append(" con foto\n\n");
+        }
+        synchronized (diagFotos) { if (!diagFotos.isEmpty()) { sb.append("Fotos que fallaron:\n"); for (String x : diagFotos) sb.append("• ").append(x).append("\n"); } }
+        TextView t = a.texto(sb.toString().trim(), 13, a.FG, Typeface.MONOSPACE);
+        t.setTextIsSelectable(true);
+        ScrollView sv = new ScrollView(a);
+        FrameLayout f = new FrameLayout(a); f.setPadding(a.dp(22), a.dp(8), a.dp(22), 0); f.addView(t);
+        sv.addView(f);
+        a.dialogo().setTitle("Cómo cargó cada fuente").setView(sv)
+                .setPositiveButton("Actualizar ahora", (d, w) -> actualizar(true)).setNegativeButton("Cerrar", null).show();
     }
 
     static byte[] leer(File f) throws IOException {
@@ -472,6 +578,7 @@ class Noticias {
         col.addView(cab);
         estado = a.texto("", 12.5f, sub(), a.tf(false));
         estado.setPadding(a.dp(22), a.dp(6), a.dp(22), 0);
+        estado.setOnClickListener(v -> revisarFuentes());
         col.addView(estado);
 
         chipsScroll = new HorizontalScrollView(a);
@@ -612,11 +719,21 @@ class Noticias {
         chip("todas", "Todas");
         for (Fuente f : FUENTES) if (act.contains(f.id)) chip(f.id, f.corto);
 
+        // que el filtro escogido siempre se vea en la fila
+        final View sel = chips.findViewWithTag("sel");
+        if (sel != null) a.ui.postDelayed(() -> { if (chipsScroll != null) chipsScroll.smoothScrollTo(Math.max(0, sel.getLeft() - a.dp(18)), 0); }, 90);
+
         lista.removeAllViews();
+        // Cuántas fotos se pueden buscar en la página de cada noticia (menos con datos móviles)
+        fotosDePagina = medidos() ? 8 : 25;
         List<Nota> mc = act.contains("mc") ? porFuente.get("mc") : null;
         if ("mc".equals(filtro)) {
             if (mc == null || mc.isEmpty()) vacio();
-            else { boolean primero = true; for (Nota n : mc) { programa(n, primero); primero = false; } }
+            else {
+                programa(mc.get(0), true);
+                lista.addView(a.etiqueta("Programas anteriores", sub()), a.lp(-2, -2, 24));
+                for (int i = 1; i < mc.size(); i++) anterior(mc.get(i));
+            }
             pie();
             return;
         }
@@ -645,6 +762,7 @@ class Noticias {
         TextView v = a.texto(t, 14, sel ? (Barberia.luz(a.acento) > 0.6 ? 0xFF141414 : 0xFFFFFFFF) : fg(), a.tf(sel));
         v.setPadding(a.dp(15), a.dp(9), a.dp(15), a.dp(9));
         v.setBackground(a.caja(sel ? a.acento : suave(), 99, 0));
+        if (sel) v.setTag("sel");
         v.setOnClickListener(x -> { filtro = id; pintar(); scroll.scrollTo(0, 0); });
         LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(-2, -2); p.rightMargin = a.dp(8);
         chips.addView(v, p);
@@ -659,7 +777,8 @@ class Noticias {
     }
 
     void pie() {
-        TextView t = a.texto("CNN por Google Noticias · Forbes · Mundo Cristiano de CBN\nTocá una noticia para leerla · mantenela presionada para compartirla", 11.5f, sub(), a.tf(false));
+        TextView t = a.texto("CNN y Forbes por sus páginas, Bing o Google Noticias · Mundo Cristiano de CBN\nTocá una noticia para leerla · mantenela presionada para compartirla\nRevisar cómo cargó cada fuente", 11.5f, sub(), a.tf(false));
+        t.setOnClickListener(v -> revisarFuentes());
         t.setLineSpacing(a.dp(3), 1f);
         t.setGravity(Gravity.CENTER);
         lista.addView(t, a.lp(-1, -2, 28));
@@ -683,11 +802,15 @@ class Noticias {
         t.setLineSpacing(a.dp(2.5f), 1f);
         txt.addView(t, a.lp(-1, -2, 6));
         fila.addView(txt, new LinearLayout.LayoutParams(0, -2, 1f));
-        if (n.img != null && !n.img.isEmpty()) {
+        boolean hay = n.img != null && !n.img.isEmpty();
+        if (hay || (!n.probada && enlaceDirecto(n.link))) {
             ImageView iv = foto(a.dp(80), a.dp(80), 14);
             LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(a.dp(80), a.dp(80)); p.leftMargin = a.dp(14);
             fila.addView(iv, p);
-            cargarFoto(iv, n.img, a.dp(80));
+            iv.setTag(R_ENLACE, n.link);
+            if (hay) cargarFoto(iv, n.img, a.dp(80));
+            else if (fotosDePagina-- > 0) { iv.setVisibility(View.GONE); buscarFotoDePagina(n, iv, a.dp(80)); }
+            else iv.setVisibility(View.GONE);
         }
         fila.setOnClickListener(v -> abrirEnlace(n.link));
         fila.setOnLongClickListener(v -> { compartir(n); return true; });
@@ -757,6 +880,36 @@ class Noticias {
         c.addView(bot, a.lp(-1, -2, 16));
         c.setOnLongClickListener(v -> { compartir(n); return true; });
         lista.addView(c, a.lp(-1, -2, grande ? 10 : 12));
+    }
+
+    /** Programa anterior en una fila corta: ▶, fecha y de qué trató. */
+    void anterior(Nota n) {
+        LinearLayout f = new LinearLayout(a);
+        f.setGravity(Gravity.CENTER_VERTICAL);
+        f.setPadding(0, a.dp(12), 0, a.dp(12));
+        TextView play = a.texto("▶", 15, Barberia.luz(a.acento) > 0.6 ? 0xFF141414 : 0xFFFFFFFF, Typeface.DEFAULT_BOLD);
+        play.setGravity(Gravity.CENTER);
+        play.setPadding(a.dp(3), 0, 0, 0);
+        play.setBackground(a.caja(a.acento, 99, 0));
+        LinearLayout.LayoutParams pp = new LinearLayout.LayoutParams(a.dp(42), a.dp(42)); pp.rightMargin = a.dp(14);
+        f.addView(play, pp);
+        LinearLayout tx = new LinearLayout(a);
+        tx.setOrientation(LinearLayout.VERTICAL);
+        String cuando = n.fecha > 0 ? "Programa del " + new SimpleDateFormat("d 'de' MMMM", MainActivity.ES).format(new Date(n.fecha)) : n.titulo;
+        String dur = duracion(n.dur);
+        tx.addView(a.texto(cuando + (dur.isEmpty() ? "" : "  ·  " + dur), 15.5f, fg(), Typeface.create("sans-serif-medium", Typeface.NORMAL)));
+        if (n.resumen != null && !n.resumen.isEmpty()) {
+            TextView r = a.texto(n.resumen, 13, sub(), a.tf(false));
+            r.setMaxLines(2); r.setEllipsize(TextUtils.TruncateAt.END);
+            r.setLineSpacing(a.dp(2), 1f);
+            tx.addView(r, a.lp(-1, -2, 4));
+        }
+        f.addView(tx, new LinearLayout.LayoutParams(0, -2, 1f));
+        f.setOnClickListener(v -> abrirEnlace(n.video != null ? n.video : n.link));
+        f.setOnLongClickListener(v -> { compartir(n); return true; });
+        lista.addView(f);
+        View r = new View(a); r.setBackgroundColor(raya());
+        lista.addView(r, new LinearLayout.LayoutParams(-1, 1));
     }
 
     static String duracion(String d) {
