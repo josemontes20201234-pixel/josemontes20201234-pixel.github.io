@@ -441,7 +441,8 @@ class Panel {
                 mus.removeAllViews();
                 Musica.Estado e = Musica.actual;
                 mus.setVisibility(e == null ? View.GONE : View.VISIBLE);
-                if (e != null) mus.addView(Musica.tarjeta(a, e, fg(), muted(), botonApagado(), 0, colorOn(), this::cerrar));
+                // si algo de la música falla, el panel se abre igual (sin la tarjetita)
+                if (e != null) try { mus.addView(Musica.tarjeta(a, e, fg(), muted(), botonApagado(), 0, colorOn(), this::cerrar)); } catch (Throwable t) { mus.setVisibility(View.GONE); }
             };
             pm.run();
             if (oyenteMusica != null) Musica.oyentes.remove(oyenteMusica);

@@ -46,6 +46,7 @@ public class Oyente extends NotificationListenerService {
 
     @Override
     public void onListenerConnected() {
+        Servicio.registrarErrores(this);
         yo = this;
         msm = (MediaSessionManager) getSystemService(Context.MEDIA_SESSION_SERVICE);
         try { msm.addOnActiveSessionsChangedListener(cambio, cn(), h); } catch (Exception e) { }

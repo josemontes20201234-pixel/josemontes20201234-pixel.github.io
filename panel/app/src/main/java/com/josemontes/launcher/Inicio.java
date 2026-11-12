@@ -25,6 +25,7 @@ public class Inicio extends Activity {
     @Override
     protected void onCreate(Bundle b) {
         super.onCreate(b);
+        Servicio.registrarErrores(this);
         getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LAYOUT_STABLE | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION);
         root = new FrameLayout(this);
         root.setBackground(new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, new int[]{0xFF1C1A16, 0xFF0B0A08}));
@@ -147,6 +148,17 @@ public class Inicio extends Activity {
             if (Servicio.yo == null) { h.toast("Primero activá Meraki Panel en Accesibilidad."); return; }
             Servicio.yo.revisarBotones(this::construir);
         }), h.lp(-1, -2, 12));
+        final String err = h.prefs.getString("ultimo_error", "");
+        if (!err.isEmpty()) {
+            nota(c5, "Último error (mandale captura a Claude):");
+            TextView te = h.texto(err, 11, 0xFFFF8A80, android.graphics.Typeface.MONOSPACE);
+            te.setTextIsSelectable(true);
+            te.setMaxLines(14);
+            te.setPadding(h.dp(12), h.dp(10), h.dp(12), h.dp(10));
+            te.setBackground(h.caja(0x33000000, 12, 0));
+            c5.addView(te, h.lp(-1, -2, 8));
+            c5.addView(boton("Borrar el error", false, () -> { h.prefs.edit().remove("ultimo_error").apply(); construir(); }), h.lp(-1, -2, 8));
+        }
         String reg = Servicio.registro();
         TextView log = h.texto(reg.isEmpty() ? "Todavía no hay nada anotado. Tocá un botón en tu panel y volvé aquí." : reg, 12, EF, android.graphics.Typeface.MONOSPACE);
         log.setTextIsSelectable(true);

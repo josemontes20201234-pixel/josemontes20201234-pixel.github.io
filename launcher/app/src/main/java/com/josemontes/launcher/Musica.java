@@ -83,6 +83,9 @@ final class Musica {
     static Bitmap achicar(Bitmap b) {
         if (b == null) return null;
         try {
+            // siempre una copia normal (no «de hardware»), para poder dibujarla y mandarla sin problemas
+            if (b.getConfig() == Bitmap.Config.HARDWARE || b.getConfig() == null) b = b.copy(Bitmap.Config.ARGB_8888, false);
+            if (b == null) return null;
             int max = 192, w = b.getWidth(), h = b.getHeight();
             if (w <= max && h <= max) return b.copy(Bitmap.Config.ARGB_8888, false);
             float k = (float) max / Math.max(w, h);

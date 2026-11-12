@@ -48,6 +48,33 @@ public class Servicio extends AccessibilityService {
         synchronized (REGISTRO) { REGISTRO.add(h + "  " + t); while (REGISTRO.size() > 60) REGISTRO.removeFirst(); }
     }
     static String registro() { synchronized (REGISTRO) { return android.text.TextUtils.join("\n", REGISTRO); } }
+
+    /** Guarda el último error para verlo en la app (tarjeta «Revisar»). */
+    static void guardarError(Context c, Throwable t) {
+        try {
+            String h = new java.text.SimpleDateFormat("dd/MM HH:mm:ss", Locale.ROOT).format(new java.util.Date());
+            String st = android.util.Log.getStackTraceString(t);
+            if (st.length() > 1800) st = st.substring(0, 1800);
+            anotar("ERROR: " + t);
+            c.getSharedPreferences("meraki", MODE_PRIVATE).edit().putString("ultimo_error", h + "\n" + st).commit();
+        } catch (Throwable x) { }
+    }
+
+    /** Si la app se cae, primero anota por qué (para no tener que adivinar). */
+    static void registrarErrores(Context c) {
+        final Context app = c.getApplicationContext();
+        final Thread.UncaughtExceptionHandler antes = Thread.getDefaultUncaughtExceptionHandler();
+        if (antes instanceof Anotador) return;
+        Thread.setDefaultUncaughtExceptionHandler(new Anotador(app, antes));
+    }
+    static final class Anotador implements Thread.UncaughtExceptionHandler {
+        final Context c; final Thread.UncaughtExceptionHandler antes;
+        Anotador(Context c, Thread.UncaughtExceptionHandler antes) { this.c = c; this.antes = antes; }
+        @Override public void uncaughtException(Thread th, Throwable t) {
+            guardarError(c, t);
+            if (antes != null) antes.uncaughtException(th, t);
+        }
+    }
     final Handler ui = new Handler(Looper.getMainLooper());
     WindowManager wm;
     View franja;
@@ -91,7 +118,9 @@ public class Servicio extends AccessibilityService {
 
     @Override
     protected void onServiceConnected() {
+        registrarErrores(this);
         yo = this;
+        anotar("Servicio conectado");
         wm = (WindowManager) getSystemService(WINDOW_SERVICE);
         crearRaiz();
         IntentFilter f = new IntentFilter();
@@ -173,20 +202,30 @@ public class Servicio extends AccessibilityService {
         View v = new View(this);
         v.setOnTouchListener(new View.OnTouchListener() {
             float y0;
-            boolean abierto;
+            boolean abierto, intentoSamsung;
             VelocityTracker vt;
             @Override public boolean onTouch(View x, MotionEvent e) {
                 switch (e.getActionMasked()) {
                     case MotionEvent.ACTION_DOWN:
-                        y0 = e.getRawY(); abierto = false; tocando = true;
+                        y0 = e.getRawY(); abierto = false; intentoSamsung = false; tocando = true;
                         if (vt != null) vt.recycle();
                         vt = VelocityTracker.obtain(); vt.addMovement(e);
                         break;
                     case MotionEvent.ACTION_MOVE: {
                         if (vt != null) vt.addMovement(e);
                         float dy = e.getRawY() - y0;
-                        if (!abierto && dy > dp(8)) { abierto = abrirPanel(true); if (abierto) cerrarSamsung(0); }
-                        if (abierto && host != null) host.panel().seguir(dy);
+                        if (!abierto && !intentoSamsung && dy > dp(8)) {
+                            try { abierto = abrirPanel(true); } catch (Throwable t) { guardarError(Servicio.this, t); abierto = false; }
+                            if (abierto) cerrarSamsung(0);
+                            else {
+                                // Nunca dejar a Jose sin panel: si el nuestro no sale, que salga el de Samsung
+                                intentoSamsung = true;
+                                anotar("No salió el Panel Meraki → abro el de Samsung");
+                                pausarFranja();
+                                performGlobalAction(GLOBAL_ACTION_NOTIFICATIONS);
+                            }
+                        }
+                        if (abierto && host != null) try { host.panel().seguir(dy); } catch (Throwable t) { guardarError(Servicio.this, t); }
                         break;
                     }
                     case MotionEvent.ACTION_UP:
@@ -195,7 +234,7 @@ public class Servicio extends AccessibilityService {
                         float vy = 0;
                         if (vt != null) { vt.addMovement(e); vt.computeCurrentVelocity(1000); vy = vt.getYVelocity(); vt.recycle(); vt = null; }
                         if (abierto && host != null) {
-                            host.panel().soltar(e.getRawY() - y0, e.getActionMasked() == MotionEvent.ACTION_CANCEL ? 0 : vy);
+                            try { host.panel().soltar(e.getRawY() - y0, e.getActionMasked() == MotionEvent.ACTION_CANCEL ? 0 : vy); } catch (Throwable t) { guardarError(Servicio.this, t); }
                             cerrarSamsung(0); cerrarSamsung(350);
                         }
                         abierto = false;
@@ -233,9 +272,15 @@ public class Servicio extends AccessibilityService {
     }
 
     boolean abrirPanel(boolean siguiendo) {
-        if (wm == null) return false;
+        if (wm == null) { anotar("Abrir panel: sin ventana del sistema"); return false; }
         if (host == null) crearRaiz();
-        if (host.panel().abierto()) return false;
+        if (host.panel().abierto()) {
+            if (raizPuesta) { anotar("Abrir panel: ya estaba abierto"); return false; }
+            // quedó «abierto» pero no se ve: se limpia y se abre de nuevo
+            anotar("Abrir panel: estaba trabado, lo limpio");
+            View c = host.panel().capa;
+            if (c != null && c.getParent() instanceof ViewGroup) ((ViewGroup) c.getParent()).removeView(c);
+        }
         if (!raizPuesta) {
             WindowManager.LayoutParams lp = new WindowManager.LayoutParams(
                     WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.MATCH_PARENT,
@@ -243,7 +288,7 @@ public class Servicio extends AccessibilityService {
                     WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN | WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS | WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED,
                     PixelFormat.TRANSLUCENT);
             lp.layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
-            try { wm.addView(raiz, lp); raizPuesta = true; lpRaiz = lp; } catch (Exception e) { return false; }
+            try { wm.addView(raiz, lp); raizPuesta = true; lpRaiz = lp; } catch (Exception e) { anotar("Abrir panel: no se pudo poner encima: " + e); return false; }
         }
         if (siguiendo) host.panel().abrirSiguiendo(); else host.panel().abrir();
         return true;
