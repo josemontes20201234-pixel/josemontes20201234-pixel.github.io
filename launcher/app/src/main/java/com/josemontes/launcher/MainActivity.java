@@ -645,6 +645,7 @@ public class MainActivity extends Activity {
     }
 
     void apagarPantalla() {
+        if (Tiles.apagarConMerakiPanel(this)) return; // así la huella sigue sirviendo al desbloquear
         android.app.admin.DevicePolicyManager dpm = (android.app.admin.DevicePolicyManager) getSystemService(Context.DEVICE_POLICY_SERVICE);
         if (dpm != null && dpm.isAdminActive(adminCn())) {
             try { dpm.lockNow(); } catch (Exception e) { toast("No se pudo apagar la pantalla."); }
@@ -656,7 +657,7 @@ public class MainActivity extends Activity {
     void pedirPermisoApagar() {
         Intent i = new Intent(android.app.admin.DevicePolicyManager.ACTION_ADD_DEVICE_ADMIN);
         i.putExtra(android.app.admin.DevicePolicyManager.EXTRA_DEVICE_ADMIN, adminCn());
-        i.putExtra(android.app.admin.DevicePolicyManager.EXTRA_ADD_EXPLANATION, "Sólo para apagar la pantalla con tu gesto. Ojo: al desbloquear quizás te pida el PIN en vez de la huella.");
+        i.putExtra(android.app.admin.DevicePolicyManager.EXTRA_ADD_EXPLANATION, "Sólo para apagar la pantalla con tu gesto. Ojo: así Android pide el patrón en vez de la huella al desbloquear. Con la app Meraki Panel activa no hace falta este permiso y la huella sigue funcionando.");
         try { startActivity(i); } catch (Exception e) { toast("Tu teléfono no permite este permiso."); }
     }
 
@@ -1980,8 +1981,9 @@ public class MainActivity extends Activity {
 
         seccion(l, "Gestos");
         for (String[] g : GESTOS) opcion(l, g[1], nombreGesto(g[0]), () -> elegirGesto(g[0], g[1]));
-        if (puedeApagar()) opcion(l, "Quitar permiso de apagar pantalla", "Hacelo antes de desinstalar el launcher", this::quitarPermisoApagar);
-        else opcion(l, "Permitir apagar la pantalla", "Para usar «Apagar la pantalla» en un gesto", this::pedirPermisoApagar);
+        if (merakiPanelActivo()) opcion(l, "Apagar la pantalla", puedeApagar() ? "Ya lo hace Meraki Panel y la huella sigue funcionando. Tocá para quitar el permiso viejo de administrador" : "Lo hace Meraki Panel: la huella sigue funcionando al desbloquear", puedeApagar() ? this::quitarPermisoApagar : () -> toast("Ya está listo."));
+        else if (puedeApagar()) opcion(l, "Quitar permiso de apagar pantalla", "Ojo: así Android pide el patrón en vez de la huella. Con Meraki Panel activo no hace falta", this::quitarPermisoApagar);
+        else opcion(l, "Permitir apagar la pantalla", "Para usar «Apagar la pantalla» en un gesto (mejor con Meraki Panel: no te quita la huella)", this::pedirPermisoApagar);
 
         seccion(l, "Fondo");
         opcion(l, "Fondo", nombre(FONDOS, fondo), () -> elegir("Fondo", FONDOS, "fondo", fondo));

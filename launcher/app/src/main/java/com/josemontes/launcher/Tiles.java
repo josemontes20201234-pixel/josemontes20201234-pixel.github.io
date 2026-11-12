@@ -49,9 +49,23 @@ public class Tiles {
         @Override public void onClick() { abrir(this, new Intent(this, MainActivity.class).putExtra("panel", true), 10); }
     }
 
+    /**
+     * Apagar la pantalla con Meraki Panel (como el botón de encendido): así la huella sigue funcionando.
+     * Con el permiso de administrador, Android exige el patrón al desbloquear.
+     */
+    static boolean apagarConMerakiPanel(Context c) {
+        try {
+            String s = android.provider.Settings.Secure.getString(c.getContentResolver(), android.provider.Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES);
+            if (s == null || !s.contains("com.josemontes.panel/")) return false;
+            c.sendBroadcast(new Intent("com.josemontes.panel.APAGAR").setPackage("com.josemontes.panel"));
+            return true;
+        } catch (Exception e) { return false; }
+    }
+
     public static class Apagar extends TileService {
         @Override public void onStartListening() { pintar(this, "Apagar pantalla", "Meraki", Tile.STATE_INACTIVE); }
         @Override public void onClick() {
+            if (apagarConMerakiPanel(this)) return;
             DevicePolicyManager dpm = (DevicePolicyManager) getSystemService(Context.DEVICE_POLICY_SERVICE);
             if (dpm != null && dpm.isAdminActive(new ComponentName(this, Admin.class))) {
                 try { dpm.lockNow(); return; } catch (Exception e) { }

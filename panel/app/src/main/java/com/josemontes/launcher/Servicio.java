@@ -80,6 +80,7 @@ public class Servicio extends AccessibilityService {
             String a = i.getAction();
             if (a == null) return;
             if (host == null) crearRaiz();
+            if (a.endsWith(".APAGAR")) { cerrarPanel(); performGlobalAction(GLOBAL_ACTION_LOCK_SCREEN); return; } // como el botón de encendido: la huella sigue sirviendo
             if (a.endsWith(".ESTILO")) host.refrescarEnFondo();
             else if (a.endsWith(".ABRIR")) { host.sincronizar(); host.leerConfig(); abrirPanel(false); }
         }
@@ -98,7 +99,7 @@ public class Servicio extends AccessibilityService {
         f.addAction(Intent.ACTION_CONFIGURATION_CHANGED);
         registerReceiver(rx, f);
         IntentFilter fl = new IntentFilter();
-        fl.addAction("com.josemontes.panel.ABRIR"); fl.addAction("com.josemontes.panel.ESTILO");
+        fl.addAction("com.josemontes.panel.ABRIR"); fl.addAction("com.josemontes.panel.ESTILO"); fl.addAction("com.josemontes.panel.APAGAR");
         registerReceiver(rxLauncher, fl, "com.josemontes.launcher.permission.PANEL", null);
         actualizarFranja();
     }
