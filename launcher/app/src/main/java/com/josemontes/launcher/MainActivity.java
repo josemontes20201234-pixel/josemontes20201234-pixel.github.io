@@ -74,6 +74,7 @@ import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.GridLayout;
 import android.widget.GridView;
+import android.widget.HorizontalScrollView;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
@@ -141,6 +142,7 @@ public class MainActivity extends Activity {
 
     static class App {
         String label, pkg, cls, busqueda; Drawable icon;
+        int cat = -1; boolean sistema; // lo que la app le dice a Android (para las categorías del cajón)
         String key() { return pkg + "/" + cls; }
         ComponentName cn() { return new ComponentName(pkg, cls); }
     }
@@ -318,6 +320,8 @@ public class MainActivity extends Activity {
             prefs.edit().putBoolean("panel_tenue", true).putString("panel_botones", bs).apply();
             estiloCambiado();
         }
+        // Una sola vez: cajón con «Las que más usás» arriba y el resto en orden alfabético (con abecedario)
+        if (!prefs.getBoolean("cajon_v2", false)) prefs.edit().putBoolean("cajon_v2", true).putBoolean("ver_sugeridas", true).putString("cajon_orden", "alfa").apply();
         // Una sola vez: deslizar el dedo a la derecha abre la página de noticias (lo escogió Jose)
         if (!prefs.getBoolean("noticias_gesto", false)) prefs.edit().putBoolean("noticias_gesto", true).putString("g_derecha", "noticias").apply();
         leerConfig();
@@ -551,6 +555,15 @@ public class MainActivity extends Activity {
         buscarWeb.setOnClickListener(v -> buscarEnGoogle(buscar.getText().toString()));
         drawer.addView(buscarWeb);
 
+        // pestañas de categorías (Todas · Meraki · Mensajes y redes…)
+        catScroll = new HorizontalScrollView(this);
+        catScroll.setHorizontalScrollBarEnabled(false);
+        catScroll.setOverScrollMode(View.OVER_SCROLL_NEVER);
+        catFila = new LinearLayout(this);
+        catFila.setPadding(0, 0, dp(8), 0);
+        catScroll.addView(catFila);
+        drawer.addView(catScroll, lp(-1, -2, 12));
+
         LinearLayout sug = columnaBase();
         sug.addView(etiqueta("Las que más usás", MUTED), lp(-2, -2, 0));
         sugeridasBox = new LinearLayout(this);
@@ -574,7 +587,19 @@ public class MainActivity extends Activity {
         drawer.setOnDragListener(this::alArrastrar);
         homeBox.setOnDragListener(this::alArrastrar);
         LinearLayout.LayoutParams lg = new LinearLayout.LayoutParams(-1, 0, 1f); lg.topMargin = dp(10);
-        drawer.addView(grid, lg);
+        // la lista con el abecedario a la derecha; la letra grande sale al lado del dedo
+        FrameLayout zonaLista = new FrameLayout(this);
+        LinearLayout filaLista = new LinearLayout(this);
+        filaLista.addView(grid, new LinearLayout.LayoutParams(0, -1, 1f));
+        abc = new Abecedario();
+        filaLista.addView(abc, new LinearLayout.LayoutParams(dp(26), -1));
+        zonaLista.addView(filaLista, new FrameLayout.LayoutParams(-1, -1));
+        burbujaAbc = texto("", 30, 0xFF141414, Typeface.create("sans-serif-black", Typeface.NORMAL));
+        burbujaAbc.setGravity(Gravity.CENTER);
+        burbujaAbc.setVisibility(View.GONE);
+        FrameLayout.LayoutParams pb = new FrameLayout.LayoutParams(dp(64), dp(64), Gravity.END | Gravity.TOP); pb.rightMargin = dp(44);
+        zonaLista.addView(burbujaAbc, pb);
+        drawer.addView(zonaLista, lg);
 
         // ===== Ajustes =====
         ajustes = new LinearLayout(this);
@@ -631,6 +656,8 @@ public class MainActivity extends Activity {
         // Con el Panel Meraki o su editor abiertos, los gestos del inicio no deben estorbar
         if (panel != null && (panel.abierto() || panel.editando()) || barberia != null && barberia.abierta() || noticias != null && noticias.abierta()) return super.dispatchTouchEvent(ev);
         if (arrastreNoticias(ev)) return true;
+        if (ev.getActionMasked() == MotionEvent.ACTION_DOWN) tocandoAbc = abc != null && abc.getVisibility() == View.VISIBLE && drawer.getVisibility() == View.VISIBLE && dentroDe(abc, bajoX, bajoY);
+        if (tocandoAbc) return super.dispatchTouchEvent(ev);
         if (gestos != null && gestos.onTouchEvent(ev)) {
             MotionEvent cancel = MotionEvent.obtain(ev);
             cancel.setAction(MotionEvent.ACTION_CANCEL);
@@ -1494,6 +1521,12 @@ public class MainActivity extends Activity {
                 a.pkg = ri.activityInfo.packageName; a.cls = ri.activityInfo.name;
                 CharSequence l = ri.loadLabel(pm); a.label = l == null ? a.pkg : l.toString();
                 a.busqueda = sinAcentos(a.label);
+                try {
+                    android.content.pm.ApplicationInfo ai = ri.activityInfo.applicationInfo;
+                    a.cat = ai.category;
+                    if ((ai.flags & android.content.pm.ApplicationInfo.FLAG_IS_GAME) != 0) a.cat = android.content.pm.ApplicationInfo.CATEGORY_GAME;
+                    a.sistema = (ai.flags & (android.content.pm.ApplicationInfo.FLAG_SYSTEM | android.content.pm.ApplicationInfo.FLAG_UPDATED_SYSTEM_APP)) != 0;
+                } catch (Exception e) { }
                 App vieja = porKey.get(a.key());
                 a.icon = vieja != null ? vieja.icon : ri.loadIcon(pm);
                 nuevas.add(a);
@@ -1516,10 +1549,15 @@ public class MainActivity extends Activity {
         String q = sinAcentos(buscar.getText().toString().trim());
         Set<String> oc = ocultas();
         filtradas.clear();
+        JSONObject man = categoriasManual();
+        boolean conCat = q.isEmpty() && prefs.getBoolean("ver_categorias", true);
+        if (!conCat) categoria = "todas";
         for (App a : todas) {
             if (q.isEmpty() && oc.contains(a.key())) continue; // las ocultas sólo salen si las buscás
+            if (!"todas".equals(categoria) && !categoria.equals(Categorias.de(a, man))) continue;
             if (q.isEmpty() || a.busqueda.contains(q)) filtradas.add(a);
         }
+        pintarCategorias(conCat, oc, man);
         if (q.isEmpty() && "uso".equals(cajonOrden)) {
             JSONObject u = usos();
             Collections.sort(filtradas, (x, y) -> Integer.compare(u.optInt(y.key(), 0), u.optInt(x.key(), 0)));
@@ -1530,6 +1568,154 @@ public class MainActivity extends Activity {
         buscarWeb.setVisibility(raw.isEmpty() ? View.GONE : View.VISIBLE);
         buscarWeb.setText("Buscar «" + raw + "» en Google  →");
         adapter.notifyDataSetChanged();
+        if (abc != null) {
+            boolean ver = q.isEmpty() && !"uso".equals(cajonOrden) && prefs.getBoolean("ver_abc", true) && filtradas.size() >= 12;
+            abc.setVisibility(ver ? View.VISIBLE : View.GONE);
+            if (ver) abc.poner(filtradas);
+        }
+    }
+
+    // =====================================================================
+    // categorías del cajón y abecedario
+    // =====================================================================
+    String categoria = "todas";
+    HorizontalScrollView catScroll;
+    LinearLayout catFila;
+    Abecedario abc;
+    TextView burbujaAbc;
+    boolean tocandoAbc;
+
+    JSONObject categoriasManual() {
+        try { return new JSONObject(prefs.getString("categorias", "{}")); } catch (Exception e) { return new JSONObject(); }
+    }
+
+    void pintarCategorias(boolean ver, Set<String> oc, JSONObject man) {
+        if (catFila == null) return;
+        catScroll.setVisibility(ver ? View.VISIBLE : View.GONE);
+        if (!ver) return;
+        Map<String, Integer> cuenta = new HashMap<>();
+        for (App a : todas) {
+            if (oc.contains(a.key())) continue;
+            String c = Categorias.de(a, man);
+            Integer n = cuenta.get(c); cuenta.put(c, n == null ? 1 : n + 1);
+        }
+        catFila.removeAllViews();
+        chipCategoria("todas", "Todas");
+        for (String[] c : Categorias.LISTA) if (cuenta.containsKey(c[0])) chipCategoria(c[0], c[1]);
+        if (!"todas".equals(categoria) && !cuenta.containsKey(categoria)) categoria = "todas";
+    }
+
+    void chipCategoria(String id, String nombre) {
+        boolean sel = id.equals(categoria);
+        TextView v = texto(nombre, 14, sel ? Musica.Barras.tintaSobre(acento) : FG, tf(sel));
+        v.setPadding(dp(15), dp(9), dp(15), dp(9));
+        v.setBackground(caja(sel ? acento : (claro ? 0x12000000 : 0x1AFFFFFF), 99, 0));
+        v.setOnClickListener(x -> {
+            categoria = id;
+            filtrar();
+            grid.setSelection(0);
+            final View el = x;
+            ui.postDelayed(() -> catScroll.smoothScrollTo(Math.max(0, el.getLeft() - dp(40)), 0), 60);
+        });
+        v.setOnLongClickListener(x -> { toast("Para cambiar una app de categoría, mantenela presionada y tocá «Cambiar categoría…»."); return true; });
+        LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(-2, -2); p.rightMargin = dp(8);
+        catFila.addView(v, p);
+    }
+
+    void cambiarCategoria(App a) {
+        JSONObject man = categoriasManual();
+        String actual = Categorias.de(a, man);
+        boolean aMano = man.has(a.key());
+        String[] n = new String[Categorias.LISTA.length + (aMano ? 1 : 0)];
+        for (int i = 0; i < Categorias.LISTA.length; i++) n[i] = (Categorias.LISTA[i][0].equals(actual) ? "✓  " : "") + Categorias.LISTA[i][1];
+        if (aMano) n[n.length - 1] = "Volver a la automática";
+        dialogo().setTitle("Categoría de " + a.label).setItems(n, (d, w) -> {
+            JSONObject j = categoriasManual();
+            try { if (w >= Categorias.LISTA.length) j.remove(a.key()); else j.put(a.key(), Categorias.LISTA[w][0]); } catch (Exception e) { }
+            prefs.edit().putString("categorias", j.toString()).apply();
+            filtrar();
+            toast(a.label + " → " + Categorias.nombre(Categorias.de(a, j)));
+        }).setNegativeButton("Cancelar", null).show();
+    }
+
+    static String letraDe(App a) {
+        String b = a.busqueda == null ? "" : a.busqueda.trim();
+        if (b.isEmpty()) return "#";
+        char c = Character.toUpperCase(b.charAt(0));
+        return c >= 'A' && c <= 'Z' ? String.valueOf(c) : "#";
+    }
+
+    /** Las letras al costado: deslizás el dedo y la lista salta a esa letra. */
+    class Abecedario extends View {
+        final List<String> letras = new ArrayList<>();
+        final List<Integer> pos = new ArrayList<>();
+        final android.graphics.Paint p = new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
+        int activa = -1;
+        float y0, paso;
+
+        Abecedario() {
+            super(MainActivity.this);
+            p.setTextAlign(android.graphics.Paint.Align.CENTER);
+            p.setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD));
+            setContentDescription("Abecedario");
+        }
+
+        void poner(List<App> l) {
+            letras.clear(); pos.clear();
+            for (int i = 0; i < l.size(); i++) {
+                String c = letraDe(l.get(i));
+                if (!letras.contains(c)) { letras.add(c); pos.add(i); }
+            }
+            invalidate();
+        }
+
+        void medir() {
+            float alto = getHeight() - dp(8);
+            int n = Math.max(1, letras.size());
+            paso = Math.min(alto / n, dp(24));
+            y0 = dp(4) + (alto - paso * n) / 2f;
+        }
+
+        @Override protected void onDraw(Canvas c) {
+            if (letras.isEmpty()) return;
+            medir();
+            p.setTextSize(Math.min(paso * 0.62f, dp(12.5f)));
+            for (int i = 0; i < letras.size(); i++) {
+                p.setColor(i == activa ? acento : MUTED);
+                c.drawText(letras.get(i), getWidth() / 2f, y0 + paso * i + paso / 2f + p.getTextSize() / 3f, p);
+            }
+        }
+
+        @Override public boolean onTouchEvent(MotionEvent e) {
+            if (letras.isEmpty()) return false;
+            switch (e.getActionMasked()) {
+                case MotionEvent.ACTION_DOWN: case MotionEvent.ACTION_MOVE: {
+                    getParent().requestDisallowInterceptTouchEvent(true);
+                    medir();
+                    int i = (int) ((e.getY() - y0) / paso);
+                    i = Math.max(0, Math.min(letras.size() - 1, i));
+                    if (i != activa) {
+                        activa = i;
+                        grid.setSelection(pos.get(i));
+                        performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK);
+                        invalidate();
+                    }
+                    burbujaAbc.setText(letras.get(i));
+                    burbujaAbc.setTextColor(Musica.Barras.tintaSobre(acento));
+                    burbujaAbc.setBackground(caja(acento, 99, 0));
+                    burbujaAbc.setVisibility(View.VISIBLE);
+                    float y = getTop() + y0 + paso * i + paso / 2f - dp(32);
+                    burbujaAbc.setTranslationY(Math.max(0, Math.min(((View) burbujaAbc.getParent()).getHeight() - dp(64), y)));
+                    return true;
+                }
+                case MotionEvent.ACTION_UP: case MotionEvent.ACTION_CANCEL:
+                    activa = -1;
+                    burbujaAbc.setVisibility(View.GONE);
+                    invalidate();
+                    return true;
+            }
+            return true;
+        }
     }
 
     int maxFavs() {
@@ -2059,6 +2245,7 @@ public class MainActivity extends Activity {
         ops.add("Crear carpeta con esta app");
         if (!idsCarpetas.isEmpty()) ops.add("Meter en una carpeta…");
         ops.add(oculta ? "Mostrar en la lista de apps" : "Ocultar de la lista de apps");
+        ops.add("Cambiar categoría…");
         ops.add("Información de la app");
         ops.add("Desinstalar");
         dialogo().setTitle(a.label).setItems(ops.toArray(new String[0]), (d, w) -> {
@@ -2066,6 +2253,7 @@ public class MainActivity extends Activity {
             if (w < ats.size()) { abrirAtajo(ats.get(w)); ui.postDelayed(this::cerrarCajon, 400); return; }
             int idx = favs.indexOf(a.key());
             switch (op) {
+                case "Cambiar categoría…": cambiarCategoria(a); break;
                 case "Crear carpeta con esta app": crearCarpeta(a); break;
                 case "Meter en una carpeta…": {
                     String[] n = new String[idsCarpetas.size()];
@@ -2153,6 +2341,7 @@ public class MainActivity extends Activity {
     // =====================================================================
     void abrirCajon() {
         if (drawer.getVisibility() == View.VISIBLE) return;
+        if (!"todas".equals(categoria)) { categoria = "todas"; filtrar(); }
         drawer.setVisibility(View.VISIBLE);
         drawer.setAlpha(0f); drawer.setTranslationY(dp(60));
         drawer.animate().alpha(1f).translationY(0).setDuration(180).start();
@@ -2239,6 +2428,8 @@ public class MainActivity extends Activity {
         opcion(l, "Orden", nombre(CAJON_ORDEN, cajonOrden), () -> elegir("Orden", CAJON_ORDEN, "cajon_orden", cajonOrden));
         opcion(l, "Columnas", nombre(COLUMNAS, String.valueOf(columnas)), () -> elegir("Columnas", COLUMNAS, "columnas", String.valueOf(columnas)));
         interruptor(l, "Mostrar «Las que más usás» arriba", verSugeridas, v -> guardar("ver_sugeridas", v));
+        interruptor(l, "Categorías arriba (pestañas)", prefs.getBoolean("ver_categorias", true), v -> { prefs.edit().putBoolean("ver_categorias", v).apply(); filtrar(); });
+        interruptor(l, "Abecedario al costado", prefs.getBoolean("ver_abc", true), v -> { prefs.edit().putBoolean("ver_abc", v).apply(); filtrar(); });
         opcion(l, "Apps ocultas", ocultas().size() + " oculta" + (ocultas().size() == 1 ? "" : "s"), this::gestionarOcultas);
 
         seccion(l, "Barbería");
@@ -2920,7 +3111,7 @@ public class MainActivity extends Activity {
     void pintarSugeridas() {
         if (sugeridasBox == null) return;
         sugeridasBox.removeAllViews();
-        boolean ver = verSugeridas && buscar.length() == 0;
+        boolean ver = verSugeridas && buscar.length() == 0 && "todas".equals(categoria);
         List<App> l = ver ? masUsadas(columnas) : new ArrayList<>();
         ((View) sugeridasBox.getParent()).setVisibility(l.isEmpty() ? View.GONE : View.VISIBLE);
         int s = tamIconoPx(); if (columnas == 5) s = Math.round(s * 0.86f);
