@@ -195,16 +195,28 @@ class Barberia {
             JSONObject o = new JSONObject(s);
             int in = o.optInt("inactivos"), pr = o.optInt("premio"), cu = o.optInt("cumple");
             List<String> p = new ArrayList<>();
-            if (in > 0) p.add(in + (in == 1 ? " cliente no viene" : " clientes no vienen") + " hace +" + o.optInt("dias", 30) + " días");
-            if (pr > 0) p.add(pr + (pr == 1 ? " premio listo" : " premios listos"));
-            if (cu > 0) p.add(cu + " cumplen este mes");
+            if (in > 0) p.add("⏰ " + in + (in == 1 ? " cliente no viene" : " clientes no vienen") + " hace +" + o.optInt("dias", 30) + " días");
+            if (pr > 0) p.add("🎁 " + pr + (pr == 1 ? " premio listo" : " premios listos"));
+            if (cu > 0) p.add("🎂 " + cu + (cu == 1 ? " cumple años este mes" : " cumplen años este mes"));
             if (p.isEmpty()) return "Tarjeta Meraki: todos tus clientes al día ✓";
-            return "👥 " + android.text.TextUtils.join(" · ", p);
+            return android.text.TextUtils.join("  ·  ", p);
         } catch (Exception e) { return null; }
     }
 
+    /** El grupo de Tarjeta Meraki que corresponde a lo que dice la línea (inactivos, premios o cumpleaños). */
+    String grupoTarjetaMeraki() {
+        try {
+            JSONObject o = new JSONObject(a.prefs.getString("tm_resumen", "{}"));
+            if (o.optInt("inactivos") > 0) return "inactivo";
+            if (o.optInt("premio") > 0) return "premio";
+            if (o.optInt("cumple") > 0) return "cumple";
+        } catch (Exception e) { }
+        return "todos";
+    }
+
     void abrirTarjetaMeraki() {
-        try { a.startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(TM_APP)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)); }
+        String url = TM_APP.substring(0, TM_APP.indexOf('?')) + "?seg=" + grupoTarjetaMeraki();
+        try { a.startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)); }
         catch (Exception e) { a.toast("No encontré Tarjeta Meraki."); }
     }
 
@@ -313,6 +325,8 @@ class Barberia {
         if (g != null) { for (String k : g.split(",")) { MainActivity.App ap = a.porKey.get(k); if (ap != null) r.add(ap); } return r; }
         for (MainActivity.App ap : a.todas) {
             String l = ap.label == null ? "" : ap.label.toLowerCase(Locale.ROOT);
+            // Meraki Panel y el launcher no son apps de trabajo
+            if (ap.pkg.equals("com.josemontes.panel") || ap.pkg.equals(a.getPackageName())) continue;
             if (l.contains("meraki") || ap.pkg.equals("com.whatsapp") || ap.pkg.equals("com.whatsapp.w4b")) r.add(ap);
             if (r.size() >= 8) break;
         }
