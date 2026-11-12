@@ -264,6 +264,16 @@ class MainActivity extends ContextWrapper {
         startActivity(new Intent(this, Inicio.class).putExtra("editor", true).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
     }
     boolean abrirPanelExterno() { return false; } // aquí el panel ya es este
+    // Modo barbería y caja viven en el launcher: se le pide a él
+    Boolean modoBarberia() { return prefs.getBoolean("modo_on", false); }
+    void alternarModoBarberia() {
+        prefs.edit().putBoolean("modo_on", !prefs.getBoolean("modo_on", false)).apply();
+        try { sendBroadcast(new Intent(LAUNCHER + ".MODO").setPackage(LAUNCHER)); } catch (Exception e) { toast("Necesitás el Meraki Launcher para el modo barbería."); }
+    }
+    void abrirCaja() {
+        try { startActivity(new Intent().setClassName(LAUNCHER, LAUNCHER + ".MainActivity").putExtra("caja", true).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)); }
+        catch (Exception e) { toast("La caja está en el Meraki Launcher."); }
+    }
     Boolean estadoConocido(String id) { return prefs.contains("conocido_" + id) ? prefs.getBoolean("conocido_" + id, false) : null; }
     void estiloCambiado() { if (Servicio.yo != null && Servicio.yo.host != null) Servicio.yo.host.refrescarEnFondo(); }
 

@@ -1,5 +1,5 @@
 // Service worker: guarda la app para que abra rápido. Los datos siempre vienen en vivo de Firebase.
-const CACHE = "meraki-v1";
+const CACHE = "meraki-v2";
 const SHELL = ["./", "./index.html", "./app.js", "./config.js", "./manifest.webmanifest", "./icon-192.png", "./icon-512.png"];
 
 self.addEventListener("install", e => {

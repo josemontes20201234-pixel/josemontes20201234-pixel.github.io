@@ -69,7 +69,7 @@ class Panel {
             {"rotacion", "Rotación"}, {"ubicacion", "Ubicación"}, {"ahorro", "Ahorro de batería"}, {"nomolestar", "No molestar"},
             {"apagar", "Apagar pantalla"}, {"samsung", "Panel de Samsung"}, {"ajustes", "Ajustes del cel"}, {"avion", "Modo avión"},
             {"oscuro", "Modo oscuro"}, {"hotspot", "Zona Wi-Fi"}, {"espejo", "Duplicar pantalla"}, {"nfc", "NFC"}, {"volumen", "Volumen"},
-            {"camara", "Cámara"}, {"alarma", "Alarmas"}, {"calc", "Calculadora"}, {"notis", "Notificaciones"}, {"tenue", "Extra tenue"}};
+            {"camara", "Cámara"}, {"alarma", "Alarmas"}, {"calc", "Calculadora"}, {"notis", "Notificaciones"}, {"tenue", "Extra tenue"}, {"modo", "Modo barbería"}, {"caja", "Caja rápida"}};
     static final String POR_DEFECTO = "wifi,bt,linterna,datos,sonido,rotacion,ubicacion,ahorro,nomolestar,apagar,notis,ajustes";
     // {nombre, fondo, color encendido, forma, borde, resplandor}
     static final String[][] TEMAS = {
@@ -535,6 +535,7 @@ class Panel {
                 case "avion": return Settings.Global.getInt(cr, Settings.Global.AIRPLANE_MODE_ON, 0) == 1;
                 case "oscuro": return (a.getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES;
                 case "nfc": { NfcAdapter n = NfcAdapter.getDefaultAdapter(a); return n != null && n.isEnabled(); }
+                case "modo": return a.modoBarberia();
                 case "tenue":
                     try { return Settings.Secure.getInt(cr, "reduce_bright_colors_activated", 0) == 1; }
                     catch (SecurityException e) { return a.estadoConocido(id); } // Android no deja leerlo: lo último que se vio
@@ -614,6 +615,8 @@ class Panel {
             case "espejo": abrirIntent(a.getPackageManager().getLaunchIntentForPackage("com.samsung.android.smartmirroring"), accion("android.settings.CAST_SETTINGS"), accion(Settings.ACTION_WIRELESS_SETTINGS)); break;
             case "nfc": probar(id, () -> abrirIntent(accion(Settings.ACTION_NFC_SETTINGS), accion(Settings.ACTION_WIRELESS_SETTINGS))); break;
             case "tenue": probar(id, () -> abrirIntent(accion("android.settings.REDUCE_BRIGHT_COLORS_SETTINGS"), accion(Settings.ACTION_ACCESSIBILITY_SETTINGS))); break;
+            case "modo": a.alternarModoBarberia(); break;
+            case "caja": cerrar(); a.abrirCaja(); break;
             case "volumen": abrirIntent(Build.VERSION.SDK_INT >= 29 ? accion(Settings.Panel.ACTION_VOLUME) : null, accion(Settings.ACTION_SOUND_SETTINGS)); break;
             case "camara": cerrar(); abrirIntent(accion(MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA)); break;
             case "alarma": cerrar(); abrirIntent(accion(AlarmClock.ACTION_SHOW_ALARMS)); break;
@@ -1199,6 +1202,8 @@ class Panel {
             case "alarma": return "M12 4a9 9 0 1 0 0 18a9 9 0 1 0 0-18 M12 9v4l2 2 M5 3L2 6 M22 6l-3-3";
             case "calc": return "M6 2h12a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z M8 6h8 M8 10h.01 M12 10h.01 M16 10h.01 M8 14h.01 M12 14h.01 M16 14h.01 M8 18h.01 M12 18h.01 M16 18h.01";
             case "notis": return "M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9 M10.3 21a1.94 1.94 0 0 0 3.4 0";
+            case "modo": return "M6 3a3 3 0 1 0 0 6a3 3 0 1 0 0-6 M6 15a3 3 0 1 0 0 6a3 3 0 1 0 0-6 M20 4L8.12 15.88 M14.47 14.48L20 20 M8.12 8.12L12 12";
+            case "caja": return "M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1z M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8 M12 17.5v-11";
             case "tenue": return "M12 8a4 4 0 1 0 0 8a4 4 0 1 0 0-8 M12 4h.01 M20 12h.01 M12 20h.01 M4 12h.01 M17.66 6.34h.01 M17.66 17.66h.01 M6.34 17.66h.01 M6.34 6.34h.01";
         }
         return "M12 2a10 10 0 1 0 0 20a10 10 0 1 0 0-20";

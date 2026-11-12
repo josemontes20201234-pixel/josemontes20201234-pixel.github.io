@@ -248,14 +248,34 @@ const Admin = {
   clientes: [], filtro:"todos", query:"", openId:null, scannedId:null, lastStamped:null, freshId:null, sent:new Set(), tab:"clientes", loaded:false, cardCache:{},
   start(u){
     this.clientes = []; this.loaded = false;
+    // El Meraki Launcher abre la app directo en un grupo (por ejemplo ?seg=inactivo)
+    try { const seg = new URLSearchParams(location.search).get("seg"); if (seg && SEGMENTS[seg]) this.filtro = seg; } catch(e){}
     this.shell(u);
     const slow = setTimeout(() => { if (!this.loaded) this.banner("No se puede conectar a la base de datos todavía. Revisá tu internet.","warn"); }, 10000);
     stopFns.push(onSnapshot(collection(db,"clientes"), snap => {
       this.clientes = snap.docs.map(d => ({id:d.id, ...d.data()}));
       if (!snap.metadata.fromCache){ this.loaded = true; clearTimeout(slow); this.banner(""); }
       this.render();
+      if (this.loaded) this.publicarResumen();
     }, e => { clearTimeout(slow); this.banner("No se pudo leer la lista ("+e.code+"). Revisá las reglas de Firestore en la guía.","warn"); }));
-    stopFns.push(onSnapshot(doc(db,"config","programa"), s => { cfg = mergeCfg(s.exists() ? s.data() : {}); this.render(); this.fillConfig(); }, () => {}));
+    stopFns.push(onSnapshot(doc(db,"config","programa"), s => { cfg = mergeCfg(s.exists() ? s.data() : {}); this.render(); this.fillConfig(); if (this.loaded) this.publicarResumen(); }, () => {}));
+  },
+  // Sólo números para la tarjeta «Hoy en Meraki» del launcher: nunca nombres ni teléfonos
+  publicarResumen(){
+    const L = this.clientes, hoy = new Date().toDateString();
+    const r = {
+      inactivos: L.filter(SEGMENTS.inactivo.test).length,
+      premio: L.filter(SEGMENTS.premio.test).length,
+      casi: L.filter(SEGMENTS.casi.test).length,
+      cumple: L.filter(SEGMENTS.cumple.test).length,
+      total: L.length,
+      hoy: L.reduce((a,c)=>a+(c.historial||[]).filter(h=>h.t==="visita"&&new Date(h.fecha).toDateString()===hoy).length,0),
+      dias: cfg.diasInactivo
+    };
+    const k = JSON.stringify(r);
+    if (k === this._resumen) return;
+    this._resumen = k;
+    setDoc(doc(db,"resumen","barberia"), {...r, actualizado: nowISO()}).catch(()=>{ this._resumen = ""; });
   },
   shell(u){
     $("#app").innerHTML =

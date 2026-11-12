@@ -355,6 +355,8 @@ public class MainActivity extends Activity {
         if (!diaConstruido.equals(hoyClave())) construirInicio();
         actualizarInfo();
         if (panel != null && panel.abierto()) panel.refrescar();
+        barberia().pintarTarjeta();
+        barberia().cargarTarjetaMeraki(false);
         cargarAgenda();
         cargarApps();
         cargarClima(false);
@@ -381,6 +383,8 @@ public class MainActivity extends Activity {
         cerrarAjustes();
         cerrarCajon();
         if (panel != null) panel.cerrar();
+        if (barberia != null) barberia.cerrarCaja();
+        if (i != null && i.getBooleanExtra("caja", false)) ui.postDelayed(() -> barberia().abrirCaja("hoy"), 150);
         if (i != null && i.getBooleanExtra("panel", false)) ui.postDelayed(() -> panel().abrir(), 120);
         if (i != null && i.getBooleanExtra("pedir_apagar", false)) pedirPermisoApagar();
         if (i != null && i.getBooleanExtra("editor_panel", false)) ui.postDelayed(() -> panel().abrirEditor("temas"), 150);
@@ -391,6 +395,21 @@ public class MainActivity extends Activity {
     Panel panel;
     View seccionPanel;
     Panel panel() { if (panel == null) panel = new Panel(this); return panel; }
+    // ===== Barbería: caja rápida, «Hoy en Meraki», modo barbería
+    Barberia barberia;
+    Barberia barberia() { if (barberia == null) barberia = new Barberia(this); return barberia; }
+    Boolean modoBarberia() { return Barberia.modoActivo(this); }
+    void alternarModoBarberia() { barberia().alternarConPermisos(); }
+    void abrirCaja() { ui.postDelayed(() -> barberia().abrirCaja("hoy"), 150); }
+    void ayudaTarjetaMeraki() {
+        if (!"permiso".equals(prefs.getString("tm_error", ""))) { barberia().cargarTarjetaMeraki(true); toast("Actualizando…"); return; }
+        TextView t = texto("En Firebase → Firestore → Rules, pegá esto justo debajo de la línea «match /databases/{database}/documents {» y tocá Publish:\n\n" + Barberia.REGLA + "\n\nSólo deja leer los números (cuántos inactivos, premios), nunca nombres ni teléfonos.", 13.5f, FG, Typeface.MONOSPACE);
+        t.setTextIsSelectable(true);
+        FrameLayout f = new FrameLayout(this); f.setPadding(dp(22), dp(8), dp(22), 0); f.addView(t);
+        dialogo().setTitle("Conectar Tarjeta Meraki").setView(f)
+                .setPositiveButton("Copiar la regla", (d, w) -> { ((android.content.ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE)).setPrimaryClip(android.content.ClipData.newPlainText("regla", Barberia.REGLA)); toast("Regla copiada"); })
+                .setNegativeButton("Cerrar", null).show();
+    }
     final boolean externo = false;
     void personalizarPanel() { panel().abrirEditor("temas"); }
     void actualizarTiles() { Tiles.actualizar(this); }
@@ -451,7 +470,8 @@ public class MainActivity extends Activity {
 
     @Override
     public void onBackPressed() {
-        if (panel != null && panel.editando()) panel.cerrarEditor();
+        if (barberia != null && barberia.abierta()) barberia.cerrarCaja();
+        else if (panel != null && panel.editando()) panel.cerrarEditor();
         else if (panel != null && panel.abierto()) panel.cerrar();
         else if (ajustes.getVisibility() == View.VISIBLE) cerrarAjustes();
         else if (drawer.getVisibility() == View.VISIBLE) cerrarCajon();
@@ -594,7 +614,7 @@ public class MainActivity extends Activity {
     public boolean dispatchTouchEvent(MotionEvent ev) {
         if (ev.getActionMasked() == MotionEvent.ACTION_DOWN) { bajoX = ev.getRawX(); bajoY = ev.getRawY(); }
         // Con el Panel Meraki o su editor abiertos, los gestos del inicio no deben estorbar
-        if (panel != null && (panel.abierto() || panel.editando())) return super.dispatchTouchEvent(ev);
+        if (panel != null && (panel.abierto() || panel.editando()) || barberia != null && barberia.abierta()) return super.dispatchTouchEvent(ev);
         if (gestos != null && gestos.onTouchEvent(ev)) {
             MotionEvent cancel = MotionEvent.obtain(ev);
             cancel.setAction(MotionEvent.ACTION_CANCEL);
@@ -747,6 +767,10 @@ public class MainActivity extends Activity {
         sv.setOverScrollMode(View.OVER_SCROLL_NEVER);
         sv.setFillViewport(true);
         LinearLayout c = columnaBase();
+        if (prefs.getBoolean("ver_barberia", true)) {
+            LinearLayout.LayoutParams pb = lp(-1, -2, 0); pb.bottomMargin = dp(12);
+            c.addView(barberia().tarjetaHoy(), pb);
+        }
         if (conAgenda && verAgenda) c.addView(tarjetaAgenda(agendaCompacta), lp(-1, -2, 0));
         widgetBox = columnaBase();
         c.addView(widgetBox, lp(-1, -2, 0));
@@ -1971,6 +1995,16 @@ public class MainActivity extends Activity {
         opcion(l, "Columnas", nombre(COLUMNAS, String.valueOf(columnas)), () -> elegir("Columnas", COLUMNAS, "columnas", String.valueOf(columnas)));
         interruptor(l, "Mostrar «Las que más usás» arriba", verSugeridas, v -> guardar("ver_sugeridas", v));
         opcion(l, "Apps ocultas", ocultas().size() + " oculta" + (ocultas().size() == 1 ? "" : "s"), this::gestionarOcultas);
+
+        seccion(l, "Barbería");
+        interruptor(l, "Tarjeta «Hoy en Meraki» en el inicio", prefs.getBoolean("ver_barberia", true), v -> guardar("ver_barberia", v));
+        opcion(l, "Caja: servicios y precios", barberia().servicios().size() + " servicios", () -> { cerrarAjustes(); barberia().abrirCaja("servicios"); });
+        opcion(l, "Modo barbería", Barberia.modoActivo(this) ? "Activo · tocá para apagarlo" : "Apagado · tocá para activarlo", () -> { barberia().alternarConPermisos(); construirAjustes(); });
+        interruptor(l, "Modo barbería: No molestar", prefs.getBoolean("modo_dnd", true), v -> guardar("modo_dnd", v));
+        opcion(l, "Modo barbería: sonido", Barberia.nombre(Barberia.SONIDOS, prefs.getString("modo_sonido", "vibrar")), () -> elegir("Sonido en modo barbería", Barberia.SONIDOS, "modo_sonido", prefs.getString("modo_sonido", "vibrar")));
+        opcion(l, "Modo barbería: brillo", Barberia.nombre(Barberia.BRILLOS, prefs.getString("modo_brillo", "igual")), () -> elegir("Brillo en modo barbería", Barberia.BRILLOS, "modo_brillo", prefs.getString("modo_brillo", "igual")));
+        opcion(l, "Apps de trabajo", barberia().appsTrabajo().size() + " apps · salen en la tarjeta con el modo barbería", () -> barberia().elegirAppsTrabajo());
+        opcion(l, "Tarjeta Meraki", "permiso".equals(prefs.getString("tm_error", "")) ? "Falta un permiso en Firebase · tocá para ver cómo" : prefs.getString("tm_resumen", "").isEmpty() ? "Abrí Tarjeta Meraki una vez para que mande sus números" : "Conectada · tocá para actualizar", this::ayudaTarjetaMeraki);
 
         seccion(l, "Panel Meraki");
         seccionPanel = l.getChildAt(l.getChildCount() - 1);

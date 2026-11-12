@@ -22,7 +22,7 @@ public class Proveedor extends ContentProvider {
         SharedPreferences pr = getContext().getSharedPreferences("meraki", 0);
         for (Map.Entry<String, ?> e : pr.getAll().entrySet()) {
             String k = e.getKey();
-            if (!(k.startsWith("panel_") || k.equals("tema") || k.equals("acento") || k.equals("letra"))) continue;
+            if (!(k.startsWith("panel_") || k.equals("tema") || k.equals("acento") || k.equals("letra") || k.equals("modo_on"))) continue;
             Object v = e.getValue();
             String t = v instanceof Boolean ? "b" : v instanceof Long ? "l" : v instanceof Integer ? "i" : "s";
             c.addRow(new Object[]{k, t, String.valueOf(v)});
