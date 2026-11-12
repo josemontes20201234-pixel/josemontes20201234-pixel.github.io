@@ -2074,7 +2074,7 @@ public class MainActivity extends Activity {
         opcion(l, "Tarjeta Meraki", "permiso".equals(prefs.getString("tm_error", "")) ? "Falta un permiso en Firebase · tocá para ver cómo" : prefs.getString("tm_resumen", "").isEmpty() ? "Abrí Tarjeta Meraki una vez para que mande sus números" : "Conectada · tocá para actualizar", this::ayudaTarjetaMeraki);
 
         seccion(l, "Noticias");
-        opcion(l, "Abrir las noticias", "CNN, Forbes y Mundo Cristiano en una página", () -> { cerrarAjustes(); noticias().abrir(dirNoticias() == 0 ? 1 : dirNoticias()); });
+        opcion(l, "Abrir las noticias", "CNN, Forbes Centroamérica, CBS MoneyWatch y Mundo Cristiano", () -> { cerrarAjustes(); noticias().abrir(dirNoticias() == 0 ? 1 : dirNoticias()); });
         opcion(l, "Cómo se abre", dirNoticias() == 1 ? "Deslizá el dedo a la derecha en el inicio" : dirNoticias() == -1 ? "Deslizá el dedo a la izquierda en el inicio" : "Sin gesto · tocá para escoger", this::elegirGestoNoticias);
         opcion(l, "Fuentes", noticias().activas().size() + " de " + Noticias.FUENTES.length + " · tocá para escoger", () -> noticias().elegirFuentes());
 

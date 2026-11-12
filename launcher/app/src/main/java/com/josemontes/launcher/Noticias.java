@@ -82,7 +82,7 @@ class Noticias {
             return h.equals(dominio) || h.endsWith("." + dominio);
         }
     }
-    /** CNN ya no tiene canal propio que funcione: se lee por Google Noticias filtrado a su sitio. Forbes y CBN sí tienen el suyo. */
+    /** CNN ya no tiene canal propio que funcione: se lee por Google Noticias filtrado a su sitio. Forbes Centroamérica, CBS y CBN sí tienen el suyo. */
     static final Fuente[] FUENTES = {
             new Fuente("cnne", "CNN en Español", "CNN en Español", "cnnespanol.cnn.com", 0xFFE5483F,
                     BING + "q=site%3acnnespanol.cnn.com&mkt=es-US&setlang=es",
@@ -94,10 +94,10 @@ class Noticias {
                     "https://forbescentroamerica.com/feed/",
                     BING + "q=site%3aforbescentroamerica.com&mkt=es-US&setlang=es",
                     GN + "q=when:7d+site:forbescentroamerica.com&hl=es-419&gl=US&ceid=US:es-419"),
-            new Fuente("forbes", "Forbes (EE. UU.)", "Forbes", "forbes.com", 0xFF5B8DEF,
-                    "https://www.forbes.com/business/feed/",
-                    BING + "q=site%3aforbes.com&mkt=en-US&setlang=en",
-                    GN + "q=when:2d+site:forbes.com&hl=en-US&gl=US&ceid=US:en"),
+            // Forbes de EE. UU. cobra después de unas cuantas noticias: Jose la cambió por CBS MoneyWatch, que es gratis
+            new Fuente("cbsmw", "CBS MoneyWatch (negocios, en inglés)", "CBS MoneyWatch", "cbsnews.com", 0xFF4FB6A5,
+                    "https://www.cbsnews.com/latest/rss/moneywatch",
+                    GN + "q=when:2d+site:cbsnews.com+MoneyWatch&hl=en-US&gl=US&ceid=US:en"),
             new Fuente("mc", "Mundo Cristiano (CBN)", "Mundo Cristiano", null, 0,
                     "https://podcast.cbn.com/CBN_Video_Podcast_Mundo_Cristiano.aspx",
                     "http://podcast.cbn.com/CBN_Video_Podcast_Mundo_Cristiano.aspx"),
@@ -110,7 +110,7 @@ class Noticias {
         String s = a.prefs.getString("noticias_fuentes", null);
         Set<String> r = new HashSet<>();
         if (s == null) { for (Fuente f : FUENTES) r.add(f.id); return r; }
-        for (String k : s.split(",")) if (!k.isEmpty()) r.add(k);
+        for (String k : s.split(",")) if (!k.isEmpty()) r.add("forbes".equals(k) ? "cbsmw" : k);
         return r;
     }
 
@@ -326,6 +326,7 @@ class Noticias {
                             break;
                         }
                         case "itunes:image": if (n.img == null) n.img = p.getAttributeValue(null, "href"); break;
+                        case "image": { String s = texto(p).trim(); if (n.img == null && s.startsWith("http")) n.img = s; break; }
                         case "itunes:duration": n.dur = texto(p).trim(); break;
                         case "itunes:summary": case "itunes:subtitle": if (n.resumen == null || n.resumen.isEmpty()) n.resumen = limpio(texto(p)); break;
                         case "source": medio = texto(p).trim(); break;
@@ -341,6 +342,8 @@ class Noticias {
                             // Bing manda el enlace por su contador: se saca la dirección real de la noticia
                             if (n.link.contains("bing.com/news/apiclick")) { try { String real = Uri.parse(n.link).getQueryParameter("url"); if (real != null && real.startsWith("http")) n.link = real; } catch (Exception e) { } }
                             if (n.img != null && n.img.contains("bing.com/th") && !n.img.contains("&w=")) n.img += "&w=240&h=240&c=7";
+                            // CBS manda la foto en 60x60: se pide más grande y, si no la da, se usa la chica
+                            if (n.img != null && n.img.contains("/thumbnail/60x60/")) n.img = n.img.replace("/thumbnail/60x60/", "/thumbnail/320x320/") + " " + n.img;
                             if (n.fecha == 0) { Matcher m = FECHA_TITULO.matcher(n.titulo); if (m.find()) n.fecha = fechaTitulo(m); }
                             if (n.resumen != null && n.resumen.length() > 400) n.resumen = n.resumen.substring(0, 400).trim() + "…";
                             if (vistos.add(n.titulo.toLowerCase(Locale.ROOT))) r.add(n);
@@ -425,23 +428,11 @@ class Noticias {
         if (b != null) { iv.setImageBitmap(b); return; }
         hilos.execute(() -> {
             Bitmap bm = null;
-            try {
-                File f = new File(carpetaFotos(), Integer.toHexString(url.hashCode()) + "_" + url.length());
-                byte[] d = f.exists() ? leer(f) : null;
-                if (d == null || d.length == 0) {
-                    d = bajar(url, 3_000_000, "image/webp,image/jpeg,image/png,image/*;q=0.8");
-                    try (FileOutputStream out = new FileOutputStream(f)) { out.write(d); }
-                }
-                BitmapFactory.Options o = new BitmapFactory.Options();
-                o.inJustDecodeBounds = true;
-                BitmapFactory.decodeByteArray(d, 0, d.length, o);
-                int s = 1;
-                while (o.outWidth / (s * 2) >= lado && o.outHeight / (s * 2) >= lado) s *= 2;
-                BitmapFactory.Options o2 = new BitmapFactory.Options();
-                o2.inSampleSize = s;
-                bm = BitmapFactory.decodeByteArray(d, 0, d.length, o2);
-                if (bm == null) { anotarFoto(url, "no se pudo leer (" + d.length + " bytes)"); new File(carpetaFotos(), Integer.toHexString(url.hashCode()) + "_" + url.length()).delete(); }
-            } catch (Exception e) { anotarFoto(url, e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage()); }
+            // puede traer varias opciones separadas por espacio: la grande primero
+            for (String u : url.trim().split(" +")) {
+                bm = bajarFoto(u, lado);
+                if (bm != null) break;
+            }
             final Bitmap fb = bm;
             if (fb != null) fotos.put(url, fb);
             a.ui.post(() -> {
@@ -451,6 +442,27 @@ class Noticias {
                 iv.setAlpha(0f); iv.animate().alpha(1f).setDuration(160).start();
             });
         });
+    }
+
+    Bitmap bajarFoto(String url, int lado) {
+        File f = new File(carpetaFotos(), Integer.toHexString(url.hashCode()) + "_" + url.length());
+        try {
+            byte[] d = f.exists() ? leer(f) : null;
+            if (d == null || d.length == 0) {
+                d = bajar(url, 3_000_000, "image/webp,image/jpeg,image/png,image/*;q=0.8");
+                try (FileOutputStream out = new FileOutputStream(f)) { out.write(d); }
+            }
+            BitmapFactory.Options o = new BitmapFactory.Options();
+            o.inJustDecodeBounds = true;
+            BitmapFactory.decodeByteArray(d, 0, d.length, o);
+            int s = 1;
+            while (o.outWidth / (s * 2) >= lado && o.outHeight / (s * 2) >= lado) s *= 2;
+            BitmapFactory.Options o2 = new BitmapFactory.Options();
+            o2.inSampleSize = s;
+            Bitmap bm = BitmapFactory.decodeByteArray(d, 0, d.length, o2);
+            if (bm == null) { anotarFoto(url, "no se pudo leer (" + d.length + " bytes)"); f.delete(); }
+            return bm;
+        } catch (Exception e) { anotarFoto(url, e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage()); return null; }
     }
 
     void anotarFoto(String url, String que) {
@@ -714,6 +726,7 @@ class Noticias {
         if (lista == null) return;
         pintarEstado();
         Set<String> act = activas();
+        if (!"todas".equals(filtro) && (fuente(filtro) == null || !act.contains(filtro))) filtro = "todas";
         // filtros por fuente
         chips.removeAllViews();
         chip("todas", "Todas");
@@ -777,7 +790,7 @@ class Noticias {
     }
 
     void pie() {
-        TextView t = a.texto("CNN y Forbes por sus páginas, Bing o Google Noticias · Mundo Cristiano de CBN\nTocá una noticia para leerla · mantenela presionada para compartirla\nRevisar cómo cargó cada fuente", 11.5f, sub(), a.tf(false));
+        TextView t = a.texto("Por sus páginas, Bing o Google Noticias · Mundo Cristiano de CBN\nTocá una noticia para leerla · mantenela presionada para compartirla\nRevisar cómo cargó cada fuente", 11.5f, sub(), a.tf(false));
         t.setOnClickListener(v -> revisarFuentes());
         t.setLineSpacing(a.dp(3), 1f);
         t.setGravity(Gravity.CENTER);
