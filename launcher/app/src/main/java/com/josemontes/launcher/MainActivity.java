@@ -134,7 +134,7 @@ public class MainActivity extends Activity {
     static final String[][] CAJON_ESTILOS = {{"cuadricula", "Cuadrícula"}, {"lista", "Lista"}};
     static final String[][] CAJON_ORDEN = {{"alfa", "Alfabético"}, {"uso", "Las que más usás primero"}};
     static final String[][] ACCIONES = {{"cajon", "Abrir todas las apps"}, {"notificaciones", "Bajar notificaciones"}, {"buscar", "Buscar"},
-            {"panel", "Abrir el Panel Meraki"}, {"google", "Abrir Google"}, {"ajustes", "Ajustes del launcher"}, {"bloquear", "Apagar la pantalla"}, {"barra", "Mostrar u ocultar la barra de arriba"}, {"app", "Abrir una app…"}, {"nada", "No hacer nada"}};
+            {"panel", "Abrir el Panel Meraki"}, {"google", "Abrir Google"}, {"ajustes", "Ajustes del launcher"}, {"bloquear", "Apagar la pantalla"}, {"barra", "Mostrar u ocultar la barra de arriba"}, {"noticias", "Abrir las noticias"}, {"app", "Abrir una app…"}, {"nada", "No hacer nada"}};
     static final String[][] GESTOS = {{"g_arriba", "Deslizar hacia arriba", "cajon"}, {"g_abajo", "Deslizar hacia abajo", "notificaciones"},
             {"g_doble", "Doble toque", "ajustes"}, {"g_derecha", "Deslizar a la derecha", "nada"}, {"g_izquierda", "Deslizar a la izquierda", "nada"}};
     static final String[][] COLUMNAS = {{"4", "4 columnas"}, {"5", "5 columnas"}};
@@ -318,6 +318,8 @@ public class MainActivity extends Activity {
             prefs.edit().putBoolean("panel_tenue", true).putString("panel_botones", bs).apply();
             estiloCambiado();
         }
+        // Una sola vez: deslizar el dedo a la derecha abre la página de noticias (lo escogió Jose)
+        if (!prefs.getBoolean("noticias_gesto", false)) prefs.edit().putBoolean("noticias_gesto", true).putString("g_derecha", "noticias").apply();
         leerConfig();
         awm = AppWidgetManager.getInstance(this);
         host = new Anfitrion(this, 1024);
@@ -384,6 +386,7 @@ public class MainActivity extends Activity {
         cerrarCajon();
         if (panel != null) panel.cerrar();
         if (barberia != null) barberia.cerrarCaja();
+        if (noticias != null) noticias.cerrar();
         if (i != null && i.getBooleanExtra("caja", false)) ui.postDelayed(() -> barberia().abrirCaja("hoy"), 150);
         if (i != null && i.getBooleanExtra("panel", false)) ui.postDelayed(() -> panel().abrir(), 120);
         if (i != null && i.getBooleanExtra("pedir_apagar", false)) pedirPermisoApagar();
@@ -471,7 +474,8 @@ public class MainActivity extends Activity {
 
     @Override
     public void onBackPressed() {
-        if (barberia != null && barberia.abierta()) barberia.cerrarCaja();
+        if (noticias != null && noticias.abierta()) noticias.cerrar();
+        else if (barberia != null && barberia.abierta()) barberia.cerrarCaja();
         else if (panel != null && panel.editando()) panel.cerrarEditor();
         else if (panel != null && panel.abierto()) panel.cerrar();
         else if (ajustes.getVisibility() == View.VISIBLE) cerrarAjustes();
@@ -614,8 +618,11 @@ public class MainActivity extends Activity {
     @Override
     public boolean dispatchTouchEvent(MotionEvent ev) {
         if (ev.getActionMasked() == MotionEvent.ACTION_DOWN) { bajoX = ev.getRawX(); bajoY = ev.getRawY(); }
+        // La página de noticias sale siguiendo el dedo
+        if (arrNoticias) return arrastreNoticias(ev);
         // Con el Panel Meraki o su editor abiertos, los gestos del inicio no deben estorbar
-        if (panel != null && (panel.abierto() || panel.editando()) || barberia != null && barberia.abierta()) return super.dispatchTouchEvent(ev);
+        if (panel != null && (panel.abierto() || panel.editando()) || barberia != null && barberia.abierta() || noticias != null && noticias.abierta()) return super.dispatchTouchEvent(ev);
+        if (arrastreNoticias(ev)) return true;
         if (gestos != null && gestos.onTouchEvent(ev)) {
             MotionEvent cancel = MotionEvent.obtain(ev);
             cancel.setAction(MotionEvent.ACTION_CANCEL);
@@ -624,6 +631,64 @@ public class MainActivity extends Activity {
             return true;
         }
         return super.dispatchTouchEvent(ev);
+    }
+
+    // ===== Página de noticias (sale desde el borde como la de Samsung)
+    Noticias noticias;
+    Noticias noticias() { if (noticias == null) noticias = new Noticias(this); return noticias; }
+    /** 1 si se abre deslizando el dedo a la derecha (sale desde la izquierda), -1 al revés, 0 sin gesto. */
+    int dirNoticias() {
+        if ("noticias".equals(accionDe("g_derecha"))) return 1;
+        if ("noticias".equals(accionDe("g_izquierda"))) return -1;
+        return 0;
+    }
+    float nX0, nY0, nUltX, nVel; long nUltT; boolean nPosible, arrNoticias;
+
+    boolean arrastreNoticias(MotionEvent ev) {
+        switch (ev.getActionMasked()) {
+            case MotionEvent.ACTION_DOWN:
+                arrNoticias = false;
+                nX0 = ev.getRawX(); nY0 = ev.getRawY(); nUltX = nX0; nUltT = ev.getEventTime(); nVel = 0;
+                nPosible = dirNoticias() != 0 && drawer.getVisibility() != View.VISIBLE && ajustes.getVisibility() != View.VISIBLE && !dentroDe(dockScroll, nX0, nY0);
+                return false;
+            case MotionEvent.ACTION_MOVE: {
+                float dx = ev.getRawX() - nX0, dy = ev.getRawY() - nY0;
+                long dt = ev.getEventTime() - nUltT;
+                if (dt > 0) nVel = nVel * 0.4f + (ev.getRawX() - nUltX) * 1000f / dt * 0.6f;
+                nUltX = ev.getRawX(); nUltT = ev.getEventTime();
+                if (!arrNoticias) {
+                    int d = dirNoticias();
+                    if (!nPosible || !(d * dx > dp(22) && Math.abs(dx) > Math.abs(dy) * 1.6f)) return false;
+                    arrNoticias = true;
+                    MotionEvent c = MotionEvent.obtain(ev);
+                    c.setAction(MotionEvent.ACTION_CANCEL);
+                    super.dispatchTouchEvent(c);
+                    if (gestos != null) gestos.onTouchEvent(c);
+                    c.recycle();
+                    noticias().abrirSiguiendo(d);
+                }
+                noticias().seguir(dx);
+                return true;
+            }
+            case MotionEvent.ACTION_UP: case MotionEvent.ACTION_CANCEL:
+                if (!arrNoticias) return false;
+                arrNoticias = false;
+                noticias().soltar(ev.getRawX() - nX0, ev.getActionMasked() == MotionEvent.ACTION_UP ? nVel : 0);
+                return true;
+        }
+        return arrNoticias;
+    }
+
+    void elegirGestoNoticias() {
+        String[] ops = {"Deslizar el dedo a la derecha (sale desde la izquierda, como Samsung)", "Deslizar el dedo a la izquierda (sale desde la derecha)", "Ninguno"};
+        dialogo().setTitle("¿Cómo abrir las noticias?").setItems(ops, (d, w) -> {
+            SharedPreferences.Editor e = prefs.edit();
+            for (String[] g : GESTOS) if ("noticias".equals(accionDe(g[0]))) e.putString(g[0], g[2]);
+            if (w == 0) e.putString("g_derecha", "noticias");
+            if (w == 1) e.putString("g_izquierda", "noticias");
+            e.apply();
+            construirAjustes();
+        }).setNegativeButton("Cancelar", null).show();
     }
 
     boolean enScrollMedio() {
@@ -654,6 +719,7 @@ public class MainActivity extends Activity {
             case "ajustes": abrirAjustes(); return true;
             case "bloquear": apagarPantalla(); return true;
             case "barra": guardar("pantalla_completa", !pantallaCompleta); toast(pantallaCompleta ? "Pantalla completa" : "Barra de arriba visible"); return true;
+            case "noticias": noticias().abrir(dirNoticias() == 0 ? 1 : dirNoticias()); return true;
             default: return false;
         }
     }
@@ -2006,6 +2072,11 @@ public class MainActivity extends Activity {
         opcion(l, "Modo barbería: brillo", Barberia.nombre(Barberia.BRILLOS, prefs.getString("modo_brillo", "igual")), () -> elegir("Brillo en modo barbería", Barberia.BRILLOS, "modo_brillo", prefs.getString("modo_brillo", "igual")));
         opcion(l, "Apps de trabajo", barberia().appsTrabajo().size() + " apps · salen en la tarjeta con el modo barbería", () -> barberia().elegirAppsTrabajo());
         opcion(l, "Tarjeta Meraki", "permiso".equals(prefs.getString("tm_error", "")) ? "Falta un permiso en Firebase · tocá para ver cómo" : prefs.getString("tm_resumen", "").isEmpty() ? "Abrí Tarjeta Meraki una vez para que mande sus números" : "Conectada · tocá para actualizar", this::ayudaTarjetaMeraki);
+
+        seccion(l, "Noticias");
+        opcion(l, "Abrir las noticias", "CNN, Forbes y Mundo Cristiano en una página", () -> { cerrarAjustes(); noticias().abrir(dirNoticias() == 0 ? 1 : dirNoticias()); });
+        opcion(l, "Cómo se abre", dirNoticias() == 1 ? "Deslizá el dedo a la derecha en el inicio" : dirNoticias() == -1 ? "Deslizá el dedo a la izquierda en el inicio" : "Sin gesto · tocá para escoger", this::elegirGestoNoticias);
+        opcion(l, "Fuentes", noticias().activas().size() + " de " + Noticias.FUENTES.length + " · tocá para escoger", () -> noticias().elegirFuentes());
 
         seccion(l, "Panel Meraki");
         seccionPanel = l.getChildAt(l.getChildCount() - 1);
