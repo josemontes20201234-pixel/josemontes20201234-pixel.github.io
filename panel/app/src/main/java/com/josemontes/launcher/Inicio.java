@@ -165,7 +165,31 @@ public class Inicio extends Activity {
         log.setPadding(h.dp(12), h.dp(10), h.dp(12), h.dp(10));
         log.setBackground(h.caja(0x33000000, 12, 0));
         c5.addView(log, h.lp(-1, -2, 12));
+        c5.addView(boton("Copiar diagnóstico para Claude", true, this::copiarDiagnostico), h.lp(-1, -2, 10));
         c5.addView(boton("Borrar lo anotado", false, () -> { synchronized (Servicio.REGISTRO) { Servicio.REGISTRO.clear(); } construir(); }), h.lp(-1, -2, 10));
+    }
+
+    /** Todo lo que sirve para encontrar una falla, listo para pegar en el chat. */
+    void copiarDiagnostico() {
+        String ver = "?";
+        try { ver = getPackageManager().getPackageInfo(getPackageName(), 0).versionName; } catch (Exception e) { }
+        StringBuilder sb = new StringBuilder();
+        sb.append("Meraki Panel ").append(ver).append(" · Android ").append(android.os.Build.VERSION.RELEASE).append(" (API ").append(android.os.Build.VERSION.SDK_INT).append(")\n");
+        sb.append("Sistema: ").append(android.os.Build.DISPLAY).append(" · ").append(android.os.Build.MODEL).append("\n");
+        sb.append("Servicio: ").append(Servicio.yo != null ? "activo" : "apagado").append(" · zona ").append(h.prefs.getString("zona", "derecha"))
+          .append(" · encendido ").append(h.prefs.getBoolean("activo", true)).append(" · música ").append(Oyente.tieneAcceso(this) ? "sí" : "no").append("\n");
+        if (Servicio.yo != null) {
+            Servicio s = Servicio.yo;
+            sb.append("Franja: ").append(s.franja != null ? "puesta" : "NO puesta").append(s.pausada ? " (apartada)" : "").append(s.raizPuesta ? " (panel encima)" : "").append("\n");
+            sb.append("Ventanas:\n").append(s.ventanasSamsung());
+        }
+        String err = h.prefs.getString("ultimo_error", "");
+        if (!err.isEmpty()) sb.append("Último error:\n").append(err).append("\n");
+        sb.append("Registro:\n").append(Servicio.registro());
+        try {
+            ((android.content.ClipboardManager) getSystemService(CLIPBOARD_SERVICE)).setPrimaryClip(android.content.ClipData.newPlainText("diagnóstico", sb.toString()));
+            h.toast("Copiado. Pegalo en el chat con Claude.");
+        } catch (Exception e) { h.toast("No se pudo copiar."); }
     }
 
     void abrirAccesoNotis() {

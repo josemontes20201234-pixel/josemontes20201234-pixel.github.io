@@ -136,8 +136,14 @@ public class Servicio extends AccessibilityService {
     @Override
     public void onAccessibilityEvent(AccessibilityEvent e) {
         if (e == null || e.getPackageName() == null) return;
-        // Cuando sale algo de Samsung (su panel, la pantalla de bloqueo) la franja se aparta para no estorbar
-        if (SYSTEMUI.contentEquals(e.getPackageName())) { if (!raizPuesta && !tocando && !ocupado) pausarFranja(); }
+        // Cuando Samsung abre SU panel (o la pantalla de bloqueo) la franja se aparta para no estorbar.
+        // Desde la actualización de One UI la barra de arriba avisa seguido (la cápsula de la música, etc.):
+        // esos avisos ya no apartan la franja, sólo cuando de verdad se abrió algo grande de Samsung.
+        if (SYSTEMUI.contentEquals(e.getPackageName())) {
+            if (raizPuesta || tocando || ocupado) return;
+            if (sombraAbierta()) { if (!pausada) anotar("Samsung abrió su panel: aparto la franja"); pausarFranja(); }
+            else { ui.removeCallbacks(revisarSombra); ui.postDelayed(revisarSombra, 350); }
+        }
         else if (pausada) reanudar.run();
     }
 
@@ -158,6 +164,12 @@ public class Servicio extends AccessibilityService {
     }
 
     // ================================================================ franja de arriba
+    /** El panel de Samsung a veces aparece un momento después del aviso: se vuelve a mirar. */
+    final Runnable revisarSombra = () -> {
+        if (raizPuesta || tocando || ocupado || pausada) return;
+        if (sombraAbierta()) { anotar("Samsung abrió su panel: aparto la franja"); pausarFranja(); }
+    };
+
     void pausarFranja() {
         pausada = true; quitarFranja();
         ui.removeCallbacks(reanudar); ui.postDelayed(reanudar, 1500);
@@ -177,17 +189,51 @@ public class Servicio extends AccessibilityService {
                 w.getBoundsInScreen(r);
                 if (r.height() < alto / 2) continue;
                 AccessibilityNodeInfo n = w.getRoot();
-                if (n != null && n.getPackageName() != null && SYSTEMUI.contentEquals(n.getPackageName())) return true;
+                if (n == null || n.getPackageName() == null || !SYSTEMUI.contentEquals(n.getPackageName())) continue;
+                // One UI nuevo deja ventanas grandes de Samsung puestas aunque no se vean: sólo cuenta si está al frente
+                if (w.isFocused() || w.isActive() || n.isVisibleToUser() && n.getChildCount() > 0 && hayAlgoVisible(n)) return true;
             }
         } catch (Exception e) { }
         return false;
     }
 
+    /** ¿La ventana de Samsung tiene algo que de verdad se ve (botones, notificaciones)? */
+    static boolean hayAlgoVisible(AccessibilityNodeInfo n) {
+        int vistos = 0;
+        for (int i = 0; i < n.getChildCount() && vistos < 3; i++) {
+            AccessibilityNodeInfo c = n.getChild(i);
+            if (c != null && c.isVisibleToUser()) vistos++;
+        }
+        return vistos >= 2;
+    }
+
+    /** Para «Copiar diagnóstico»: qué ventanas grandes de Samsung hay ahorita. */
+    String ventanasSamsung() {
+        StringBuilder sb = new StringBuilder();
+        try {
+            Rect r = new Rect();
+            for (AccessibilityWindowInfo w : getWindows()) {
+                AccessibilityNodeInfo n = w.getRoot();
+                String pk = n == null || n.getPackageName() == null ? "?" : n.getPackageName().toString();
+                w.getBoundsInScreen(r);
+                sb.append("· ").append(pk.replace("com.android.", "")).append(" tipo ").append(w.getType()).append(" ").append(r.width()).append("x").append(r.height())
+                  .append(w.isFocused() ? " enfocada" : "").append(w.isActive() ? " activa" : "").append("\n");
+            }
+        } catch (Exception e) { sb.append("(no se pudo leer)\n"); }
+        return sb.toString();
+    }
+
+    String motivoFranja = "";
+    void motivo(String m) { if (!m.equals(motivoFranja)) { motivoFranja = m; anotar("Franja: " + m); } }
+
     void actualizarFranja() {
         quitarFranja();
-        if (wm == null || pausada || raizPuesta || !prefs().getBoolean("activo", true)) return;
+        if (wm == null) { motivo("sin ventana del sistema"); return; }
+        if (pausada) { motivo("apartada (panel de Samsung abierto)"); return; }
+        if (raizPuesta) return;
+        if (!prefs().getBoolean("activo", true)) { motivo("apagada en «Panel Meraki encendido»"); return; }
         KeyguardManager km = (KeyguardManager) getSystemService(KEYGUARD_SERVICE);
-        if (km != null && km.isKeyguardLocked()) return;
+        if (km != null && km.isKeyguardLocked()) { motivo("pantalla bloqueada"); return; }
         String zona = prefs().getString("zona", "derecha");
         int ancho = getResources().getDisplayMetrics().widthPixels;
         int sb = getResources().getIdentifier("status_bar_height", "dimen", "android");
@@ -208,6 +254,7 @@ public class Servicio extends AccessibilityService {
                 switch (e.getActionMasked()) {
                     case MotionEvent.ACTION_DOWN:
                         y0 = e.getRawY(); abierto = false; intentoSamsung = false; tocando = true;
+                        anotar("Franja: tocaste");
                         if (vt != null) vt.recycle();
                         vt = VelocityTracker.obtain(); vt.addMovement(e);
                         break;
@@ -216,7 +263,7 @@ public class Servicio extends AccessibilityService {
                         float dy = e.getRawY() - y0;
                         if (!abierto && !intentoSamsung && dy > dp(8)) {
                             try { abierto = abrirPanel(true); } catch (Throwable t) { guardarError(Servicio.this, t); abierto = false; }
-                            if (abierto) cerrarSamsung(0);
+                            if (abierto) { cerrarSamsung(0); anotar("Panel Meraki abierto"); }
                             else {
                                 // Nunca dejar a Jose sin panel: si el nuestro no sale, que salga el de Samsung
                                 intentoSamsung = true;
@@ -231,6 +278,8 @@ public class Servicio extends AccessibilityService {
                     case MotionEvent.ACTION_UP:
                     case MotionEvent.ACTION_CANCEL: {
                         tocando = false;
+                        if (e.getActionMasked() == MotionEvent.ACTION_CANCEL && !abierto) anotar("Franja: Samsung se llevó el deslizón");
+                        else if (!abierto && !intentoSamsung) anotar("Franja: soltaste sin bajar (" + Math.round((e.getRawY() - y0) / getResources().getDisplayMetrics().density) + " dp)");
                         float vy = 0;
                         if (vt != null) { vt.addMovement(e); vt.computeCurrentVelocity(1000); vy = vt.getYVelocity(); vt.recycle(); vt = null; }
                         if (abierto && host != null) {
@@ -244,7 +293,7 @@ public class Servicio extends AccessibilityService {
                 return true;
             }
         });
-        try { wm.addView(v, lp); franja = v; } catch (Exception e) { franja = null; }
+        try { wm.addView(v, lp); franja = v; motivo("puesta (" + zona + ")"); } catch (Exception e) { franja = null; motivo("no se pudo poner: " + e); }
     }
 
     /** Cierra el panel de Samsung si se abrió detrás del nuestro. */
