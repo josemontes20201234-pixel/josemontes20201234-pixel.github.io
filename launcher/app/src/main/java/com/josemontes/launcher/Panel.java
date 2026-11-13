@@ -415,28 +415,10 @@ class Panel {
         cab.addView(iconoBoton("M18 6L6 18 M6 6l12 12", "Cerrar", this::cerrar, vista));
         h.addView(cab);
 
-        // botones
-        List<String> ids = botones();
-        boolean ancho = prefB("panel_anchos", false);
-        int cols = ancho ? 2 : Math.max(3, Math.min(5, Integer.parseInt(pref("panel_columnas", "4"))));
-        LinearLayout fila = null;
-        for (int i = 0; i < ids.size(); i++) {
-            if (i % cols == 0) { fila = new LinearLayout(a); fila.setGravity(Gravity.TOP); h.addView(fila, A.lp(-1, -2, ancho ? 8 : 14)); }
-            View b = boton(ids.get(i), ancho, cols, vista);
-            LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(0, -2, 1f);
-            if (ancho) { p.leftMargin = i % 2 == 1 ? a.dp(4) : 0; p.rightMargin = i % 2 == 0 ? a.dp(4) : 0; }
-            fila.addView(b, p);
-        }
-        if (fila != null && ids.size() % cols != 0) for (int k = ids.size() % cols; k < cols; k++) fila.addView(new View(a), new LinearLayout.LayoutParams(0, 1, 1f));
-        if (ids.isEmpty()) h.addView(A.texto("No hay botones. Tocá el lápiz para agregar.", 14, muted(), A.tf(false)), A.lp(-2, -2, 14));
-
-        if (prefB("panel_brillo", true)) h.addView(barraBrillo(vista), A.lp(-1, -2, 16));
-        if (prefB("panel_volumen", true)) h.addView(barraVolumen(vista), A.lp(-1, -2, 10));
-
-        // la música que suena (la lee Meraki Panel); se esconde cuando no suena nada
-        if (!vista && prefB("panel_musica", true)) {
-            final FrameLayout mus = new FrameLayout(a);
-            h.addView(mus, A.lp(-1, -2, 14));
+        // la música que suena (la lee Meraki Panel), arriba bajo la hora; se esconde cuando no suena nada
+        final FrameLayout mus = !vista && prefB("panel_musica", true) ? new FrameLayout(a) : null;
+        if (mus != null) {
+            h.addView(mus, A.lp(-1, -2, 12));
             Runnable pm = () -> {
                 mus.removeAllViews();
                 Musica.Estado e = Musica.actual;
@@ -449,6 +431,41 @@ class Panel {
             oyenteMusica = pm;
             Musica.oyentes.add(pm);
         }
+
+        // botones, brillo y volumen: si con la música ya no caben en la pantalla, se deslizan
+        final LinearLayout cuerpo = new LinearLayout(a);
+        cuerpo.setOrientation(LinearLayout.VERTICAL);
+        ScrollView sc = new ScrollView(a) {
+            @Override protected void onMeasure(int ws, int hs) {
+                int pantalla = a.getResources().getDisplayMetrics().heightPixels;
+                int usado = a.insetArriba + a.dp(8) + a.dp(32) + cab.getMeasuredHeight() + a.dp(34) + a.insetAbajo
+                        + (mus != null && mus.getVisibility() == View.VISIBLE ? mus.getMeasuredHeight() + a.dp(12) : 0);
+                int max = Math.max(a.dp(180), pantalla - usado);
+                int disp = MeasureSpec.getMode(hs) == MeasureSpec.UNSPECIFIED ? max : Math.min(max, MeasureSpec.getSize(hs));
+                super.onMeasure(ws, MeasureSpec.makeMeasureSpec(disp, MeasureSpec.AT_MOST));
+            }
+        };
+        sc.setVerticalScrollBarEnabled(false);
+        sc.setOverScrollMode(View.OVER_SCROLL_NEVER);
+        sc.addView(cuerpo, new FrameLayout.LayoutParams(-1, -2));
+        h.addView(sc, new LinearLayout.LayoutParams(-1, -2));
+
+        List<String> ids = botones();
+        boolean ancho = prefB("panel_anchos", false);
+        int cols = ancho ? 2 : Math.max(3, Math.min(5, Integer.parseInt(pref("panel_columnas", "4"))));
+        LinearLayout fila = null;
+        for (int i = 0; i < ids.size(); i++) {
+            if (i % cols == 0) { fila = new LinearLayout(a); fila.setGravity(Gravity.TOP); cuerpo.addView(fila, A.lp(-1, -2, ancho ? 8 : 14)); }
+            View b = boton(ids.get(i), ancho, cols, vista);
+            LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(0, -2, 1f);
+            if (ancho) { p.leftMargin = i % 2 == 1 ? a.dp(4) : 0; p.rightMargin = i % 2 == 0 ? a.dp(4) : 0; }
+            fila.addView(b, p);
+        }
+        if (fila != null && ids.size() % cols != 0) for (int k = ids.size() % cols; k < cols; k++) fila.addView(new View(a), new LinearLayout.LayoutParams(0, 1, 1f));
+        if (ids.isEmpty()) cuerpo.addView(A.texto("No hay botones. Tocá el lápiz para agregar.", 14, muted(), A.tf(false)), A.lp(-2, -2, 14));
+
+        if (prefB("panel_brillo", true)) cuerpo.addView(barraBrillo(vista), A.lp(-1, -2, 16));
+        if (prefB("panel_volumen", true)) cuerpo.addView(barraVolumen(vista), A.lp(-1, -2, 10));
 
         View raya = new View(a); raya.setBackground(A.caja(MainActivity.conAlpha(fg(), 0x55), 9, 0));
         LinearLayout.LayoutParams lr = new LinearLayout.LayoutParams(a.dp(42), a.dp(4)); lr.gravity = Gravity.CENTER_HORIZONTAL; lr.topMargin = a.dp(14);
