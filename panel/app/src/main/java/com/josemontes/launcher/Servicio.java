@@ -283,8 +283,16 @@ public class Servicio extends AccessibilityService {
                         float vy = 0;
                         if (vt != null) { vt.addMovement(e); vt.computeCurrentVelocity(1000); vy = vt.getYVelocity(); vt.recycle(); vt = null; }
                         if (abierto && host != null) {
-                            try { host.panel().soltar(e.getRawY() - y0, e.getActionMasked() == MotionEvent.ACTION_CANCEL ? 0 : vy); } catch (Throwable t) { guardarError(Servicio.this, t); }
+                            float dy = e.getRawY() - y0;
+                            boolean cancel = e.getActionMasked() == MotionEvent.ACTION_CANCEL;
+                            // Con One UI nuevo Samsung a veces se queda con el dedo a medio camino (CANCEL) y el panel se cerraba.
+                            // Si ya bajaste un poquito o Samsung se llevó el dedo, el Panel Meraki se abre completo.
+                            boolean completo = cancel || dy > dp(20) || vy > dp(300);
+                            anotar("Soltaste: " + (cancel ? "Samsung se llevó el dedo" : "normal") + " · bajaste " + Math.round(dy / getResources().getDisplayMetrics().density) + " dp · " + (completo ? "abro completo" : "lo cierro"));
+                            try { host.panel().soltar(completo ? 100000f : dy, completo ? dp(3000) : vy); } catch (Throwable t) { guardarError(Servicio.this, t); }
                             cerrarSamsung(0); cerrarSamsung(350);
+                            final long t0 = System.currentTimeMillis();
+                            ui.postDelayed(() -> { if (host != null && !host.panel().abierto()) anotar("El panel se cerró solo (" + (System.currentTimeMillis() - t0) + " ms)"); }, 1200);
                         }
                         abierto = false;
                         break;
@@ -315,7 +323,7 @@ public class Servicio extends AccessibilityService {
         };
         raiz.setOnHierarchyChangeListener(new ViewGroup.OnHierarchyChangeListener() {
             @Override public void onChildViewAdded(View p, View c) { }
-            @Override public void onChildViewRemoved(View p, View c) { if (raiz.getChildCount() == 0) ui.post(Servicio.this::quitarRaiz); }
+            @Override public void onChildViewRemoved(View p, View c) { anotar("Panel cerrado"); if (raiz.getChildCount() == 0) ui.post(Servicio.this::quitarRaiz); }
         });
         host = new MainActivity(this, null, this, raiz);
     }
