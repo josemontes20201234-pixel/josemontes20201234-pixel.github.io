@@ -1,0 +1,27 @@
+plugins { id 'com.android.application' }
+def build = (System.getenv("GITHUB_RUN_NUMBER") ?: "1") as Integer
+android {
+    namespace 'com.josemontes.enfoque'
+    compileSdk 34
+    defaultConfig {
+        applicationId 'com.josemontes.enfoque'
+        minSdk 26
+        targetSdk 34
+        versionCode build
+        versionName "1.0." + build
+    }
+    signingConfigs {
+        release {
+            // Firma fija para que cada versión nueva se instale encima de la anterior
+            storeFile file('meraki-enfoque.jks')
+            storePassword 'merakienfoque'
+            keyAlias 'meraki'
+            keyPassword 'merakienfoque'
+        }
+    }
+    buildTypes {
+        release { minifyEnabled false; signingConfig signingConfigs.release }
+    }
+    lint { checkReleaseBuilds false; abortOnError false }
+    compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
+}
