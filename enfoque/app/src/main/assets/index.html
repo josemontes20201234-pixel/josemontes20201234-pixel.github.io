@@ -136,7 +136,12 @@ canvas#fx{position:fixed;inset:0;pointer-events:none;z-index:60}
         <button class="chip on" data-v="hoy">Hoy</button>
         <button class="chip" data-v="manana">Mañana</button>
         <button class="chip" data-v="sin">Sin fecha</button>
-        <input type="time" id="capTime" aria-label="Hora del recordatorio">
+      </div>
+      <div class="lbl">⏰ Hora del aviso <span style="opacity:.7">(opcional)</span></div>
+      <div class="row" style="flex-wrap:nowrap">
+        <input type="time" id="capTime" aria-label="Hora del aviso" style="flex:none;min-width:130px">
+        <span id="timeHint" class="tip" style="flex:1">Tocá el cuadro para escoger la hora</span>
+        <button class="x" id="timeClear" style="display:none" aria-label="Quitar hora">×</button>
       </div>
       <button class="btn full" id="addBtn" style="margin-top:14px">Guardar tarea</button>
       <div class="confirm" id="confirm"></div>
@@ -383,8 +388,22 @@ function isLate(t){
   return false;
 }
 
+function updTimeHint(){
+  var v=$("capTime").value;
+  $("timeHint").innerHTML=v?"Te aviso a las <b style='color:var(--gold2)'>"+fmtTime(v)+"</b>":"Tocá el cuadro para escoger la hora";
+  $("timeClear").style.display=v?"":"none";
+}
+$("capTime").addEventListener("input",updTimeHint);
+$("capTime").addEventListener("change",updTimeHint);
+$("timeClear").onclick=function(){$("capTime").value="";updTimeHint()};
+function setWhen(v){capWhen=v;$("whenChips").querySelectorAll(".chip").forEach(function(x){x.classList.toggle("on",x.dataset.v===v)})}
+
 $("addBtn").onclick=function(){
   var txt=$("capText").value.trim();
+  // Si dijo "hoy" o "mañana" al final, lo uso como fecha y lo quito del texto
+  var m=txt.match(/[\s,]+(para\s+)?(hoy|ma[ñn]ana)[\s.!]*$/i);
+  if(m&&txt.length>m[0].length){txt=txt.slice(0,m.index).trim();setWhen(/hoy/i.test(m[2])?"hoy":"manana")}
+  txt=txt.charAt(0).toUpperCase()+txt.slice(1);
   if(!txt){$("capText").focus();toast("Escribí o dictá la tarea");return}
   var date=capWhen==="hoy"?dkey():capWhen==="manana"?addDays(dkey(),1):"";
   var time=$("capTime").value||"";
@@ -395,7 +414,7 @@ $("addBtn").onclick=function(){
   var c=$("confirm");
   c.innerHTML="🗣️ <b>"+who+":</b> “Entonces tengo que <b>"+esc(lowerFirst(txt))+"</b>"+(date?(" "+dueLabel(t).toLowerCase().replace(" · "," a las ")):"")+", ¿verdad?”";
   c.style.display="block";
-  $("capText").value="";$("capTime").value="";
+  $("capText").value="";$("capTime").value="";updTimeHint();
   vib(30);render();
 };
 function lowerFirst(s){return s.charAt(0).toLowerCase()+s.slice(1)}
