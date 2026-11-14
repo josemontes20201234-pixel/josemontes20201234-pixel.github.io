@@ -395,6 +395,7 @@ public class MainActivity extends Activity {
     protected void onNewIntent(Intent i) {
         super.onNewIntent(i);
         // Botón de inicio: siempre volver a la pantalla principal
+        cerrarEditorBloqueo();
         cerrarAjustes();
         cerrarCajon();
         if (panel != null) panel.cerrar();
@@ -487,7 +488,8 @@ public class MainActivity extends Activity {
 
     @Override
     public void onBackPressed() {
-        if (noticias != null && noticias.abierta()) noticias.cerrar();
+        if (editorBloqueo != null) cerrarEditorBloqueo();
+        else if (noticias != null && noticias.abierta()) noticias.cerrar();
         else if (barberia != null && barberia.abierta()) barberia.cerrarCaja();
         else if (panel != null && panel.editando()) panel.cerrarEditor();
         else if (panel != null && panel.abierto()) panel.cerrar();
@@ -655,7 +657,7 @@ public class MainActivity extends Activity {
         // La página de noticias sale siguiendo el dedo
         if (arrNoticias) return arrastreNoticias(ev);
         // Con el Panel Meraki o su editor abiertos, los gestos del inicio no deben estorbar
-        if (panel != null && (panel.abierto() || panel.editando()) || barberia != null && barberia.abierta() || noticias != null && noticias.abierta()) return super.dispatchTouchEvent(ev);
+        if (panel != null && (panel.abierto() || panel.editando()) || barberia != null && barberia.abierta() || noticias != null && noticias.abierta() || editorBloqueo != null) return super.dispatchTouchEvent(ev);
         if (arrastreNoticias(ev)) return true;
         if (ev.getActionMasked() == MotionEvent.ACTION_DOWN) tocandoAbc = abc != null && abc.getVisibility() == View.VISIBLE && drawer.getVisibility() == View.VISIBLE && dentroDe(abc, bajoX, bajoY);
         if (tocandoAbc) return super.dispatchTouchEvent(ev);
@@ -1409,6 +1411,90 @@ public class MainActivity extends Activity {
         }).setNegativeButton("Cancelar", null).show();
     }
 
+    // ===== acomodar la foto del bloqueo con el dedo (mover y pellizcar), viendo cómo queda
+    FrameLayout editorBloqueo;
+
+    void acomodarFoto() {
+        if (!hayFotoBloqueo()) { toast("Primero poné una foto."); return; }
+        final FondoVivo.Pintor pt = new FondoVivo.Pintor(this);
+        pt.x = prefs.getFloat("bloqueo_foto_x", 0f); pt.y = prefs.getFloat("bloqueo_foto_y", 0f); pt.zoom = prefs.getFloat("bloqueo_foto_zoom", 1f);
+        editorBloqueo = new FrameLayout(this);
+        editorBloqueo.setBackgroundColor(0xFF000000);
+        editorBloqueo.setClickable(true);
+        final View vista = new View(this) {
+            @Override protected void onDraw(Canvas c) { pt.pintar(c, getWidth(), getHeight(), true); }
+        };
+        editorBloqueo.addView(vista, new FrameLayout.LayoutParams(-1, -1));
+        new Thread(() -> { pt.proxima = FondoVivo.Pintor.proximaCita(this); ui.post(vista::invalidate); }).start();
+
+        final android.view.ScaleGestureDetector pellizco = new android.view.ScaleGestureDetector(this, new android.view.ScaleGestureDetector.SimpleOnScaleGestureListener() {
+            @Override public boolean onScale(android.view.ScaleGestureDetector d) {
+                pt.zoom = Math.max(1f, Math.min(3f, pt.zoom * d.getScaleFactor()));
+                vista.invalidate();
+                return true;
+            }
+        });
+        final float[] ult = new float[2];
+        vista.setOnTouchListener((v, e) -> {
+            pellizco.onTouchEvent(e);
+            switch (e.getActionMasked()) {
+                case MotionEvent.ACTION_DOWN: ult[0] = e.getX(); ult[1] = e.getY(); break;
+                case MotionEvent.ACTION_POINTER_UP: case MotionEvent.ACTION_POINTER_DOWN:
+                    ult[0] = e.getX(0); ult[1] = e.getY(0); break;
+                case MotionEvent.ACTION_MOVE:
+                    if (e.getPointerCount() == 1 && !pellizco.isInProgress() && pt.foto != null) {
+                        android.graphics.RectF r = pt.marcoFoto(v.getWidth(), v.getHeight());
+                        float sx = (r.width() - v.getWidth()) / 2f, sy = (r.height() - v.getHeight()) / 2f;
+                        if (sx > 1) pt.x = Math.max(-1f, Math.min(1f, pt.x + (e.getX() - ult[0]) / sx));
+                        if (sy > 1) pt.y = Math.max(-1f, Math.min(1f, pt.y + (e.getY() - ult[1]) / sy));
+                        vista.invalidate();
+                    }
+                    ult[0] = e.getX(); ult[1] = e.getY();
+                    break;
+            }
+            return true;
+        });
+
+        TextView ayuda = texto("Mové la foto con un dedo y pellizcá con dos para acercarla.\nEl reloj y las notificaciones de Samsung van encima.", 13.5f, 0xFFF5F1E8, tf(false));
+        ayuda.setGravity(Gravity.CENTER);
+        ayuda.setPadding(dp(16), dp(10), dp(16), dp(10));
+        ayuda.setBackground(caja(0xB3000000, 16, 0));
+        FrameLayout.LayoutParams pa = new FrameLayout.LayoutParams(-2, -2, Gravity.TOP | Gravity.CENTER_HORIZONTAL);
+        pa.topMargin = insetArriba + dp(16); pa.leftMargin = dp(16); pa.rightMargin = dp(16);
+        editorBloqueo.addView(ayuda, pa);
+
+        LinearLayout barra = new LinearLayout(this);
+        barra.setGravity(Gravity.CENTER);
+        String[][] bts = {{"centrar", "Centrar"}, {"cancelar", "Cancelar"}, {"guardar", "Guardar"}};
+        for (String[] b : bts) {
+            boolean fuerte = "guardar".equals(b[0]);
+            TextView t = texto(b[1], 15, fuerte ? Musica.Barras.tintaSobre(acento) : 0xFFF5F1E8, tf(true));
+            t.setGravity(Gravity.CENTER);
+            t.setPadding(dp(18), dp(12), dp(18), dp(12));
+            t.setBackground(caja(fuerte ? acento : 0xB3000000, 99, fuerte ? 0 : 0x55FFFFFF));
+            t.setOnClickListener(x -> {
+                if ("centrar".equals(b[0])) { pt.x = 0f; pt.y = 0f; pt.zoom = 1f; vista.invalidate(); return; }
+                if ("guardar".equals(b[0])) {
+                    prefs.edit().putFloat("bloqueo_foto_x", pt.x).putFloat("bloqueo_foto_y", pt.y).putFloat("bloqueo_foto_zoom", pt.zoom).apply();
+                    toast("Listo. Apagá y prendé la pantalla para verla.");
+                }
+                cerrarEditorBloqueo();
+            });
+            LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(-2, -2); p.leftMargin = dp(5); p.rightMargin = dp(5);
+            barra.addView(t, p);
+        }
+        FrameLayout.LayoutParams pb = new FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM);
+        pb.bottomMargin = insetAbajo + dp(18);
+        editorBloqueo.addView(barra, pb);
+        root.addView(editorBloqueo, new FrameLayout.LayoutParams(-1, -1));
+    }
+
+    void cerrarEditorBloqueo() {
+        if (editorBloqueo == null) return;
+        root.removeView(editorBloqueo);
+        editorBloqueo = null;
+    }
+
     void interruptorBloqueo(LinearLayout l, String nombre, String k) {
         interruptor(l, nombre, prefs.getBoolean("bloqueo_" + k, true), v -> prefs.edit().putBoolean("bloqueo_" + k, v).apply());
     }
@@ -1455,7 +1541,7 @@ public class MainActivity extends Activity {
                 boolean ok = guardarFoto(ub, FondoVivo.FOTO, Math.max(getResources().getDisplayMetrics().heightPixels, 1600));
                 ui.post(() -> {
                     if (!ok) { toast("No pude abrir esa foto. Probá con otra."); return; }
-                    prefs.edit().putLong("bloqueo_foto_v", System.currentTimeMillis()).apply();
+                    prefs.edit().putLong("bloqueo_foto_v", System.currentTimeMillis()).putFloat("bloqueo_foto_x", 0f).putFloat("bloqueo_foto_y", 0f).putFloat("bloqueo_foto_zoom", 1f).apply();
                     construirAjustes();
                     if (fondoVivoPuesto()) toast("¡Listo! Apagá y prendé la pantalla para verla.");
                     else dialogo().setTitle("Foto guardada").setMessage("Ahora falta poner el fondo Meraki en tu pantalla de bloqueo.")
@@ -2529,6 +2615,7 @@ public class MainActivity extends Activity {
         boolean puesto = fondoVivoPuesto();
         opcion(l, puesto ? "✓ Fondo Meraki puesto" : "Poner el fondo Meraki", puesto ? "Tocá para verlo o ponerlo de nuevo" : "Tocá «Establecer» y escogé «Pantalla de bloqueo». La huella y el PIN siguen siendo de Samsung", this::ponerFondoVivo);
         opcion(l, "Foto de fondo", hayFotoBloqueo() ? "Tu foto · tocá para cambiarla" : "Fondo Meraki · tocá para poner tu foto", this::elegirFotoBloqueo);
+        if (hayFotoBloqueo()) opcion(l, "Acomodar la foto", "Movela y acercala con el dedo para que se vean sus caras", this::acomodarFoto);
         if (hayFotoBloqueo()) opcion(l, "Quitar la foto", "Vuelve al fondo Meraki con la M dorada", () -> {
             new File(getFilesDir(), FondoVivo.FOTO).delete();
             prefs.edit().putLong("bloqueo_foto_v", 0).apply();
