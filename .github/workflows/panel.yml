@@ -19,7 +19,11 @@ jobs:
         with:
           gradle-version: '8.7'
       - name: Compilar APK
-        run: gradle -p panel assembleRelease --no-daemon --stacktrace
+        env:
+          LAUNCHER_KEY_PASSWORD: ${{ secrets.LAUNCHER_KEY_PASSWORD }}
+        run: |
+          if [ -z "$LAUNCHER_KEY_PASSWORD" ]; then echo "::error::Falta el secreto LAUNCHER_KEY_PASSWORD en Settings > Secrets and variables > Actions"; exit 1; fi
+          gradle -p panel assembleRelease --no-daemon --stacktrace
       - name: Publicar APK
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

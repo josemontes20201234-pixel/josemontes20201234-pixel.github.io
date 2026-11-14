@@ -12,11 +12,12 @@ android {
     }
     signingConfigs {
         release {
-            // Firma fija para que cada versión nueva se instale encima de la anterior
-            storeFile file('meraki-enfoque.jks')
-            storePassword 'merakienfoque'
+            // Firma fija para que cada versión nueva se instale encima de la anterior.
+            // La llave está cifrada (AES-256); su contraseña vive solo en el secreto ENFOQUE_KEY_PASSWORD de GitHub.
+            storeFile file('meraki-enfoque-2026.jks')
+            storePassword System.getenv('ENFOQUE_KEY_PASSWORD')
             keyAlias 'meraki'
-            keyPassword 'merakienfoque'
+            keyPassword System.getenv('ENFOQUE_KEY_PASSWORD')
         }
     }
     buildTypes {

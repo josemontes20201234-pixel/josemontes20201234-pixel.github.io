@@ -22,11 +22,12 @@ android {
     sourceSets { main { java.srcDirs += gen } }
     signingConfigs {
         release {
-            // Misma llave que el launcher: así se pueden compartir el estilo del panel
-            storeFile file('meraki-launcher.jks')
-            storePassword 'merakilauncher'
+            // Misma llave que el launcher: así se pueden compartir el estilo del panel.
+            // Contraseña solo en el secreto LAUNCHER_KEY_PASSWORD de GitHub.
+            storeFile file('../../launcher/app/meraki-launcher-2026.jks')
+            storePassword System.getenv('LAUNCHER_KEY_PASSWORD')
             keyAlias 'meraki'
-            keyPassword 'merakilauncher'
+            keyPassword System.getenv('LAUNCHER_KEY_PASSWORD')
         }
     }
     buildTypes {

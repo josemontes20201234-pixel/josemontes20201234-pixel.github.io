@@ -12,11 +12,12 @@ android {
     }
     signingConfigs {
         release {
-            // Firma fija para que cada versión nueva se instale encima de la anterior
-            storeFile file('meraki-launcher.jks')
-            storePassword 'merakilauncher'
+            // Firma fija para que cada versión nueva se instale encima de la anterior.
+            // La llave está cifrada (AES-256); su contraseña vive solo en el secreto LAUNCHER_KEY_PASSWORD de GitHub.
+            storeFile file('meraki-launcher-2026.jks')
+            storePassword System.getenv('LAUNCHER_KEY_PASSWORD')
             keyAlias 'meraki'
-            keyPassword 'merakilauncher'
+            keyPassword System.getenv('LAUNCHER_KEY_PASSWORD')
         }
     }
     buildTypes {
