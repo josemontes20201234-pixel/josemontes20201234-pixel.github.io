@@ -69,11 +69,13 @@ public class FondoVivo extends WallpaperService {
         final BroadcastReceiver rx = new BroadcastReceiver() {
             @Override public void onReceive(Context c, Intent i) { if (visible) dibujar(); }
         };
+        final Runnable alCambiarMusica = () -> { if (visible) dibujar(); };
 
         @Override public void onCreate(SurfaceHolder s) {
             super.onCreate(s);
             pintor = new Pintor(FondoVivo.this);
             pintor.prefs.registerOnSharedPreferenceChangeListener(this);
+            Musica.oyentes.add(alCambiarMusica);
             IntentFilter f = new IntentFilter();
             f.addAction(Intent.ACTION_USER_PRESENT); f.addAction(Intent.ACTION_SCREEN_ON); f.addAction(Intent.ACTION_SCREEN_OFF);
             try {
@@ -85,6 +87,7 @@ public class FondoVivo extends WallpaperService {
             h.removeCallbacksAndMessages(null);
             try { unregisterReceiver(rx); } catch (Exception e) { }
             pintor.prefs.unregisterOnSharedPreferenceChangeListener(this);
+            Musica.oyentes.remove(alCambiarMusica);
             super.onDestroy();
         }
 
@@ -160,6 +163,15 @@ public class FondoVivo extends WallpaperService {
         float fx() { return x != null ? x : prefs.getFloat("bloqueo_foto_x", 0f); }
         float fy() { return y != null ? y : prefs.getFloat("bloqueo_foto_y", 0f); }
         float fz() { return zoom != null ? zoom : prefs.getFloat("bloqueo_foto_zoom", 1f); }
+
+        /** ¿Hay música? Samsung pone su barrita de música abajo y no hay que taparla. */
+        boolean hayMusica() {
+            try {
+                android.media.AudioManager am = (android.media.AudioManager) ctx.getSystemService(Context.AUDIO_SERVICE);
+                if (am != null && am.isMusicActive()) return true;
+            } catch (Exception e) { }
+            return Musica.actual != null;
+        }
 
         // ------------------------------------------------------------ datos
         /** Lo siguiente del calendario (hoy o mañana). */
@@ -287,8 +299,16 @@ public class FondoVivo extends WallpaperService {
 
             boolean conLogo = ver("logo"), conVerso = ver("versiculo");
             String[] v = Versiculos.deHoy(0);
-            StaticLayout verso = conVerso ? StaticLayout.Builder.obtain("«" + v[1] + "»", 0, v[1].length() + 2, pVerso, anchoTexto)
-                    .setLineSpacing(dp(2), 1f).setMaxLines(3).setEllipsize(TextUtils.TruncateAt.END).build() : null;
+            StaticLayout verso = null;
+            if (conVerso) {
+                // el versículo siempre completo: si es largo, la letra se achica un poquito
+                String tv = "«" + v[1] + "»";
+                for (float tam : new float[]{15, 14, 13, 12}) {
+                    pVerso.setTextSize(tam * sp);
+                    verso = StaticLayout.Builder.obtain(tv, 0, tv.length(), pVerso, anchoTexto).setLineSpacing(dp(2), 1f).build();
+                    if (verso.getLineCount() <= 4) break;
+                }
+            }
 
             List<String> chips = new ArrayList<>();
             if (ver("hoy")) { String t = textoHoy(); if (t != null) chips.add(t); chips.addAll(avisosTarjeta()); }
@@ -308,7 +328,7 @@ public class FondoVivo extends WallpaperService {
             float y0;
             if ("arriba".equals(pos)) y0 = alto * 0.24f;
             else if ("centro".equals(pos)) y0 = (alto - altoBloque) / 2f;
-            else y0 = alto * 0.80f - altoBloque;
+            else y0 = alto * (hayMusica() ? 0.685f : 0.80f) - altoBloque;
             y0 = Math.max(alto * 0.18f, y0);
 
             // sombra detrás del bloque (hasta abajo si va abajo)
