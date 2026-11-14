@@ -2,4 +2,6 @@
 <resources>
     <string name="bloqueo_desc">Permite que Meraki Launcher apague la pantalla cuando hacés doble toque en el inicio. No lee ni guarda nada de lo que hay en tu pantalla.</string>
     <string name="admin_desc">Sólo sirve para apagar la pantalla cuando hacés el gesto que elegiste en Meraki Launcher. No puede ver ni borrar nada.</string>
+    <string name="fondo_nombre">Meraki · pantalla de bloqueo</string>
+    <string name="fondo_desc">Tu foto con el estilo Meraki. En la pantalla de bloqueo muestra el versículo del día, cómo va la barbería, tu próxima cita y el clima. La huella y el PIN siguen siendo de Samsung.</string>
 </resources>

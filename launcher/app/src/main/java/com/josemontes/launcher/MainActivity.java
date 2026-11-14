@@ -4,6 +4,7 @@ import android.Manifest;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.SearchManager;
+import android.app.WallpaperManager;
 import android.appwidget.AppWidgetHost;
 import android.appwidget.AppWidgetHostView;
 import android.appwidget.AppWidgetManager;
@@ -1345,7 +1346,72 @@ public class MainActivity extends Activity {
         @Override public int getOpacity() { return PixelFormat.OPAQUE; }
     }
 
-    static final int ELEGIR_FOTO = 31;
+    static final int ELEGIR_FOTO = 31, ELEGIR_FOTO_BLOQUEO = 32;
+
+    // =====================================================================
+    // pantalla de bloqueo: el fondo vivo Meraki (va detrás del bloqueo de Samsung)
+    // =====================================================================
+    static final String[][] POS_BLOQUEO = {{"abajo", "Abajo (encima de la huella)"}, {"centro", "Al centro"}, {"arriba", "Arriba (debajo del reloj de Samsung)"}};
+    static final String[] OSCURO = {"Poquito", "Normal", "Bastante"};
+
+    boolean fondoVivoPuesto() {
+        try {
+            WallpaperManager wm = WallpaperManager.getInstance(this);
+            android.app.WallpaperInfo wi = Build.VERSION.SDK_INT >= 34 ? wm.getWallpaperInfo(WallpaperManager.FLAG_LOCK) : null;
+            if (wi == null) wi = wm.getWallpaperInfo();
+            return wi != null && getPackageName().equals(wi.getPackageName()) && wi.getServiceName().endsWith(".FondoVivo");
+        } catch (Exception e) { return false; }
+    }
+
+    void ponerFondoVivo() {
+        Intent i = new Intent(WallpaperManager.ACTION_CHANGE_LIVE_WALLPAPER);
+        i.putExtra(WallpaperManager.EXTRA_LIVE_WALLPAPER_COMPONENT, new ComponentName(this, FondoVivo.class));
+        try { startActivity(i); toast("Tocá «Establecer» y escogé «Pantalla de bloqueo»."); }
+        catch (Exception e) {
+            try { startActivity(new Intent(WallpaperManager.ACTION_LIVE_WALLPAPER_CHOOSER)); toast("Buscá «Meraki · pantalla de bloqueo»."); }
+            catch (Exception x) { toast("Este cel no deja poner fondos vivos desde aquí."); }
+        }
+    }
+
+    boolean hayFotoBloqueo() { return prefs.getLong("bloqueo_foto_v", 0) > 0 && new File(getFilesDir(), FondoVivo.FOTO).exists(); }
+
+    void elegirFotoBloqueo() {
+        Intent i = new Intent(Intent.ACTION_GET_CONTENT).setType("image/*").addCategory(Intent.CATEGORY_OPENABLE);
+        try { startActivityForResult(Intent.createChooser(i, "Elegí la foto para tu pantalla de bloqueo"), ELEGIR_FOTO_BLOQUEO); }
+        catch (Exception e) {
+            try { startActivityForResult(new Intent(Intent.ACTION_PICK).setType("image/*"), ELEGIR_FOTO_BLOQUEO); }
+            catch (Exception e2) { toast("No encontré la galería."); }
+        }
+    }
+
+    /** Copia la foto escogida, del tamaño de la pantalla y derecha. */
+    boolean guardarFoto(Uri u, String archivo, int tam) {
+        try {
+            BitmapFactory.Options o = new BitmapFactory.Options(); o.inJustDecodeBounds = true;
+            try (InputStream in = getContentResolver().openInputStream(u)) { BitmapFactory.decodeStream(in, null, o); }
+            int muestra = 1; while (Math.min(o.outWidth, o.outHeight) / (muestra * 2) >= tam / 2) muestra *= 2;
+            BitmapFactory.Options o2 = new BitmapFactory.Options(); o2.inSampleSize = muestra;
+            Bitmap bm;
+            try (InputStream in = getContentResolver().openInputStream(u)) { bm = BitmapFactory.decodeStream(in, null, o2); }
+            if (bm == null) return false;
+            bm = girarSiHaceFalta(u, bm);
+            try (FileOutputStream out = new FileOutputStream(new File(getFilesDir(), archivo))) { bm.compress(Bitmap.CompressFormat.JPEG, 92, out); }
+            return true;
+        } catch (Throwable e) { return false; }
+    }
+
+    void elegirOscuro() {
+        int act = prefs.getInt("bloqueo_oscuro", 2);
+        dialogo().setTitle("Oscurecer la foto detrás de las letras").setSingleChoiceItems(OSCURO, act - 1, (d, w) -> {
+            d.dismiss();
+            prefs.edit().putInt("bloqueo_oscuro", w + 1).apply();
+            construirAjustes();
+        }).setNegativeButton("Cancelar", null).show();
+    }
+
+    void interruptorBloqueo(LinearLayout l, String nombre, String k) {
+        interruptor(l, nombre, prefs.getBoolean("bloqueo_" + k, true), v -> prefs.edit().putBoolean("bloqueo_" + k, v).apply());
+    }
 
     void elegirFoto() {
         Intent i = new Intent(Intent.ACTION_GET_CONTENT).setType("image/*").addCategory(Intent.CATEGORY_OPENABLE);
@@ -1379,6 +1445,23 @@ public class MainActivity extends Activity {
                 dialogo().setTitle("¿Restaurar esta copia?").setMessage("Se reemplaza tu configuración actual del launcher (estilo, apps fijadas, carpetas, gestos…).")
                         .setPositiveButton("Restaurar", (d, w) -> leerRespaldo(u)).setNegativeButton("Cancelar", null).show();
             }
+            return;
+        }
+        if (rc == ELEGIR_FOTO_BLOQUEO) {
+            if (res != RESULT_OK || data == null || data.getData() == null) return;
+            final Uri ub = data.getData();
+            toast("Poniendo tu foto en la pantalla de bloqueo…");
+            new Thread(() -> {
+                boolean ok = guardarFoto(ub, FondoVivo.FOTO, Math.max(getResources().getDisplayMetrics().heightPixels, 1600));
+                ui.post(() -> {
+                    if (!ok) { toast("No pude abrir esa foto. Probá con otra."); return; }
+                    prefs.edit().putLong("bloqueo_foto_v", System.currentTimeMillis()).apply();
+                    construirAjustes();
+                    if (fondoVivoPuesto()) toast("¡Listo! Apagá y prendé la pantalla para verla.");
+                    else dialogo().setTitle("Foto guardada").setMessage("Ahora falta poner el fondo Meraki en tu pantalla de bloqueo.")
+                            .setPositiveButton("Ponerlo", (d, w) -> ponerFondoVivo()).setNegativeButton("Después", null).show();
+                });
+            }).start();
             return;
         }
         if (rc != ELEGIR_FOTO || res != RESULT_OK || data == null || data.getData() == null) return;
@@ -2441,6 +2524,23 @@ public class MainActivity extends Activity {
         opcion(l, "Modo barbería: brillo", Barberia.nombre(Barberia.BRILLOS, prefs.getString("modo_brillo", "igual")), () -> elegir("Brillo en modo barbería", Barberia.BRILLOS, "modo_brillo", prefs.getString("modo_brillo", "igual")));
         opcion(l, "Apps de trabajo", barberia().appsTrabajo().size() + " apps · salen en la tarjeta con el modo barbería", () -> barberia().elegirAppsTrabajo());
         opcion(l, "Tarjeta Meraki", "permiso".equals(prefs.getString("tm_error", "")) ? "Falta un permiso en Firebase · tocá para ver cómo" : prefs.getString("tm_resumen", "").isEmpty() ? "Abrí Tarjeta Meraki una vez para que mande sus números" : "Conectada · tocá para actualizar", this::ayudaTarjetaMeraki);
+
+        seccion(l, "Pantalla de bloqueo");
+        boolean puesto = fondoVivoPuesto();
+        opcion(l, puesto ? "✓ Fondo Meraki puesto" : "Poner el fondo Meraki", puesto ? "Tocá para verlo o ponerlo de nuevo" : "Tocá «Establecer» y escogé «Pantalla de bloqueo». La huella y el PIN siguen siendo de Samsung", this::ponerFondoVivo);
+        opcion(l, "Foto de fondo", hayFotoBloqueo() ? "Tu foto · tocá para cambiarla" : "Fondo Meraki · tocá para poner tu foto", this::elegirFotoBloqueo);
+        if (hayFotoBloqueo()) opcion(l, "Quitar la foto", "Vuelve al fondo Meraki con la M dorada", () -> {
+            new File(getFilesDir(), FondoVivo.FOTO).delete();
+            prefs.edit().putLong("bloqueo_foto_v", 0).apply();
+            construirAjustes();
+        });
+        opcion(l, "Dónde va la información", nombre(POS_BLOQUEO, prefs.getString("bloqueo_pos", "abajo")), () -> elegir("Dónde va la información", POS_BLOQUEO, "bloqueo_pos", prefs.getString("bloqueo_pos", "abajo")));
+        opcion(l, "Oscurecer la foto", OSCURO[Math.max(0, Math.min(2, prefs.getInt("bloqueo_oscuro", 2) - 1))] + " · para que se lean las letras", this::elegirOscuro);
+        interruptorBloqueo(l, "Logo Meraki", "logo");
+        interruptorBloqueo(l, "Versículo del día", "versiculo");
+        interruptorBloqueo(l, "Hoy en Meraki y Tarjeta Meraki", "hoy");
+        interruptorBloqueo(l, "Próxima cita", "cita");
+        interruptorBloqueo(l, "Clima", "clima");
 
         seccion(l, "Noticias");
         opcion(l, "Abrir las noticias", "CNN, Forbes Centroamérica, CBS MoneyWatch y Mundo Cristiano", () -> { cerrarAjustes(); noticias().abrir(dirNoticias() == 0 ? 1 : dirNoticias()); });
