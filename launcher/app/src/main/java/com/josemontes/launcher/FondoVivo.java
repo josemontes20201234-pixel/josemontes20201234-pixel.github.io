@@ -143,6 +143,8 @@ public class FondoVivo extends WallpaperService {
         volatile String proxima;
         /** Mientras se acomoda la foto en Ajustes, se usan estos valores en vez de los guardados. */
         Float x, y, zoom;
+        /** Para ver una sugerencia antes de usarla. */
+        Integer acentoF, oscuroF;
 
         Pintor(Context c) {
             ctx = c;
@@ -154,7 +156,7 @@ public class FondoVivo extends WallpaperService {
 
         int dp(float v) { return Math.round(v * den); }
         boolean ver(String k) { return prefs.getBoolean("bloqueo_" + k, true); }
-        int acento() { try { return 0xFF000000 | Integer.parseInt(prefs.getString("acento", "D9B55C"), 16); } catch (Exception e) { return 0xFFD9B55C; } }
+        int acento() { if (acentoF != null) return acentoF; try { return 0xFF000000 | Integer.parseInt(prefs.getString("acento", "D9B55C"), 16); } catch (Exception e) { return 0xFFD9B55C; } }
         float fx() { return x != null ? x : prefs.getFloat("bloqueo_foto_x", 0f); }
         float fy() { return y != null ? y : prefs.getFloat("bloqueo_foto_y", 0f); }
         float fz() { return zoom != null ? zoom : prefs.getFloat("bloqueo_foto_zoom", 1f); }
@@ -271,7 +273,7 @@ public class FondoVivo extends WallpaperService {
         void pintarBloqueo(Canvas c, int ancho, int alto) {
             int ac = acento();
             String pos = prefs.getString("bloqueo_pos", "abajo");
-            int oscuro = prefs.getInt("bloqueo_oscuro", 2); // 1 poco · 2 normal · 3 mucho
+            int oscuro = oscuroF != null ? oscuroF : prefs.getInt("bloqueo_oscuro", 2); // 1 poco · 2 normal · 3 mucho
             int a1 = oscuro == 1 ? 0x66 : oscuro == 3 ? 0xD9 : 0xA6;
             int margen = dp(24), anchoTexto = ancho - margen * 2;
 

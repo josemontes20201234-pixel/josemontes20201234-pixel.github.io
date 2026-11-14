@@ -127,6 +127,7 @@ public class MainActivity extends Activity {
     static final String[][] ESTILOS = {{"meraki", "Meraki (reloj, agenda y apps abajo)"}, {"revista", "Revista (letras grandes y lista de apps)"},
             {"reloj", "Reloj (anillo de minutos)"}, {"columna", "Columna (hora vertical e íconos al lado)"}};
     static final String[][] ICONOS = {{"original", "Originales"}, {"mono", "Monocromo"}, {"oro", "Monocromo de color"}, {"circulo", "En círculo"}};
+    static final String[][] RELOJES_N = Relojes.LISTA;
     static final String[][] ACENTOS = {{"D9B55C", "Oro Meraki"}, {"F5F1E8", "Blanco hueso"}, {"D8443A", "Rojo poste"}, {"3F6FD8", "Azul poste"}, {"6FCF97", "Verde menta"}, {"C9A7FF", "Lavanda"}};
     static final String[][] LETRAS = {{"moderna", "Moderna"}, {"clasica", "Clásica (con serifa)"}, {"condensada", "Condensada"}};
     static final String[][] TEMAS = {{"oscuro", "Oscuro"}, {"claro", "Claro"}};
@@ -176,6 +177,8 @@ public class MainActivity extends Activity {
     TextView buscarWeb, tituloCajon;
     final List<TextView> infoViews = new ArrayList<>();
     final List<Dial> diales = new ArrayList<>();
+    /** Lo que se actualiza cada minuto (relojes analógico y en palabras). */
+    final List<Runnable> alMinuto = new ArrayList<>();
     final List<TextView> fechas = new ArrayList<>();
     final List<App> todas = new ArrayList<>();
     final List<App> filtradas = new ArrayList<>();
@@ -191,7 +194,7 @@ public class MainActivity extends Activity {
     final BroadcastReceiver receptor = new BroadcastReceiver() {
         @Override public void onReceive(Context c, Intent i) {
             if (Intent.ACTION_BATTERY_CHANGED.equals(i.getAction())) { leerBateria(i); actualizarInfo(); }
-            else { for (Dial d : diales) d.invalidate(); for (TextView t : fechas) t.setText(textoFecha()); if (!diaConstruido.equals(hoyClave())) construirInicio(); }
+            else { for (Dial d : diales) d.invalidate(); for (Runnable r : new ArrayList<>(alMinuto)) r.run(); for (TextView t : fechas) t.setText(textoFecha()); if (!diaConstruido.equals(hoyClave())) construirInicio(); }
         }
     };
 
@@ -280,6 +283,9 @@ public class MainActivity extends Activity {
         if (claro && acento == 0xFFD9B55C) acento = 0xFFA8822B;
         FG = claro ? 0xFF141414 : 0xFFF5F1E8;
         MUTED = claro ? 0xFF6E685E : 0xFF9A948A;
+        // color de los textos escogido en «Relojes y colores»
+        String ct = prefs.getString("color_texto", null);
+        if (ct != null) try { FG = 0xFF000000 | Integer.parseInt(ct, 16); MUTED = conAlpha(FG, 0xA8); } catch (Exception e) { }
         CARD = claro ? 0xB3FFFFFF : 0x99141210;
         LINEA = claro ? 0x22000000 : conAlpha(acento, 0x40);
         CAJON = claro ? 0xFFF4F1EA : 0xFF0B0A08; // sólido: que no se vea el inicio detrás de las apps
@@ -396,6 +402,7 @@ public class MainActivity extends Activity {
         super.onNewIntent(i);
         // Botón de inicio: siempre volver a la pantalla principal
         cerrarEditorBloqueo();
+        cerrarCapas();
         cerrarAjustes();
         cerrarCajon();
         if (panel != null) panel.cerrar();
@@ -489,6 +496,7 @@ public class MainActivity extends Activity {
     @Override
     public void onBackPressed() {
         if (editorBloqueo != null) cerrarEditorBloqueo();
+        else if (!capas.isEmpty()) cerrarCapa();
         else if (noticias != null && noticias.abierta()) noticias.cerrar();
         else if (barberia != null && barberia.abierta()) barberia.cerrarCaja();
         else if (panel != null && panel.editando()) panel.cerrarEditor();
@@ -657,7 +665,7 @@ public class MainActivity extends Activity {
         // La página de noticias sale siguiendo el dedo
         if (arrNoticias) return arrastreNoticias(ev);
         // Con el Panel Meraki o su editor abiertos, los gestos del inicio no deben estorbar
-        if (panel != null && (panel.abierto() || panel.editando()) || barberia != null && barberia.abierta() || noticias != null && noticias.abierta() || editorBloqueo != null) return super.dispatchTouchEvent(ev);
+        if (panel != null && (panel.abierto() || panel.editando()) || barberia != null && barberia.abierta() || noticias != null && noticias.abierta() || editorBloqueo != null || !capas.isEmpty()) return super.dispatchTouchEvent(ev);
         if (arrastreNoticias(ev)) return true;
         if (ev.getActionMasked() == MotionEvent.ACTION_DOWN) tocandoAbc = abc != null && abc.getVisibility() == View.VISIBLE && drawer.getVisibility() == View.VISIBLE && dentroDe(abc, bajoX, bajoY);
         if (tocandoAbc) return super.dispatchTouchEvent(ev);
@@ -847,7 +855,7 @@ public class MainActivity extends Activity {
     // =====================================================================
     void construirInicio() {
         homeBox.removeAllViews();
-        infoViews.clear(); diales.clear(); fechas.clear();
+        infoViews.clear(); diales.clear(); fechas.clear(); alMinuto.clear();
         agendaLista = null; agendaCaja = null; agendaTitulo = null; widgetBox = null; scrollMedio = null; dockScroll = null; puntosDock = null;
         accesosCaja = null; musicaCaja = null;
         diaConstruido = hoyClave();
@@ -907,6 +915,21 @@ public class MainActivity extends Activity {
     }
 
     View espacio(LinearLayout padre) { View e = new View(this); padre.addView(e, new LinearLayout.LayoutParams(-1, 0, 1f)); return e; }
+
+    /** El color del reloj del inicio: el escogido o el de cada estilo. */
+    int colorReloj(int def) {
+        String c = prefs.getString("reloj_color", null);
+        if (c == null) return def;
+        try { return 0xFF000000 | Integer.parseInt(c, 16); } catch (Exception e) { return def; }
+    }
+
+    void abrirAlarmas() { abrir(new Intent(AlarmClock.ACTION_SHOW_ALARMS), "No encontré la app del reloj."); }
+
+    // ===== capas de pantalla completa (Relojes y colores, Sugerencias): «atrás» cierra la de encima
+    final List<View> capas = new ArrayList<>();
+    void abrirCapa(View v) { capas.add(v); root.addView(v, new FrameLayout.LayoutParams(-1, -1)); }
+    void cerrarCapa() { if (capas.isEmpty()) return; View v = capas.remove(capas.size() - 1); root.removeView(v); }
+    void cerrarCapas() { while (!capas.isEmpty()) cerrarCapa(); }
 
     TextClock reloj(float sp, Typeface t, int color, String f12, String f24) {
         TextClock c = new TextClock(this);
@@ -989,10 +1012,15 @@ public class MainActivity extends Activity {
     View inicioMeraki() {
         LinearLayout h = columnaBase();
         h.addView(marca());
-        TextClock hora = reloj(88, Typeface.create("sans-serif-light", Typeface.NORMAL), FG, "h:mm", "HH:mm");
-        hora.setLetterSpacing(-0.02f);
-        if ("clasica".equals(letra) || "condensada".equals(letra)) hora.setTypeface(tf(false));
-        h.addView(hora, lp(-2, -2, 26));
+        String re = Relojes.actual(this);
+        View otro = "clasico".equals(re) ? null : Relojes.crear(this, re, false, 1f, colorReloj(FG), true);
+        if (otro != null) h.addView(otro, lp(-2, -2, 26));
+        else {
+            TextClock hora = reloj(88, Typeface.create("sans-serif-light", Typeface.NORMAL), colorReloj(FG), "h:mm", "HH:mm");
+            hora.setLetterSpacing(-0.02f);
+            if ("clasica".equals(letra) || "condensada".equals(letra)) hora.setTypeface(tf(false));
+            h.addView(hora, lp(-2, -2, 26));
+        }
         TextView fecha = fecha(17, Typeface.create("sans-serif-medium", Typeface.NORMAL), acento);
         h.addView(fecha, lp(-2, -2, 6));
         h.addView(info(13, MUTED), lp(-1, -2, 8));
@@ -1031,6 +1059,9 @@ public class MainActivity extends Activity {
     // ---------- Estilo Revista ("Have a NICE Saturday") ----------
     View inicioRevista() {
         LinearLayout h = columnaBase();
+        String re = Relojes.actual(this);
+        View otro = "clasico".equals(re) ? null : Relojes.crear(this, re, false, 0.8f, colorReloj(FG), true);
+        if (otro != null) { LinearLayout.LayoutParams po = otro.getLayoutParams() instanceof LinearLayout.LayoutParams ? (LinearLayout.LayoutParams) otro.getLayoutParams() : new LinearLayout.LayoutParams(-2, -2); po.bottomMargin = dp(14); h.addView(otro, po); }
         SimpleDateFormat fd = new SimpleDateFormat("dd MMM yyyy", ES);
         TextView badge = texto(fd.format(new Date()).toUpperCase(ES).replace(".", ""), 11, claro ? 0xFFFFFFFF : 0xFF0B0A08, Typeface.create("sans-serif-medium", Typeface.BOLD));
         badge.setLetterSpacing(0.15f);
@@ -1074,10 +1105,18 @@ public class MainActivity extends Activity {
         LinearLayout h = columnaBase();
         h.addView(marca());
         espacio(h);
-        Dial d = new Dial(this);
-        diales.add(d);
-        d.setOnClickListener(v -> abrir(new Intent(AlarmClock.ACTION_SHOW_ALARMS), "No encontré la app del reloj."));
-        h.addView(d, new LinearLayout.LayoutParams(-1, dp(250)));
+        String re = Relojes.actual(this);
+        View otro = "clasico".equals(re) || "anillo".equals(re) ? null : Relojes.crear(this, re, false, 1f, colorReloj(FG), true);
+        if (otro != null) {
+            LinearLayout.LayoutParams po = otro.getLayoutParams() instanceof LinearLayout.LayoutParams ? (LinearLayout.LayoutParams) otro.getLayoutParams() : new LinearLayout.LayoutParams(-2, -2);
+            po.gravity = Gravity.CENTER_HORIZONTAL;
+            h.addView(otro, po);
+        } else {
+            Dial d = new Dial(this);
+            diales.add(d);
+            d.setOnClickListener(v -> abrir(new Intent(AlarmClock.ACTION_SHOW_ALARMS), "No encontré la app del reloj."));
+            h.addView(d, new LinearLayout.LayoutParams(-1, dp(250)));
+        }
         TextView fecha = fecha(15, tf(false), acento);
         fecha.setGravity(Gravity.CENTER);
         h.addView(fecha, lp(-1, -2, 4));
@@ -1101,8 +1140,13 @@ public class MainActivity extends Activity {
 
         LinearLayout izq = columnaBase();
         Typeface fino = "moderna".equals(letra) ? Typeface.create("sans-serif-thin", Typeface.NORMAL) : tf(false);
-        izq.addView(reloj(64, fino, acento, "hh", "HH"));
-        izq.addView(reloj(64, fino, acento, "mm", "mm"), lp(-2, -2, 0));
+        String re = Relojes.actual(this);
+        View otro = "clasico".equals(re) ? null : Relojes.crear(this, re, true, 0.72f, colorReloj(acento), true);
+        if (otro != null) izq.addView(otro);
+        else {
+            izq.addView(reloj(64, fino, colorReloj(acento), "hh", "HH"));
+            izq.addView(reloj(64, fino, colorReloj(acento), "mm", "mm"), lp(-2, -2, 0));
+        }
         SimpleDateFormat fd = new SimpleDateFormat("d MMM yyyy", ES);
         TextView badge = texto(fd.format(new Date()).replace(".", ""), 11, claro ? 0xFFFFFFFF : 0xFF0B0A08, Typeface.create("sans-serif-medium", Typeface.BOLD));
         badge.setBackground(caja(FG, 99, 0));
@@ -1153,7 +1197,7 @@ public class MainActivity extends Activity {
             p.setTypeface(Typeface.create("sans-serif-light", Typeface.NORMAL));
             if (!"moderna".equals(letra)) p.setTypeface(tf(false));
             p.setTextSize(R * 0.78f);
-            p.setColor(FG);
+            p.setColor(colorReloj(FG));
             p.setTextAlign(Paint.Align.LEFT);
             String hs = String.format(Locale.ROOT, "%02d", hr);
             float hw = p.measureText(hs);
@@ -2578,7 +2622,10 @@ public class MainActivity extends Activity {
         seccion(l, "Pantalla de inicio");
         opcion(l, "Estilo de inicio", nombre(ESTILOS, estilo), () -> elegir("Estilo de inicio", ESTILOS, "estilo", estilo));
         opcion(l, "Tema", nombre(TEMAS, claro ? "claro" : "oscuro"), () -> elegir("Tema", TEMAS, "tema", claro ? "claro" : "oscuro"));
-        opcion(l, "Color de acento", nombre(ACENTOS, prefs.getString("acento", "D9B55C")), () -> elegir("Color de acento", ACENTOS, "acento", prefs.getString("acento", "D9B55C")));
+        opcion(l, "Relojes y colores", nombre(RELOJES_N, Relojes.actual(this)) + " · reloj, textos y acento", () -> Relojes.abrirPanel(this));
+        String acG = prefs.getString("acento", "D9B55C");
+        boolean acLista = false; for (String[] o : ACENTOS) if (o[0].equalsIgnoreCase(acG)) acLista = true;
+        opcion(l, "Color de acento", acLista ? nombre(ACENTOS, acG) : "Personalizado · " + Colores.nombre(acento), () -> elegir("Color de acento", ACENTOS, "acento", acG));
         opcion(l, "Letra", nombre(LETRAS, letra), () -> elegir("Letra", LETRAS, "letra", letra));
         opcion(l, "Tu nombre (para el saludo)", nombre.isEmpty() ? "Sin nombre" : nombre, this::editarNombre);
 
@@ -2615,6 +2662,7 @@ public class MainActivity extends Activity {
         boolean puesto = fondoVivoPuesto();
         opcion(l, puesto ? "✓ Fondo Meraki puesto" : "Poner el fondo Meraki", puesto ? "Tocá para verlo o ponerlo de nuevo" : "Tocá «Establecer» y escogé «Pantalla de bloqueo». La huella y el PIN siguen siendo de Samsung", this::ponerFondoVivo);
         opcion(l, "Foto de fondo", hayFotoBloqueo() ? "Tu foto · tocá para cambiarla" : "Fondo Meraki · tocá para poner tu foto", this::elegirFotoBloqueo);
+        if (hayFotoBloqueo()) opcion(l, "✨ Sugerencias según tu foto", "Colores que combinan, acomodo para no tapar caras, qué tan oscuro y el color para el reloj de Samsung", () -> Sugerencias.abrir(this));
         if (hayFotoBloqueo()) opcion(l, "Acomodar la foto", "Movela y acercala con el dedo para que se vean sus caras", this::acomodarFoto);
         if (hayFotoBloqueo()) opcion(l, "Quitar la foto", "Vuelve al fondo Meraki con la M dorada", () -> {
             new File(getFilesDir(), FondoVivo.FOTO).delete();
