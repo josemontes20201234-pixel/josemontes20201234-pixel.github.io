@@ -59,7 +59,7 @@ import java.util.regex.Pattern;
 
 /**
  * Página de noticias: sale desde el borde siguiendo el dedo, como la de Samsung.
- * CNN (español e inglés), Forbes (Centroamérica y EE. UU.) y el noticiero Mundo Cristiano de CBN.
+ * Diarios de El Salvador, CNN (español e inglés), Forbes Centroamérica, CBS MoneyWatch y el noticiero Mundo Cristiano de CBN.
  */
 class Noticias {
     final MainActivity a;
@@ -84,6 +84,20 @@ class Noticias {
     }
     /** CNN ya no tiene canal propio que funcione: se lee por Google Noticias filtrado a su sitio. Forbes Centroamérica, CBS y CBN sí tienen el suyo. */
     static final Fuente[] FUENTES = {
+            // ---- El Salvador (las escogió Jose). Primero su canal propio si tiene, luego Bing y Google Noticias.
+            new Fuente("lpg", "La Prensa Gráfica (El Salvador)", "La Prensa Gráfica", "laprensagrafica.com", 0xFF2F80ED,
+                    BING + "q=site%3alaprensagrafica.com&mkt=es-US&setlang=es",
+                    GN + "q=when:2d+site:laprensagrafica.com&hl=es-419&gl=US&ceid=US:es-419"),
+            new Fuente("edh", "El Diario de Hoy (El Salvador)", "El Diario de Hoy", "elsalvador.com", 0xFF4A90C2,
+                    BING + "q=site%3aelsalvador.com&mkt=es-US&setlang=es",
+                    GN + "q=when:2d+site:elsalvador.com&hl=es-419&gl=US&ceid=US:es-419"),
+            new Fuente("des", "Diario El Salvador", "Diario El Salvador", "diarioelsalvador.com", 0xFF3BA3D0,
+                    "https://diarioelsalvador.com/feed/",
+                    BING + "q=site%3adiarioelsalvador.com&mkt=es-US&setlang=es",
+                    GN + "q=when:2d+site:diarioelsalvador.com&hl=es-419&gl=US&ceid=US:es-419"),
+            new Fuente("faro", "El Faro (El Salvador)", "El Faro", "elfaro.net", 0xFFE0A526,
+                    BING + "q=site%3aelfaro.net&mkt=es-US&setlang=es",
+                    GN + "q=when:7d+site:elfaro.net&hl=es-419&gl=US&ceid=US:es-419"),
             new Fuente("cnne", "CNN en Español", "CNN en Español", "cnnespanol.cnn.com", 0xFFE5483F,
                     BING + "q=site%3acnnespanol.cnn.com&mkt=es-US&setlang=es",
                     GN + "q=when:2d+site:cnnespanol.cnn.com&hl=es-419&gl=US&ceid=US:es-419"),
@@ -103,6 +117,8 @@ class Noticias {
                     "http://podcast.cbn.com/CBN_Video_Podcast_Mundo_Cristiano.aspx"),
     };
     static final int POR_FUENTE = 15;
+    /** Las nacionales: juntas en el botón «El Salvador». */
+    static final Set<String> SV = new HashSet<>(java.util.Arrays.asList("lpg", "edh", "des", "faro"));
 
     static Fuente fuente(String id) { for (Fuente f : FUENTES) if (f.id.equals(id)) return f; return null; }
 
@@ -111,6 +127,11 @@ class Noticias {
         Set<String> r = new HashSet<>();
         if (s == null) { for (Fuente f : FUENTES) r.add(f.id); return r; }
         for (String k : s.split(",")) if (!k.isEmpty()) r.add("forbes".equals(k) ? "cbsmw" : k);
+        // Una sola vez: si ya había escogido fuentes antes, se le suman las de El Salvador
+        if (!a.prefs.getBoolean("noticias_sv", false)) {
+            r.addAll(SV);
+            a.prefs.edit().putBoolean("noticias_sv", true).putString("noticias_fuentes", TextUtils.join(",", r)).apply();
+        }
         return r;
     }
 
@@ -123,7 +144,7 @@ class Noticias {
             List<String> k = new ArrayList<>();
             for (int i = 0; i < FUENTES.length; i++) if (sel[i]) k.add(FUENTES[i].id);
             a.prefs.edit().putString("noticias_fuentes", TextUtils.join(",", k)).putLong("noticias_leido", 0).apply();
-            if (!k.contains(filtro) && !"todas".equals(filtro)) filtro = "todas";
+            if (!k.contains(filtro) && !"todas".equals(filtro) && !"sv".equals(filtro)) filtro = "todas";
             if (a.ajustes.getVisibility() == View.VISIBLE) a.construirAjustes();
             if (abierta()) { pintar(); actualizar(true); }
         }).setNegativeButton("Cancelar", null).show();
@@ -726,10 +747,13 @@ class Noticias {
         if (lista == null) return;
         pintarEstado();
         Set<String> act = activas();
-        if (!"todas".equals(filtro) && (fuente(filtro) == null || !act.contains(filtro))) filtro = "todas";
+        boolean haySV = false; for (String k : SV) if (act.contains(k)) haySV = true;
+        if ("sv".equals(filtro) && !haySV) filtro = "todas";
+        if (!"todas".equals(filtro) && !"sv".equals(filtro) && (fuente(filtro) == null || !act.contains(filtro))) filtro = "todas";
         // filtros por fuente
         chips.removeAllViews();
         chip("todas", "Todas");
+        if (haySV) chip("sv", "🇸🇻 El Salvador");
         for (Fuente f : FUENTES) if (act.contains(f.id)) chip(f.id, f.corto);
 
         // que el filtro escogido siempre se vea en la fila
@@ -755,7 +779,8 @@ class Noticias {
         List<Nota> l = new ArrayList<>();
         for (Fuente f : FUENTES) {
             if (f.id.equals("mc") || !act.contains(f.id)) continue;
-            if (!"todas".equals(filtro) && !f.id.equals(filtro)) continue;
+            if ("sv".equals(filtro)) { if (!SV.contains(f.id)) continue; }
+            else if (!"todas".equals(filtro) && !f.id.equals(filtro)) continue;
             List<Nota> x = porFuente.get(f.id);
             if (x != null) l.addAll(x);
         }

@@ -2678,7 +2678,7 @@ public class MainActivity extends Activity {
         interruptorBloqueo(l, "Clima", "clima");
 
         seccion(l, "Noticias");
-        opcion(l, "Abrir las noticias", "CNN, Forbes Centroamérica, CBS MoneyWatch y Mundo Cristiano", () -> { cerrarAjustes(); noticias().abrir(dirNoticias() == 0 ? 1 : dirNoticias()); });
+        opcion(l, "Abrir las noticias", "El Salvador, CNN, Forbes Centroamérica, CBS MoneyWatch y Mundo Cristiano", () -> { cerrarAjustes(); noticias().abrir(dirNoticias() == 0 ? 1 : dirNoticias()); });
         opcion(l, "Cómo se abre", dirNoticias() == 1 ? "Deslizá el dedo a la derecha en el inicio" : dirNoticias() == -1 ? "Deslizá el dedo a la izquierda en el inicio" : "Sin gesto · tocá para escoger", this::elegirGestoNoticias);
         opcion(l, "Fuentes", noticias().activas().size() + " de " + Noticias.FUENTES.length + " · tocá para escoger", () -> noticias().elegirFuentes());
 
