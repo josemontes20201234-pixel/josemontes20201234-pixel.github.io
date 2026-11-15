@@ -554,7 +554,11 @@ public class Servicio extends AccessibilityService {
         int abajo = real.y - dp(56); // dejar libre la barra de abajo
         boolean visible = blanco.isVisibleToUser();
         String donde = "[" + r.toShortString() + (visible ? "" : " oculto") + " de " + real.x + "x" + real.y + "]";
-        boolean enPantalla = visible && r.width() > 0 && r.height() > 0 && r.centerX() > 0 && r.centerX() < real.x && r.centerY() > dp(40) && r.centerY() < abajo;
+        // La parte del botón que de verdad se ve (sin la barra de arriba ni la de abajo): si se ve un buen pedazo, se toca ahí
+        int arriba = dp(40);
+        int vTop = Math.max(r.top, arriba), vBot = Math.min(r.bottom, real.y - dp(16));
+        boolean enPantalla = visible && r.width() > 0 && r.height() > 0 && r.centerX() > 0 && r.centerX() < real.x && vBot - vTop >= dp(32);
+        int tocaY = (vTop + vBot) / 2;
         if (!enPantalla) {
             intentosMover++;
             // 1) pedirle a Samsung que lo muestre; 2) mover la lista que lo contiene; 3) deslizar la lista hacia arriba con el dedo
@@ -566,7 +570,8 @@ public class Servicio extends AccessibilityService {
             }
             if (intentosMover <= 6) {
                 android.graphics.Path p = new android.graphics.Path();
-                float desde = r.top > abajo ? real.y * 0.78f : real.y * 0.45f, hasta = r.top > abajo ? real.y * 0.42f : real.y * 0.80f; // si está abajo, la lista sube; si está arriba, baja
+                boolean estaAbajo = r.centerY() > real.y / 2;
+                float desde = estaAbajo ? real.y * 0.78f : real.y * 0.45f, hasta = estaAbajo ? real.y * 0.42f : real.y * 0.80f; // si está abajo, la lista sube; si está arriba, baja
                 p.moveTo(real.x * 0.5f, desde);
                 p.lineTo(real.x * 0.5f, hasta);
                 gesto(p, 420);
@@ -577,8 +582,8 @@ public class Servicio extends AccessibilityService {
             return false;
         }
         android.graphics.Path p = new android.graphics.Path();
-        p.moveTo(r.centerX(), r.centerY());
-        p.lineTo(r.centerX() + 1, r.centerY() + 1);
+        p.moveTo(r.centerX(), tocaY);
+        p.lineTo(r.centerX() + 1, tocaY + 1);
         gesto(p, 60);
         comoToque = "con el dedo " + donde;
         return true;
