@@ -324,12 +324,41 @@ class MainActivity extends ContextWrapper {
             }
             // sin el permiso: sigue abajo, tocando el botón de Samsung
             case "datos": case "avion": case "ubicacion": case "ahorro": case "hotspot": case "nfc": case "oscuro": {
+                if (("ubicacion".equals(id) || "ahorro".equals(id)) && directo(id, ventanita)) return true;
                 Servicio s = Servicio.yo;
                 if (s == null || srv == null) { Servicio.anotar("«" + id + "»: " + (s == null ? "el servicio no está activo" : "el panel no está encima de todo") + " → ventanita"); return false; }
                 return s.tocarBotonSamsung(id, ventanita);
             }
         }
         return false;
+    }
+
+    /** Ubicación y ahorro de batería directo con el permiso de adb; si no cambió, se toca el botón de Samsung. */
+    boolean directo(final String id, final Runnable ventanita) {
+        if (checkSelfPermission("android.permission.WRITE_SECURE_SETTINGS") != android.content.pm.PackageManager.PERMISSION_GRANTED) return false;
+        final Boolean antes = estadoDirecto(id);
+        if (antes == null) return false;
+        try {
+            android.content.ContentResolver cr = getContentResolver();
+            if ("ubicacion".equals(id)) android.provider.Settings.Secure.putInt(cr, "location_mode", antes ? 0 : 3);
+            else android.provider.Settings.Global.putInt(cr, "low_power", antes ? 0 : 1);
+        } catch (Throwable e) { Servicio.anotar("«" + id + "»: directo falló (" + e + ") → panel de Samsung"); return false; }
+        Servicio.anotar("«" + id + "»: directo con el permiso → " + (antes ? "apagando" : "encendiendo"));
+        ui.postDelayed(() -> {
+            Boolean ahora = estadoDirecto(id);
+            if (ahora != null && !ahora.equals(antes)) { Servicio.anotar("  listo: " + (ahora ? "encendido" : "apagado")); actualizarTiles(); return; }
+            Servicio.anotar("  no cambió → panel de Samsung");
+            Servicio s = Servicio.yo;
+            if (s != null && srv != null) s.tocarBotonSamsung(id, ventanita); else ventanita.run();
+        }, 700);
+        return true;
+    }
+
+    Boolean estadoDirecto(String id) {
+        try {
+            if ("ubicacion".equals(id)) { android.location.LocationManager lm = (android.location.LocationManager) getSystemService(LOCATION_SERVICE); return lm.isLocationEnabled(); }
+            android.os.PowerManager pm = (android.os.PowerManager) getSystemService(POWER_SERVICE); return pm.isPowerSaveMode();
+        } catch (Throwable e) { return null; }
     }
 
     void actualizarTiles() { if (Servicio.yo != null) Servicio.yo.actualizarFranja(); }
