@@ -1,0 +1,1015 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b0a08">
+<title>Meraki CRM</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@1,800&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0b0a08; --card:#16140f; --card2:#1f1c16; --line:#2e2a20;
+  --gold:#d9b55c; --gold2:#f1d58a; --txt:#f5f1e8; --mut:#a8a297; --ok:#7cc48a; --warn:#e58a6b; --vino:#7a2348;
+  --ig:#e1306c; --fb:#4a7fe0; --wa:#3fbf6a; --tt:#5fd3d9;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--txt);font-family:Manrope,system-ui,sans-serif;font-size:16px}
+body{padding-bottom:88px;min-height:100vh;background:radial-gradient(ellipse 90% 40% at 80% 0%,rgba(122,35,72,.22),transparent 70%),var(--bg)}
+button,input,select,textarea{font-family:inherit}
+button{cursor:pointer}
+.wrap{max-width:600px;margin:0 auto;padding:14px 16px}
+header{display:flex;align-items:center;gap:12px;padding:8px 0 10px}
+.logo{width:42px;height:42px;border-radius:50%;border:2px solid var(--gold);display:grid;place-items:center;font:italic 800 24px "Playfair Display",Georgia,serif;color:var(--gold2);flex:none}
+.brand{flex:1;min-width:0}
+.brand b{display:block;letter-spacing:.26em;color:var(--gold);font-size:14px;font-weight:800}
+.brand small{display:block;color:var(--mut);font-size:12px;margin-top:2px}
+h2{font-size:12px;letter-spacing:.24em;text-transform:uppercase;color:var(--gold);margin:24px 0 10px;font-weight:800}
+h3{font-size:17px;margin:0 0 4px;font-weight:800}
+.card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:14px}
+.card+.card{margin-top:10px}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.sp{flex:1}
+.mut{color:var(--mut)}
+.small{font-size:13px}
+.chip{background:var(--card2);border:1px solid var(--line);color:var(--txt);border-radius:999px;padding:8px 13px;font-size:14px;font-weight:600;white-space:nowrap}
+.chip.on{background:var(--gold);color:#111;border-color:var(--gold)}
+.chips{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;scrollbar-width:none}
+.chips::-webkit-scrollbar{display:none}
+.btn{background:var(--gold);color:#111;border:0;border-radius:14px;padding:13px 16px;font-weight:800;font-size:15px;display:inline-flex;align-items:center;justify-content:center;gap:8px;text-decoration:none}
+.btn.ghost{background:transparent;color:var(--gold2);border:1px solid var(--gold)}
+.btn.dark{background:var(--card2);color:var(--txt);border:1px solid var(--line)}
+.btn.full{width:100%}
+.btn.sm{padding:8px 12px;font-size:13px;border-radius:10px}
+.btn[disabled]{opacity:.5}
+.mini{background:var(--card2);border:1px solid var(--line);color:var(--gold2);border-radius:10px;padding:7px 11px;font-size:13px;font-weight:700}
+input[type=text],input[type=tel],input[type=password],input[type=number],input[type=date],input[type=datetime-local],select,textarea{width:100%;background:var(--card2);border:1px solid var(--line);color:var(--txt);border-radius:12px;padding:11px 12px;font-size:16px;color-scheme:dark}
+textarea{resize:vertical;min-height:96px;line-height:1.45}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--gold)}
+label.l{display:block;font-size:13px;color:var(--mut);margin:12px 0 6px;font-weight:600}
+.empty{color:var(--mut);font-size:14px;text-align:center;padding:18px 8px}
+nav{position:fixed;bottom:0;left:0;right:0;background:rgba(14,13,10,.96);border-top:1px solid var(--line);display:flex;justify-content:center;z-index:20;padding-bottom:env(safe-area-inset-bottom)}
+nav .in{display:flex;max-width:600px;width:100%}
+nav button{flex:1;background:none;border:0;color:var(--mut);padding:10px 0 12px;font-size:11px;display:flex;flex-direction:column;align-items:center;gap:4px;font-weight:700;position:relative}
+nav button svg{width:24px;height:24px}
+nav button.on{color:var(--gold2)}
+nav .dot{position:absolute;top:6px;left:calc(50% + 8px);min-width:17px;height:17px;border-radius:9px;background:var(--warn);color:#111;font-size:10px;font-weight:800;display:none;align-items:center;justify-content:center;padding:0 4px}
+.view{display:none}.view.on{display:block}
+/* hoy */
+.saludo{font:italic 800 26px "Playfair Display",Georgia,serif;margin:6px 0 2px;text-wrap:balance}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:12px 8px;text-align:center}
+.stat b{display:block;font-size:24px;color:var(--gold2);font-weight:800}
+.stat span{font-size:11.5px;color:var(--mut);font-weight:600}
+.tarea{display:flex;gap:12px;align-items:flex-start;padding:12px 0;border-bottom:1px solid var(--line)}
+.tarea:last-child{border-bottom:0;padding-bottom:2px}
+.tarea:first-child{padding-top:2px}
+.ico{width:38px;height:38px;border-radius:12px;display:grid;place-items:center;font-size:19px;flex:none;background:var(--card2);border:1px solid var(--line)}
+.tarea .t{flex:1;min-width:0}
+.tarea .n{font-weight:800}
+.tarea .m{font-size:13px;color:var(--mut);margin-top:2px;line-height:1.35}
+.acts{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.prog{height:10px;background:var(--card2);border-radius:99px;overflow:hidden;border:1px solid var(--line);margin-top:10px}
+.prog i{display:block;height:100%;background:linear-gradient(90deg,var(--gold),var(--gold2));width:0;transition:width .4s}
+.idea{border-left:3px solid var(--gold);padding-left:12px}
+/* gente */
+.embudo{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:8px}
+.embudo div{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:8px 4px;text-align:center}
+.embudo b{display:block;font-size:20px;color:var(--gold2)}
+.embudo span{font-size:10.5px;color:var(--mut);font-weight:700}
+.persona{display:flex;gap:12px;align-items:center;padding:12px;background:var(--card);border:1px solid var(--line);border-radius:16px;margin-top:8px}
+.av{width:44px;height:44px;border-radius:50%;display:grid;place-items:center;font-weight:800;font-size:17px;flex:none;background:var(--card2);border:1px solid var(--line);color:var(--gold2);position:relative}
+.av i{position:absolute;right:-3px;bottom:-3px;width:18px;height:18px;border-radius:50%;font-size:10px;display:grid;place-items:center;font-style:normal;color:#111;font-weight:800;border:2px solid var(--card)}
+.persona .t{flex:1;min-width:0}
+.persona .n{font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.persona .m{font-size:12.5px;color:var(--mut);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tag{font-size:11px;font-weight:800;border-radius:99px;padding:3px 8px;background:var(--card2);border:1px solid var(--line);color:var(--gold2);white-space:nowrap}
+.tag.nuevo{color:#111;background:var(--gold2);border-color:var(--gold2)}
+.tag.cliente{color:var(--ok)}
+.tag.perdido{color:var(--mut)}
+/* contenido */
+.semana{display:grid;grid-template-columns:repeat(7,1fr);gap:5px}
+.dia{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:7px 2px;text-align:center;min-height:74px}
+.dia.hoy{border-color:var(--gold)}
+.dia.descanso{opacity:.45}
+.dia small{display:block;font-size:10.5px;color:var(--mut);font-weight:700;text-transform:uppercase}
+.dia b{display:block;font-size:17px;margin:2px 0 4px}
+.dia i{display:block;width:8px;height:8px;border-radius:50%;margin:3px auto 0;background:var(--gold)}
+.dia i.pub{background:var(--ok)}
+.dia i.idea{background:transparent;border:1.5px solid var(--gold)}
+.post{display:flex;gap:12px;padding:10px;background:var(--card);border:1px solid var(--line);border-radius:16px;margin-top:8px;align-items:center}
+.post .f{width:58px;height:58px;border-radius:12px;background:var(--card2);flex:none;object-fit:cover;display:grid;place-items:center;font-size:22px;border:1px solid var(--line)}
+.post .t{flex:1;min-width:0}
+.post .n{font-weight:800;font-size:14.5px}
+.post .m{font-size:12.5px;color:var(--mut);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.foto{width:100%;aspect-ratio:1;border-radius:16px;background:var(--card2);border:1.5px dashed var(--line);display:grid;place-items:center;color:var(--mut);font-weight:700;overflow:hidden;max-width:100%}
+.foto img{width:100%;height:100%;object-fit:cover}
+.redes{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.red{display:flex;align-items:center;gap:10px;padding:12px;border-radius:14px;background:var(--card2);border:1px solid var(--line);font-weight:800;color:var(--txt);font-size:14.5px}
+.red span{width:28px;height:28px;border-radius:8px;display:grid;place-items:center;color:#fff;font-size:14px;flex:none}
+/* hojas */
+.hoja{position:fixed;inset:0;background:var(--bg);z-index:40;overflow-y:auto;display:none;padding-bottom:40px}
+.hoja.on{display:block}
+.hoja .top{position:sticky;top:0;background:rgba(11,10,8,.97);border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px;padding:12px 16px;z-index:2}
+.hoja .top button.x{background:none;border:0;color:var(--txt);font-size:24px;padding:4px 8px}
+.hoja .top b{flex:1;font-size:17px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hist{font-size:13.5px;border-left:2px solid var(--line);padding:2px 0 10px 12px;margin-left:6px}
+.hist small{color:var(--mut);display:block;font-size:11.5px}
+.ia{background:linear-gradient(135deg,#2a1d2a,#1f1a10);border:1px solid #5a3d4a;border-radius:16px;padding:14px}
+.ia .opc{background:rgba(0,0,0,.25);border:1px solid var(--line);border-radius:12px;padding:12px;margin-top:8px;white-space:pre-wrap;font-size:14.5px;line-height:1.45}
+.cargando{display:inline-block;width:16px;height:16px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:g .8s linear infinite;vertical-align:-3px}
+@keyframes g{to{transform:rotate(360deg)}}
+.toast{position:fixed;left:50%;bottom:96px;transform:translateX(-50%);background:var(--txt);color:#111;padding:11px 16px;border-radius:12px;font-weight:700;font-size:14px;z-index:90;max-width:90%;text-align:center;display:none}
+.paso{display:flex;gap:12px;padding:10px 0;border-bottom:1px solid var(--line);font-size:14.5px;line-height:1.45}
+.paso:last-child{border-bottom:0}
+.paso b.n{width:26px;height:26px;border-radius:50%;background:var(--gold);color:#111;display:grid;place-items:center;flex:none;font-size:13px}
+code{background:var(--card2);border:1px solid var(--line);border-radius:6px;padding:1px 6px;font-size:12.5px;color:var(--gold2);word-break:break-all}
+.msg{padding:10px 12px;border-radius:14px;background:var(--card2);margin-top:6px;font-size:14.5px;line-height:1.4;max-width:85%}
+.msg.yo{background:#3a2f17;margin-left:auto}
+.msg small{display:block;color:var(--mut);font-size:11px;margin-top:3px}
+.ok{color:var(--ok)}.warn{color:var(--warn)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="logo">M</div>
+    <div class="brand"><b>MERAKI CRM</b><small id="subt">Clientes · Redes · Contenido</small></div>
+    <button class="mini" id="btnSync" title="Actualizar">↻</button>
+  </header>
+
+  <!-- ============ HOY ============ -->
+  <section class="view on" id="v-hoy">
+    <div class="saludo" id="saludo">Hola, Jose</div>
+    <div class="mut small" id="fecha"></div>
+    <div class="stats" style="margin-top:14px">
+      <div class="stat"><b id="sHoy">0</b><span>para escribir hoy</span></div>
+      <div class="stat"><b id="sNuevos">0</b><span>nuevos de redes</span></div>
+      <div class="stat"><b id="sSemana">0/3</b><span>posts esta semana</span></div>
+    </div>
+    <h2>A quién escribirle hoy</h2>
+    <div class="card" id="tareas"></div>
+    <h2>Contenido</h2>
+    <div class="card" id="hoyContenido"></div>
+    <h2>Lo que te funciona</h2>
+    <div class="card" id="hoyAnalisis"></div>
+  </section>
+
+  <!-- ============ GENTE ============ -->
+  <section class="view" id="v-gente">
+    <div class="row"><h2 style="margin:8px 0 0">Tu gente</h2><span class="sp"></span><button class="btn sm" id="btnNuevo">＋ Nuevo</button></div>
+    <div class="embudo" id="embudo"></div>
+    <input type="text" id="buscar" placeholder="Buscar nombre, usuario o teléfono" style="margin-top:12px">
+    <div class="chips" id="filtros" style="margin-top:10px"></div>
+    <div id="lista"></div>
+  </section>
+
+  <!-- ============ CONTENIDO ============ -->
+  <section class="view" id="v-cont">
+    <div class="row"><h2 style="margin:8px 0 0">Esta semana</h2><span class="sp"></span><button class="btn sm" id="btnPost">＋ Publicación</button></div>
+    <div class="row small mut" style="margin:6px 0 10px"><button class="mini" id="semAnt">‹</button><span id="semTxt" class="sp" style="text-align:center"></span><button class="mini" id="semSig">›</button></div>
+    <div class="semana" id="semana"></div>
+    <div id="posts"></div>
+    <h2>Ideas para publicar</h2>
+    <div class="chips" id="pilares"></div>
+    <div id="ideas"></div>
+    <div style="margin-top:12px"><button class="btn ghost full" id="btnPlan">✨ Que Claude me arme la semana</button></div>
+  </section>
+
+  <!-- ============ BANDEJA (Meta) ============ -->
+  <section class="view" id="v-bandeja"><div id="bandeja"></div></section>
+
+  <!-- ============ AJUSTES ============ -->
+  <section class="view" id="v-ajustes"><div id="ajustes"></div></section>
+</div>
+
+<nav><div class="in">
+  <button data-v="hoy" class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/></svg>Hoy<span class="dot" id="dotHoy"></span></button>
+  <button data-v="gente"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18.5 14.8c1.6.8 2.6 2.5 3 5.2"/></svg>Gente</button>
+  <button data-v="cont"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="18" height="18" rx="4"/><circle cx="9" cy="9" r="2"/><path d="M21 15l-5-5L5 21"/></svg>Contenido</button>
+  <button data-v="bandeja"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg>Bandeja<span class="dot" id="dotBand"></span></button>
+  <button data-v="ajustes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>Ajustes</button>
+</div></nav>
+
+<div class="hoja" id="hoja"><div class="top"><button class="x" id="hojaX">←</button><b id="hojaT"></b><span id="hojaA"></span></div><div class="wrap" id="hojaC"></div></div>
+<div class="toast" id="toast"></div>
+
+<script>
+"use strict";
+/* ================================================================ base */
+const $ = s => document.querySelector(s);
+const APP = !!window.Android;
+const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+const DIA = 86400000;
+const hoy0 = () => { const d = new Date(); d.setHours(0,0,0,0); return d.getTime(); };
+const dias = t => t ? Math.floor((hoy0() - new Date(t).setHours(0,0,0,0)) / DIA) : null;
+const DIAS = ["Dom","Lun","Mar","Mié","Jue","Vie","Sáb"];
+const DIAS_L = ["domingo","lunes","martes","miércoles","jueves","viernes","sábado"];
+const MESES = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
+const fechaLarga = t => { const d = new Date(t); return DIAS_L[d.getDay()] + " " + d.getDate() + " de " + MESES[d.getMonth()]; };
+const hora = t => { const d = new Date(t); let h = d.getHours(), m = d.getMinutes(); const ap = h >= 12 ? "pm" : "am"; h = h % 12 || 12; return h + (m ? ":" + String(m).padStart(2,"0") : "") + " " + ap; };
+const haceTxt = t => { const n = dias(t); return n === null ? "" : n <= 0 ? "hoy" : n === 1 ? "ayer" : "hace " + n + " días"; };
+function toast(t){ const e = $("#toast"); e.textContent = t; e.style.display = "block"; clearTimeout(toast.k); toast.k = setTimeout(() => e.style.display = "none", 2600); }
+const primerNombre = n => String(n || "").trim().split(/\s+/)[0] || "";
+
+const REDES = {
+  instagram:{n:"Instagram", c:"var(--ig)", i:"IG", pk:"com.instagram.android"},
+  facebook:{n:"Facebook", c:"var(--fb)", i:"f", pk:"com.facebook.katana,com.facebook.pages.app"},
+  whatsapp:{n:"WhatsApp", c:"var(--wa)", i:"W", pk:"com.whatsapp.w4b,com.whatsapp"},
+  tiktok:{n:"TikTok", c:"var(--tt)", i:"♪", pk:"com.zhiliaoapp.musically,com.ss.android.ugc.trill"},
+  tarjeta:{n:"Tarjeta Meraki", c:"var(--gold)", i:"M"},
+  otro:{n:"Otro", c:"var(--mut)", i:"•"}
+};
+const ESTADOS = [["nuevo","Nuevo"],["conversando","Conversando"],["agendado","Agendado"],["cliente","Cliente"],["perdido","No se dio"]];
+const estadoTxt = k => (ESTADOS.find(e => e[0] === k) || ["", "—"])[1];
+
+const PILARES = {
+  antes:{n:"Antes y después", e:"✂️", ideas:["Carrusel: foto antes, foto después y un video corto del degradado.","Reel de 7 segundos: la cara de él al verse en el espejo.","Transformación del mes: el cambio más grande que hiciste."]},
+  tip:{n:"Tip de cuidado", e:"💡", ideas:["Cómo dejarte el fade fresco más días (3 consejos).","¿Cera, pomada o gel? Qué usar según tu tipo de pelo.","Cada cuánto cortarte según el estilo que llevás."]},
+  promo:{n:"Promo", e:"🔥", ideas:["Martes de clásico: recordá el Corte clásico a $3.50.","Combo el patrón: corte + barba por $5.00.","Ya aceptamos tarjeta por acercamiento: subí el anuncio."]},
+  detras:{n:"Detrás de cámaras", e:"🎬", ideas:["Tu mesa de trabajo antes de abrir: herramientas, café y música.","Un día en Meraki en 15 segundos.","Cómo desinfectás y preparás todo antes de cada cliente."]},
+  cliente:{n:"Cliente feliz", e:"🙌", ideas:["Foto con un cliente fiel y por qué vuelve.","Pedile a un cliente que diga en 5 segundos qué le gusta de Meraki.","Repostá la historia donde un cliente te etiquetó."]},
+  club:{n:"Tarjeta y Club", e:"🏆", ideas:["Explicá la Tarjeta Meraki: 8 sellos y el corte va por la casa.","Felicitá a quien completó su tarjeta esta semana.","Presentá el Club Meraki: Flow, Plus y VIP."]},
+  ritual:{n:"Ritual Spa", e:"🧖", ideas:["Video del Ritual Meraki Spa con toalla caliente.","Por qué el ritual es el regalo perfecto para él.","Antes y después del Servicio full detalle."]}
+};
+const HASHTAGS = "#MerakiBarbershop #Apopa #BarberiaApopa #BarberSV #ElSalvador #SanSalvador #Barbershop #BarberLife #Fade #CorteDeCabello #Degradado #BarberoSalvadoreño";
+const CONTEXTO = "Meraki Barbershop es una barbería premium en Apopa, San Salvador, El Salvador. El barbero y dueño es Jose. Abre de martes a domingo; el lunes descansa.\n" +
+  "Estilo de la marca: negro y dorado, elegante y cercano.\n" +
+  "Servicios: Corte clásico $3.50 · Corte moderno $4.00 · Combo el patrón $5.00 · Servicio full detalle $6.00 · Diseño de barba el patrón $3.50 · Ritual Meraki Spa $5.00.\n" +
+  "Bebidas: café $0.30 · gaseosa $0.70 · jugo $0.60 · energy $0.65.\n" +
+  "Pagos: efectivo, transferencia y tarjeta (solo por acercamiento).\n" +
+  "Tarjeta Meraki: tarjeta de sellos; al completar 8 sellos el corte va gratis. Club Meraki: membresías Flow, Plus y VIP.";
+
+/* ================================================================ datos */
+const D = (() => { try { return JSON.parse(localStorage.getItem("crm") || "{}"); } catch(e) { return {}; } })();
+D.personas = D.personas || [];
+D.posts = D.posts || [];
+D.hechos = D.hechos || {};           // tareas que ya hiciste: clave → fecha
+D.aj = Object.assign({meta:3, modelo:"claude-sonnet-5-5", contexto:CONTEXTO, hashtags:HASHTAGS, ig:"", ubicacion:"", graphV:"v23.0", horario:"Martes a domingo"}, D.aj || {});
+D.tm = D.tm || {clientes:[], cfg:{meta:8, diasInactivo:30, premio:"corte gratis"}, cuando:0};
+D.meta = D.meta || {};
+function guardar(){ try { localStorage.setItem("crm", JSON.stringify(D)); } catch(e) { toast("No se pudo guardar: memoria llena"); } }
+
+/* fotos en IndexedDB (no caben en localStorage) */
+const fotos = (() => {
+  let db;
+  const abrir = () => db ? Promise.resolve(db) : new Promise((ok, mal) => { const r = indexedDB.open("crm_fotos", 1); r.onupgradeneeded = () => r.result.createObjectStore("f"); r.onsuccess = () => ok(db = r.result); r.onerror = () => mal(r.error); });
+  const tx = (m, fn) => abrir().then(d => new Promise((ok, mal) => { const t = d.transaction("f", m); const r = fn(t.objectStore("f")); t.oncomplete = () => ok(r && r.result); t.onerror = () => mal(t.error); }));
+  return { poner:(k, v) => tx("readwrite", s => s.put(v, k)), leer:k => tx("readonly", s => s.get(k)).catch(() => null), quitar:k => tx("readwrite", s => s.delete(k)) };
+})();
+
+/* ================================================================ internet (por el puente nativo) */
+const esperando = {};
+window.__http = (id, estado, texto) => { const p = esperando[id]; if (!p) return; delete esperando[id]; p({estado, texto}); };
+function http(metodo, url, {headers = {}, body = "", tipo = "json"} = {}) {
+  if (APP) return new Promise(ok => { const id = uid(); esperando[id] = ok; Android.http(id, metodo, url, JSON.stringify(headers), typeof body === "string" ? body : JSON.stringify(body), tipo); })
+    .then(r => { let j = null; try { j = JSON.parse(r.texto); } catch(e) {} return {estado:r.estado, json:j, texto:r.texto}; });
+  const op = {method:metodo, headers:Object.assign({}, headers)};
+  if (tipo === "multipart") { const f = new FormData(); const o = JSON.parse(body); for (const k in o) f.append(k, o[k]); op.body = f; }
+  else if (body) { op.body = typeof body === "string" ? body : JSON.stringify(body); op.headers["Content-Type"] = op.headers["Content-Type"] || (tipo === "form" ? "application/x-www-form-urlencoded" : "application/json"); }
+  return fetch(url, op).then(async r => { const t = await r.text(); let j = null; try { j = JSON.parse(t); } catch(e) {} return {estado:r.status, json:j, texto:t}; }).catch(e => ({estado:0, json:{error:{message:String(e)}}, texto:""}));
+}
+const errorDe = r => (r.json && (r.json.error && (r.json.error.message || r.json.error.type) || r.json.error_description)) || ("Error " + r.estado);
+
+/* ================================================================ Tarjeta Meraki (Firebase) */
+const FB_KEY = "AIzaSyCysp_Pr9o-LYM5td9wOGLNNvsSKaEx2MQ";
+const FS = "https://firestore.googleapis.com/v1/projects/meraki-barbershop/databases/(default)/documents";
+const REGLA_CRM = '    match /crm/{d} {\n      allow read, write: if request.auth != null && request.auth.token.email_verified == true && request.auth.token.email.lower() == "josemontes20201234@gmail.com";\n    }';
+let ficha = null;
+async function token() {
+  if (ficha && ficha.hasta > Date.now() + 60000) return ficha.t;
+  if (!D.aj.rt) return null;
+  const r = await http("POST", "https://securetoken.googleapis.com/v1/token?key=" + FB_KEY, {tipo:"form", body:"grant_type=refresh_token&refresh_token=" + encodeURIComponent(D.aj.rt)});
+  if (r.estado !== 200 || !r.json) { if (r.estado === 400) { D.aj.rt = ""; guardar(); toast("Volvé a entrar a Tarjeta Meraki"); } return null; }
+  if (r.json.refresh_token && r.json.refresh_token !== D.aj.rt) { D.aj.rt = r.json.refresh_token; guardar(); }
+  ficha = {t:r.json.id_token, hasta:Date.now() + Number(r.json.expires_in || 3600) * 1000};
+  return ficha.t;
+}
+window.alEntrar = rt => { D.aj.rt = rt; ficha = null; guardar(); toast("¡Conectado a Tarjeta Meraki!"); traerTarjeta(true).then(() => { subirTodo(); pintarTodo(); }); };
+function valor(v) {
+  if (!v) return null;
+  if ("stringValue" in v) return v.stringValue;
+  if ("integerValue" in v) return Number(v.integerValue);
+  if ("doubleValue" in v) return v.doubleValue;
+  if ("booleanValue" in v) return v.booleanValue;
+  if ("timestampValue" in v) return v.timestampValue;
+  if ("nullValue" in v) return null;
+  if ("mapValue" in v) { const o = {}; const f = v.mapValue.fields || {}; for (const k in f) o[k] = valor(f[k]); return o; }
+  if ("arrayValue" in v) return (v.arrayValue.values || []).map(valor);
+  return null;
+}
+const docA = d => { const o = {}; const f = d.fields || {}; for (const k in f) o[k] = valor(f[k]); o.id = d.name.split("/").pop(); return o; };
+async function listar(col, t) {
+  let todos = [], pag = "";
+  for (let i = 0; i < 20; i++) {
+    const r = await http("GET", FS + "/" + col + "?pageSize=300" + (pag ? "&pageToken=" + encodeURIComponent(pag) : ""), {headers:{Authorization:"Bearer " + t}});
+    if (r.estado !== 200) return {error:r};
+    todos = todos.concat((r.json.documents || []).map(docA));
+    if (!r.json.nextPageToken) break; pag = r.json.nextPageToken;
+  }
+  return {docs:todos};
+}
+let traendo = false;
+async function traerTarjeta(forzar) {
+  if (traendo || !D.aj.rt) return;
+  if (!forzar && Date.now() - D.tm.cuando < 10 * 60000) return;
+  traendo = true; $("#btnSync").innerHTML = '<span class="cargando"></span>';
+  try {
+    const t = await token(); if (!t) return;
+    const c = await listar("clientes", t);
+    if (c.docs) {
+      D.tm.clientes = c.docs.map(x => ({id:x.id, nombre:x.nombre || "", telefono:x.telefono || "", cumple:x.cumple || "", sellos:x.sellos || 0, visitas:x.visitasTotales || 0, ultimaVisita:x.ultimaVisita || null, creado:x.creado || null}));
+      D.tm.cuando = Date.now(); D.tm.error = "";
+    } else D.tm.error = errorDe(c.error);
+    const g = await http("GET", FS + "/config/programa", {headers:{Authorization:"Bearer " + t}});
+    if (g.estado === 200) { const o = docA(g.json); D.tm.cfg = {meta:o.meta || 8, diasInactivo:o.diasInactivo || 30, premio:o.premio || "corte gratis"}; }
+    await bajarCrm(t);
+    guardar();
+  } finally { traendo = false; $("#btnSync").textContent = "↻"; }
+}
+/* copia de seguridad del CRM en Firebase (colección «crm», sólo vos la ves) */
+const sinFoto = p => { const o = Object.assign({}, p); delete o.foto; return o; };
+async function subirDoc(id, obj) {
+  if (!D.aj.rt || D.aj.crmNube === false) return;
+  const t = await token(); if (!t) return;
+  const r = await http("PATCH", FS + "/crm/" + id, {headers:{Authorization:"Bearer " + t}, body:{fields:{d:{stringValue:JSON.stringify(obj)}, u:{integerValue:String(obj.u || Date.now())}}}});
+  if (r.estado === 403) { D.aj.crmNube = false; guardar(); }
+}
+async function borrarDoc(id) { if (!D.aj.rt || D.aj.crmNube === false) return; const t = await token(); if (t) http("DELETE", FS + "/crm/" + id, {headers:{Authorization:"Bearer " + t}}); }
+async function bajarCrm(t) {
+  const r = await listar("crm", t);
+  if (!r.docs) { if (r.error && r.error.estado === 403) D.aj.crmNube = false; return; }
+  D.aj.crmNube = true;
+  for (const doc of r.docs) {
+    let o; try { o = JSON.parse(doc.d); } catch(e) { continue; }
+    const lista = doc.id.startsWith("p_") ? D.personas : doc.id.startsWith("x_") ? D.posts : null; if (!lista) continue;
+    const i = lista.findIndex(x => x.id === o.id);
+    if (i < 0) lista.push(o); else if ((o.u || 0) > (lista[i].u || 0)) lista[i] = Object.assign(lista[i], o);
+  }
+}
+function subirTodo() { D.personas.forEach(p => subirDoc("p_" + p.id, p)); D.posts.forEach(p => subirDoc("x_" + p.id, sinFoto(p))); }
+function guardarPersona(p) { p.u = Date.now(); if (!D.personas.includes(p)) D.personas.push(p); guardar(); subirDoc("p_" + p.id, p); }
+function guardarPost(p) { p.u = Date.now(); if (!D.posts.includes(p)) D.posts.push(p); guardar(); subirDoc("x_" + p.id, sinFoto(p)); alarmas(); }
+
+/* ================================================================ gente: CRM + Tarjeta Meraki juntos */
+const soloNum = t => String(t || "").replace(/\D/g, "");
+const telSV = t => { let n = soloNum(t); if (n.length === 8) n = "503" + n; return n; };
+function gente() {
+  const L = D.personas.filter(p => !p.borrado).map(p => Object.assign({}, p, {tm:p.tmId ? D.tm.clientes.find(c => c.id === p.tmId) : null}));
+  const usados = new Set(L.map(p => p.tmId).filter(Boolean));
+  for (const c of D.tm.clientes) {
+    if (usados.has(c.id)) continue;
+    const mismo = c.telefono && L.find(p => !p.tmId && soloNum(p.tel).slice(-8) === soloNum(c.telefono).slice(-8));
+    if (mismo) { mismo.tm = c; continue; }
+    L.push({id:"tm_" + c.id, virtual:true, tmId:c.id, tm:c, nombre:c.nombre, tel:c.telefono, red:"tarjeta", estado:"cliente", historial:[]});
+  }
+  L.forEach(p => { if (p.tm && !p.tel) p.tel = p.tm.telefono; });
+  return L;
+}
+function real(p) { // vuelve real una persona que sólo existía en Tarjeta Meraki
+  if (!p.virtual) return D.personas.find(x => x.id === p.id) || p;
+  const n = {id:uid(), tmId:p.tmId, nombre:p.nombre, tel:p.tel || "", red:"tarjeta", estado:"cliente", usuario:"", notas:"", historial:[], creado:Date.now()};
+  guardarPersona(n); return n;
+}
+const sellosTxt = c => c ? c.sellos + "/" + D.tm.cfg.meta + " sellos" : "";
+const premioListo = c => c && c.sellos >= D.tm.cfg.meta;
+const cumpleEn = c => { if (!c || !c.cumple) return null; const [m, d] = c.cumple.split("-").map(Number); const h = new Date(); h.setHours(0,0,0,0); let f = new Date(h.getFullYear(), m - 1, d); if (f < h) f = new Date(h.getFullYear() + 1, m - 1, d); return Math.round((f - h) / DIA); };
+
+/* ===== plantillas de mensaje ===== */
+const PLANT = {
+  respuesta:{n:"Responder", t:"¡Qué onda{, nombre}! Gracias por escribirnos a Meraki Barbershop 💈 ¿En qué te ayudamos?"},
+  precios:{n:"Precios", t:"¡Hola{, nombre}! Estos son nuestros precios 💈\n\n✂️ Corte clásico $3.50\n✂️ Corte moderno $4.00\n🔥 Combo el patrón $5.00\n⭐ Servicio full detalle $6.00\n🧔 Diseño de barba el patrón $3.50\n🧖 Ritual Meraki Spa $5.00\n\nAceptamos efectivo, transferencia y tarjeta por acercamiento. ¿Te apartamos tu espacio?"},
+  agendar:{n:"Agendar", t:"¡Claro{, nombre}! ¿Qué día y a qué hora te queda mejor? Te apartamos tu espacio en Meraki 💈"},
+  seguimiento:{n:"Seguimiento", t:"¡Qué onda{, nombre}! ¿Siempre te apartamos tu espacio esta semana? Decime qué día te queda 💈"},
+  extranamos:{n:"Te extrañamos", t:"¡{nombre}! Hace rato no te vemos por Meraki 👀 Tu tarjeta va en {sellos} sellos. Esta semana te esperamos, ¿te apartamos un espacio?"},
+  premio:{n:"Premio listo", t:"{nombre}, ¡completaste tu Tarjeta Meraki! 🏆 En tu próxima visita tenés {premio}. Escribime para apartarte tu espacio."},
+  cumple:{n:"Cumpleaños", t:"¡Feliz cumpleaños, {nombre}! 🎂 De parte de Meraki Barbershop: venite esta semana y celebramos con tu corte."},
+  resena:{n:"Pedir etiqueta", t:"¡{nombre}, gracias por venir a Meraki! 🙌 Si te gustó tu corte, subí tu foto a historias y etiquetanos{ ig}. ¡Nos ayudás un montón!"},
+  bienvenida:{n:"Bienvenida", t:"¡Bienvenido a Meraki{, nombre}! 💈 Ya tenés tu Tarjeta Meraki: con cada visita sumás un sello y al completar {meta} el corte va por la casa."}
+};
+function llenar(k, p) {
+  const n = primerNombre(p && p.nombre);
+  return PLANT[k].t
+    .replace("{, nombre}", n ? ", " + n : "").replace(/\{nombre\}/g, n || "")
+    .replace("{sellos}", p && p.tm ? p.tm.sellos + "/" + D.tm.cfg.meta : "tus")
+    .replace("{premio}", D.tm.cfg.premio).replace("{meta}", D.tm.cfg.meta)
+    .replace("{ ig}", D.aj.ig ? " @" + D.aj.ig.replace(/^@/, "") : "");
+}
+function escribir(p, texto) {
+  const n = telSV(p.tel);
+  if (p.red === "instagram" && !n) { if (APP) Android.copiar(texto); toast("Texto copiado: pegalo en el chat"); abrir(p.usuario ? "https://ig.me/m/" + p.usuario.replace(/^@/, "") : "https://instagram.com/direct/inbox/"); return; }
+  if (p.red === "facebook" && !n) { if (APP) Android.copiar(texto); toast("Texto copiado: pegalo en Messenger"); abrir(p.usuario ? "https://m.me/" + p.usuario.replace(/^@/, "") : "https://m.me/"); return; }
+  if (p.red === "tiktok" && !n) { if (APP) Android.copiar(texto); toast("Texto copiado"); abrir(p.usuario ? "https://www.tiktok.com/@" + p.usuario.replace(/^@/, "") : "https://www.tiktok.com/"); return; }
+  if (!n) { if (APP) Android.copiar(texto); toast("No tiene teléfono: texto copiado"); return; }
+  abrir("https://wa.me/" + n + "?text=" + encodeURIComponent(texto));
+}
+const abrir = u => APP ? Android.abrir(u) : window.open(u, "_blank");
+
+/* ===== la inteligencia: a quién escribirle hoy ===== */
+const hecho = (k, nDias) => D.hechos[k] && dias(D.hechos[k]) < nDias;
+function tareasHoy() {
+  const T = [], G = gente(), h = new Date();
+  for (const p of G) {
+    const c = p.tm, ult = (p.historial || []).slice(-1)[0];
+    const silencio = dias(ult ? ult.t : p.creado);
+    if (p.proximo && new Date(p.proximo).setHours(0,0,0,0) <= hoy0() && !hecho("prox_" + p.id + p.proximo, 999))
+      T.push({p, k:"prox_" + p.id + p.proximo, e:"📌", pr:1, n:"Seguimiento que agendaste", m:p.notaProx || "Lo dejaste para hoy.", pl:"seguimiento"});
+    if (p.estado === "nuevo" && !p.virtual && !hecho("nuevo_" + p.id, 2))
+      T.push({p, k:"nuevo_" + p.id, e:"✨", pr:0, n:"Respondele", m:"Llegó por " + REDES[p.red || "otro"].n + " " + haceTxt(p.creado) + ". Responder rápido es lo que más convierte.", pl:"respuesta"});
+    if (p.estado === "conversando" && silencio >= 3 && !hecho("conv_" + p.id, 4))
+      T.push({p, k:"conv_" + p.id, e:"💬", pr:2, n:"Preguntale si agenda", m:"Están conversando y no le escribís hace " + silencio + " días.", pl:"seguimiento"});
+    if (c) {
+      if (premioListo(c) && !hecho("premio_" + p.tmId, 7)) T.push({p, k:"premio_" + p.tmId, e:"🏆", pr:2, n:"Tiene su premio listo", m:"Completó " + sellosTxt(c) + ". Invitalo a reclamarlo.", pl:"premio"});
+      const cu = cumpleEn(c);
+      if (cu !== null && cu <= 2 && !hecho("cumple_" + p.tmId + h.getFullYear(), 300)) T.push({p, k:"cumple_" + p.tmId + h.getFullYear(), e:"🎂", pr:1, n:cu === 0 ? "Cumple hoy" : "Cumple en " + cu + (cu === 1 ? " día" : " días"), m:"Mandale saludos de Meraki.", pl:"cumple"});
+      const dv = dias(c.ultimaVisita);
+      if (dv !== null && dv >= D.tm.cfg.diasInactivo && !premioListo(c) && !hecho("inact_" + p.tmId, 21)) T.push({p, k:"inact_" + p.tmId, e:"⏰", pr:3, n:"No viene hace " + dv + " días", m:"Lleva " + sellosTxt(c) + ". Un mensaje lo hace volver.", pl:"extranamos", orden:-dv});
+      if (dv !== null && dv <= 1 && c.visitas >= 3 && !hecho("resena_" + p.tmId, 90)) T.push({p, k:"resena_" + p.tmId, e:"📸", pr:4, n:"Pedile que te etiquete", m:"Vino " + (dv === 0 ? "hoy" : "ayer") + " y es cliente fiel (" + c.visitas + " visitas).", pl:"resena"});
+    }
+  }
+  T.sort((a, b) => a.pr - b.pr || (a.orden || 0) - (b.orden || 0));
+  // no abrumar: máximo 4 inactivos por día
+  let inact = 0; return T.filter(t => t.pl !== "extranamos" || ++inact <= 4);
+}
+
+/* ===== contenido: semana, metas y lo que funciona ===== */
+const inicioSemana = (t = Date.now()) => { const d = new Date(t); d.setHours(0,0,0,0); const w = (d.getDay() + 6) % 7; return d.getTime() - w * DIA; };
+const postsEntre = (a, b) => D.posts.filter(p => !p.borrado && p.fecha && new Date(p.fecha).getTime() >= a && new Date(p.fecha).getTime() < b);
+const publicadosSemana = (t = Date.now()) => postsEntre(inicioSemana(t), inicioSemana(t) + 7 * DIA).filter(p => p.estado === "publicado").length;
+function racha() { let n = 0, s = inicioSemana() - 7 * DIA; if (publicadosSemana() >= D.aj.meta) n = 1; while (publicadosSemana(s) >= D.aj.meta && n < 99) { n++; s -= 7 * DIA; } return n; }
+const puntos = p => p.res ? (Number(p.res.likes) || 0) + 3 * (Number(p.res.comentarios) || 0) + 4 * (Number(p.res.guardados) || 0) + 2 * (Number(p.res.compartidos) || 0) : null;
+function analisis() {
+  const con = D.posts.filter(p => !p.borrado && p.estado === "publicado" && puntos(p) !== null);
+  if (con.length < 4) return null;
+  const prom = a => a.reduce((s, x) => s + puntos(x), 0) / a.length, gen = prom(con);
+  const por = f => { const g = {}; con.forEach(p => { const k = f(p); (g[k] = g[k] || []).push(p); }); return Object.entries(g).filter(([, a]) => a.length >= 2).map(([k, a]) => ({k, v:prom(a), n:a.length})).sort((a, b) => b.v - a.v); };
+  const franja = h => h < 11 ? "mañana (antes de 11)" : h < 14 ? "mediodía (11 a 2)" : h < 18 ? "tarde (2 a 6)" : "noche (después de 6)";
+  return {n:con.length, gen, pilar:por(p => p.pilar || "otro")[0], dia:por(p => new Date(p.fecha).getDay())[0], franja:por(p => franja(new Date(p.fecha).getHours()))[0], top:con.slice().sort((a, b) => puntos(b) - puntos(a))[0]};
+}
+function pilarSugerido() {
+  const ult = {}; Object.keys(PILARES).forEach(k => ult[k] = 0);
+  D.posts.filter(p => !p.borrado && p.pilar && p.estado !== "idea").forEach(p => ult[p.pilar] = Math.max(ult[p.pilar] || 0, new Date(p.fecha || p.u || 0).getTime()));
+  const a = analisis(); let lista = Object.keys(PILARES).sort((x, y) => ult[x] - ult[y]);
+  if (a && a.pilar && PILARES[a.pilar.k] && dias(ult[a.pilar.k]) >= 5) lista = [a.pilar.k].concat(lista.filter(x => x !== a.pilar.k));
+  return lista[0];
+}
+
+/* ================================================================ Claude */
+async function claude(sistema, contenido, max = 1200) {
+  if (!D.aj.claude) throw new Error("Poné tu clave de Claude en Ajustes.");
+  const r = await http("POST", "https://api.anthropic.com/v1/messages", {headers:{"x-api-key":D.aj.claude, "anthropic-version":"2023-06-01", "content-type":"application/json"},
+    body:{model:D.aj.modelo || "claude-sonnet-5-5", max_tokens:max, system:sistema, messages:[{role:"user", content:contenido}]}});
+  if (r.estado !== 200) throw new Error(r.estado === 401 ? "La clave de Claude no sirve. Revisala en Ajustes." : r.estado === 400 && /credit|balance/i.test(r.texto) ? "Tu cuenta de Claude no tiene saldo." : errorDe(r));
+  return (r.json.content || []).filter(b => b.type === "text").map(b => b.text).join("\n").trim();
+}
+const SIS = () => "Sos el community manager de Meraki Barbershop. Escribís en español salvadoreño con voseo (vos, tenés, vení), cálido, seguro y con estilo premium, sin exagerar con los emojis (2 a 4 máximo). Nunca inventés precios, horarios ni promociones que no estén aquí.\n\nDatos del negocio:\n" + D.aj.contexto + (D.aj.ubicacion ? "\nUbicación: " + D.aj.ubicacion : "") + (D.aj.horario ? "\nHorario: " + D.aj.horario : "") + (D.aj.ig ? "\nInstagram: @" + D.aj.ig.replace(/^@/, "") : "");
+const sacarJSON = t => { const m = t.match(/\{[\s\S]*\}|\[[\s\S]*\]/); return JSON.parse(m ? m[0] : t); };
+function achicar(dataUrl, lado = 1024) {
+  return new Promise(ok => { const im = new Image(); im.onload = () => { const s = Math.min(1, lado / Math.max(im.width, im.height)); const c = document.createElement("canvas"); c.width = Math.round(im.width * s); c.height = Math.round(im.height * s); c.getContext("2d").drawImage(im, 0, 0, c.width, c.height); ok(c.toDataURL("image/jpeg", .85)); }; im.onerror = () => ok(null); im.src = dataUrl; });
+}
+
+/* ================================================================ Meta (Instagram + Facebook) */
+const G = () => "https://graph.facebook.com/" + (D.aj.graphV || "v23.0") + "/";
+async function graph(ruta, params = {}, metodo = "GET", tipo = "form") {
+  const tok = params.access_token || D.meta.token;
+  const q = Object.assign({}, params, {access_token:tok});
+  if (metodo === "GET" || metodo === "DELETE") { const r = await http(metodo, G() + ruta + "?" + new URLSearchParams(q)); if (r.estado !== 200) throw new Error(errorDe(r)); return r.json; }
+  const r = tipo === "multipart" ? await http("POST", G() + ruta, {tipo:"multipart", body:JSON.stringify(q)}) : await http("POST", G() + ruta, {tipo:"form", body:new URLSearchParams(q).toString()});
+  if (r.estado !== 200) throw new Error(errorDe(r)); return r.json;
+}
+const metaListo = () => !!(D.meta.token && D.meta.page);
+async function conectarMeta(tok) {
+  tok = tok.trim(); if (!tok) throw new Error("Pegá el token.");
+  let paginas = null;
+  try { paginas = (await graph("me/accounts", {fields:"id,name,access_token,instagram_business_account{id,username,followers_count,profile_picture_url}", access_token:tok})).data; } catch(e) {}
+  let pg;
+  if (paginas && paginas.length) pg = paginas[0];
+  else { const me = await graph("me", {fields:"id,name,instagram_business_account{id,username,followers_count,profile_picture_url}", access_token:tok}); pg = Object.assign(me, {access_token:tok}); }
+  D.meta = {token:pg.access_token, page:pg.id, pageName:pg.name, ig:pg.instagram_business_account ? pg.instagram_business_account.id : "", igUser:pg.instagram_business_account ? pg.instagram_business_account.username : "", seguidores:pg.instagram_business_account ? pg.instagram_business_account.followers_count : null, cuando:Date.now(), paginas:paginas ? paginas.map(p => ({id:p.id, name:p.name})) : []};
+  if (D.meta.igUser && !D.aj.ig) D.aj.ig = D.meta.igUser;
+  guardar(); return D.meta;
+}
+async function publicarMeta(post, donde, textoFinal, foto) {
+  const hechos = [];
+  if (!foto) throw new Error("Para publicar directo necesitás una foto.");
+  if (donde.includes("facebook")) {
+    const r = await graph(D.meta.page + "/photos", {source:foto, message:textoFinal}, "POST", "multipart");
+    hechos.push("Facebook"); post.fbId = r.post_id || r.id;
+  }
+  if (donde.includes("instagram")) {
+    if (!D.meta.ig) throw new Error("Tu página no tiene Instagram vinculado.");
+    // Instagram pide la foto en internet: la subimos escondida a tu página y usamos esa dirección
+    const sub = await graph(D.meta.page + "/photos", {source:foto, published:"false"}, "POST", "multipart");
+    const img = await graph(sub.id, {fields:"images"});
+    const url = img.images && img.images[0] && img.images[0].source; if (!url) throw new Error("Facebook no devolvió la foto.");
+    const c = await graph(D.meta.ig + "/media", {image_url:url, caption:textoFinal}, "POST");
+    for (let i = 0; i < 15; i++) { const s = await graph(c.id, {fields:"status_code"}); if (s.status_code === "FINISHED") break; if (s.status_code === "ERROR") throw new Error("Instagram no aceptó la foto."); await new Promise(r => setTimeout(r, 2000)); }
+    const p = await graph(D.meta.ig + "/media_publish", {creation_id:c.id}, "POST");
+    post.igId = p.id; hechos.push("Instagram");
+    try { await graph(sub.id, {}, "DELETE"); } catch(e) {}
+  }
+  return hechos;
+}
+
+/* ================================================================ pantallas */
+let vista = "hoy";
+function ir(v) { vista = v; document.querySelectorAll(".view").forEach(e => e.classList.toggle("on", e.id === "v-" + v)); document.querySelectorAll("nav button").forEach(b => b.classList.toggle("on", b.dataset.v === v)); pintar(); scrollTo(0, 0); }
+document.querySelectorAll("nav button").forEach(b => b.onclick = () => ir(b.dataset.v));
+function pintar() { ({hoy:pintarHoy, gente:pintarGente, cont:pintarCont, bandeja:pintarBandeja, ajustes:pintarAjustes})[vista](); }
+function pintarTodo() { pintar(); puntitos(); }
+function puntitos() { const n = tareasHoy().length; const d = $("#dotHoy"); d.textContent = n; d.style.display = n && vista !== "hoy" ? "flex" : "none"; }
+
+/* ----- HOY ----- */
+function pintarHoy() {
+  const h = new Date(), hr = h.getHours();
+  $("#saludo").textContent = (hr < 12 ? "Buenos días" : hr < 18 ? "Buenas tardes" : "Buenas noches") + ", Jose";
+  $("#fecha").textContent = fechaLarga(h) + (h.getDay() === 1 ? " · hoy descansás" : "") + (D.tm.cuando ? " · Tarjeta Meraki al día" : "");
+  const T = tareasHoy(), G2 = gente();
+  $("#sHoy").textContent = T.length;
+  $("#sNuevos").textContent = G2.filter(p => p.estado === "nuevo").length;
+  $("#sSemana").textContent = publicadosSemana() + "/" + D.aj.meta;
+  let html = "";
+  if (!D.aj.rt) html += '<div class="tarea"><div class="ico">💳</div><div class="t"><div class="n">Conectá Tarjeta Meraki</div><div class="m">Así te aviso quién no viene, quién cumple años y quién tiene su premio listo.</div><div class="acts"><button class="btn sm" data-entrar>Conectar</button></div></div></div>';
+  T.slice(0, 12).forEach((t, i) => {
+    html += '<div class="tarea"><div class="ico">' + t.e + '</div><div class="t"><div class="n">' + esc(t.p.nombre || t.p.usuario || "Sin nombre") + ' <span class="mut small" style="font-weight:600">· ' + esc(t.n) + '</span></div><div class="m">' + esc(t.m) + '</div><div class="acts">' +
+      '<button class="btn sm" data-t="' + i + '" data-a="escribir">Escribirle</button><button class="mini" data-t="' + i + '" data-a="listo">✓ Listo</button><button class="mini" data-t="' + i + '" data-a="ver">Ver</button></div></div></div>';
+  });
+  if (!T.length && D.aj.rt) html += '<div class="empty">✓ Estás al día con tu gente. Buen momento para crear contenido.</div>';
+  if (T.length > 12) html += '<div class="empty">Y ' + (T.length - 12) + ' más. Terminá estos primero.</div>';
+  $("#tareas").innerHTML = html;
+  $("#tareas").onclick = e => {
+    const b = e.target.closest("button"); if (!b) return;
+    if (b.hasAttribute("data-entrar")) return entrarTarjeta();
+    const t = T[b.dataset.t]; if (!t) return;
+    if (b.dataset.a === "escribir") { escribir(t.p, llenar(t.pl, t.p)); marcar(t, "Le escribiste: " + PLANT[t.pl].n); }
+    else if (b.dataset.a === "listo") { marcar(t, "Listo: " + t.n); pintarHoy(); puntitos(); }
+    else verPersona(t.p);
+  };
+  // contenido de hoy
+  const hoyPosts = postsEntre(hoy0(), hoy0() + DIA).filter(p => p.estado !== "publicado");
+  const sug = pilarSugerido(), P = PILARES[sug];
+  let c = "";
+  if (hoyPosts.length) c += hoyPosts.map(p => '<div class="tarea"><div class="ico">' + (PILARES[p.pilar] ? PILARES[p.pilar].e : "📣") + '</div><div class="t"><div class="n">Hoy toca publicar · ' + hora(p.fecha) + '</div><div class="m">' + esc((p.texto || p.idea || "").slice(0, 90)) + '</div><div class="acts"><button class="btn sm" data-post="' + p.id + '">Abrir</button></div></div></div>').join("");
+  c += '<div class="idea"><div class="mut small" style="font-weight:700">' + (hoyPosts.length ? "Otra idea" : "Idea de hoy") + ' · ' + P.e + ' ' + P.n + '</div><div style="margin-top:4px;line-height:1.4">' + esc(P.ideas[new Date().getDate() % P.ideas.length]) + '</div><div class="acts"><button class="btn sm" data-crear="' + sug + '">Crear esta publicación</button></div></div>';
+  const r = racha();
+  c += '<div style="margin-top:14px" class="row small"><b>' + publicadosSemana() + ' de ' + D.aj.meta + '</b><span class="mut">publicaciones esta semana</span><span class="sp"></span>' + (r > 0 ? '<span class="tag">🔥 ' + r + (r === 1 ? " semana" : " semanas") + '</span>' : '') + '</div><div class="prog"><i style="width:' + Math.min(100, publicadosSemana() / D.aj.meta * 100) + '%"></i></div>';
+  $("#hoyContenido").innerHTML = c;
+  $("#hoyContenido").onclick = e => { const b = e.target.closest("button"); if (!b) return; if (b.dataset.post) editarPost(D.posts.find(p => p.id === b.dataset.post)); if (b.dataset.crear) editarPost(null, {pilar:b.dataset.crear, idea:P.ideas[new Date().getDate() % P.ideas.length]}); };
+  // análisis
+  const a = analisis();
+  let an = "";
+  if (!a) an = '<div class="mut small" style="line-height:1.5">Cuando anotés cuántos likes y comentarios tuvo cada publicación (o conectés Instagram), aquí te digo qué tipo de post, qué día y a qué hora te va mejor. Por ahora empezá con <b style="color:var(--txt)">martes a sábado, al mediodía o después de las 6 pm</b>: es cuando la gente revisa el teléfono en el almuerzo y al salir del trabajo.</div>';
+  else {
+    an += '<div class="small mut">Según tus ' + a.n + ' publicaciones con resultados:</div><div style="margin-top:8px;line-height:1.6">';
+    if (a.pilar && PILARES[a.pilar.k]) an += '🏅 Lo que más gusta: <b>' + PILARES[a.pilar.k].n + '</b> (' + Math.round(a.pilar.v / a.gen * 100 - 100) + '% más que tu promedio)<br>';
+    if (a.dia) an += '📅 Mejor día: <b>' + DIAS_L[a.dia.k] + '</b><br>';
+    if (a.franja) an += '⏰ Mejor hora: <b>' + a.franja.k + '</b><br>';
+    if (a.top) an += '⭐ Tu mejor post: «' + esc((a.top.texto || a.top.idea || "").slice(0, 60)) + '…»';
+    an += '</div><div class="acts"><button class="mini" id="btnAnal">✨ Que Claude lo analice</button></div>';
+  }
+  $("#hoyAnalisis").innerHTML = an;
+  const ba = $("#btnAnal"); if (ba) ba.onclick = analizarConClaude;
+}
+function marcar(t, txt) {
+  D.hechos[t.k] = new Date().toISOString();
+  const p = real(t.p); p.historial = p.historial || []; p.historial.push({t:Date.now(), x:txt});
+  if (t.pl === "respuesta" && p.estado === "nuevo") p.estado = "conversando";
+  if (t.k.startsWith("prox_")) p.proximo = "";
+  guardarPersona(p);
+}
+async function analizarConClaude() {
+  const L = D.posts.filter(p => !p.borrado && p.estado === "publicado" && puntos(p) !== null).slice(-40).map(p => ({fecha:new Date(p.fecha).toString().slice(0, 21), tipo:PILARES[p.pilar] ? PILARES[p.pilar].n : "otro", texto:(p.texto || "").slice(0, 140), resultados:p.res}));
+  hojaIA("Qué te funciona", async () => claude(SIS(), "Estas son mis publicaciones con sus resultados (likes, comentarios, guardados, compartidos):\n" + JSON.stringify(L) + "\n\nDecime en pocas líneas, como amigo y con total honestidad: qué me funciona, qué no, a qué hora y qué día conviene publicar, y 3 ideas concretas para la próxima semana. Sin rodeos, en viñetas cortas.", 900));
+}
+
+/* ----- GENTE ----- */
+let filtro = "todos";
+const FILTROS = [["todos","Todos"],["nuevo","Nuevos"],["conversando","Conversando"],["agendado","Agendados"],["cliente","Clientes"],["redes","De redes"],["inactivos","No vienen"],["cumple","Cumple este mes"],["premio","Premio listo"]];
+function pintarGente() {
+  const G2 = gente(), q = $("#buscar").value.trim().toLowerCase(), qn = soloNum(q);
+  const cuenta = k => G2.filter(p => p.estado === k).length;
+  $("#embudo").innerHTML = [["nuevo","Nuevos"],["conversando","Conversan"],["agendado","Agendados"],["cliente","Clientes"]].map(([k, n]) => '<div><b>' + cuenta(k) + '</b><span>' + n + '</span></div>').join("");
+  $("#filtros").innerHTML = FILTROS.map(([k, n]) => '<button class="chip' + (filtro === k ? " on" : "") + '" data-f="' + k + '">' + n + '</button>').join("");
+  const mes = new Date().getMonth() + 1;
+  const pasa = p => {
+    if (filtro === "redes") return ["instagram","facebook","tiktok","whatsapp"].includes(p.red);
+    if (filtro === "inactivos") return p.tm && dias(p.tm.ultimaVisita) >= D.tm.cfg.diasInactivo;
+    if (filtro === "cumple") return p.tm && p.tm.cumple && Number(p.tm.cumple.split("-")[0]) === mes;
+    if (filtro === "premio") return premioListo(p.tm);
+    return filtro === "todos" || p.estado === filtro;
+  };
+  let L = G2.filter(pasa).filter(p => !q || (p.nombre || "").toLowerCase().includes(q) || (p.usuario || "").toLowerCase().includes(q) || (qn.length >= 3 && soloNum(p.tel).includes(qn)));
+  const peso = p => p.estado === "nuevo" ? 0 : p.estado === "conversando" ? 1 : p.estado === "agendado" ? 2 : 3;
+  L.sort((a, b) => peso(a) - peso(b) || (b.u || b.creado || 0) - (a.u || a.creado || 0) || (a.nombre || "").localeCompare(b.nombre || ""));
+  const total = L.length; L = L.slice(0, 150);
+  $("#lista").innerHTML = L.length ? L.map(p => {
+    const r = REDES[p.red || "otro"] || REDES.otro, c = p.tm;
+    const sub = [p.usuario ? "@" + p.usuario.replace(/^@/, "") : "", c ? sellosTxt(c) : "", c && c.ultimaVisita ? "vino " + haceTxt(c.ultimaVisita) : "", !c && p.creado ? "llegó " + haceTxt(p.creado) : ""].filter(Boolean).join(" · ");
+    return '<div class="persona" data-id="' + p.id + '"><div class="av">' + esc((p.nombre || p.usuario || "?").replace(/^@/, "").charAt(0).toUpperCase()) + '<i style="background:' + r.c + '">' + r.i + '</i></div><div class="t"><div class="n">' + esc(p.nombre || p.usuario || "Sin nombre") + '</div><div class="m">' + esc(sub || r.n) + '</div></div><span class="tag ' + p.estado + '">' + estadoTxt(p.estado) + '</span></div>';
+  }).join("") + (total > 150 ? '<div class="empty">Mostrando 150 de ' + total + '. Buscá por nombre para ver el resto.</div>' : "") : '<div class="empty">' + (D.tm.clientes.length || D.personas.length ? "Nadie en este grupo." : "Todavía no hay nadie. Tocá «＋ Nuevo» o conectá Tarjeta Meraki en Ajustes.") + '</div>';
+}
+$("#buscar").oninput = () => pintarGente();
+$("#filtros").onclick = e => { const b = e.target.closest("[data-f]"); if (b) { filtro = b.dataset.f; pintarGente(); } };
+$("#lista").onclick = e => { const d = e.target.closest(".persona"); if (d) verPersona(gente().find(p => p.id === d.dataset.id)); };
+$("#btnNuevo").onclick = () => editarPersona(null);
+
+/* ----- hojas (pantallas encima) ----- */
+const pila = [];
+function hoja(titulo, html, accion, alCerrar) {
+  if ($("#hoja").classList.contains("on")) pila.push({t:$("#hojaT").textContent, h:$("#hojaC").innerHTML, a:$("#hojaA").innerHTML, re:hoja.re});
+  $("#hojaT").textContent = titulo; $("#hojaC").innerHTML = html; $("#hojaA").innerHTML = accion || "";
+  $("#hoja").classList.add("on"); $("#hoja").scrollTop = 0; hoja.alCerrar = alCerrar; hoja.re = null;
+  return $("#hojaC");
+}
+function cerrarHoja() {
+  if (hoja.alCerrar) { const f = hoja.alCerrar; hoja.alCerrar = null; f(); }
+  const ant = pila.pop();
+  if (ant && ant.re) { $("#hoja").classList.remove("on"); ant.re(); return; }
+  pila.length = 0; $("#hoja").classList.remove("on"); pintarTodo();
+}
+$("#hojaX").onclick = cerrarHoja;
+window.atras = () => { if ($("#hoja").classList.contains("on")) { cerrarHoja(); return true; } if (vista !== "hoy") { ir("hoy"); return true; } return false; };
+
+function verPersona(p0) {
+  if (!p0) return;
+  const p = p0.virtual ? p0 : Object.assign({}, D.personas.find(x => x.id === p0.id) || p0, {tm:p0.tm});
+  const c = p.tm, r = REDES[p.red || "otro"] || REDES.otro;
+  const R = () => { if (p.virtual) { const q = real(p); p.virtual = false; p.id = q.id; return q; } return D.personas.find(x => x.id === p.id); };
+  const guardarNotas = () => { const n = $("#pNotas"), pr = $("#pProx"); if (!n) return; if (n.value !== (p.notas || "") || pr.value !== (p.proximo || "")) { const q = R(); q.notas = p.notas = n.value; q.proximo = p.proximo = pr.value; guardarPersona(q); } };
+  const mostrar = () => verPersona(gente().find(x => x.id === (p.virtual ? p.id : p.id)) || p);
+  let h = '<div class="row" style="gap:14px"><div class="av" style="width:58px;height:58px;font-size:24px">' + esc((p.nombre || p.usuario || "?").replace(/^@/, "").charAt(0).toUpperCase()) + '<i style="background:' + r.c + '">' + r.i + '</i></div><div class="sp"><h3>' + esc(p.nombre || "Sin nombre") + '</h3><div class="mut small">' + esc([r.n, p.usuario ? "@" + p.usuario.replace(/^@/, "") : "", p.tel].filter(Boolean).join(" · ")) + '</div></div></div>';
+  h += '<label class="l">En qué va</label><div class="chips" id="pEst">' + ESTADOS.map(([k, n]) => '<button class="chip' + (p.estado === k ? " on" : "") + '" data-e="' + k + '">' + n + '</button>').join("") + '</div>';
+  if (c) h += '<div class="card" style="margin-top:14px"><div class="row"><b>💳 Tarjeta Meraki</b><span class="sp"></span>' + (premioListo(c) ? '<span class="tag nuevo">🏆 Premio listo</span>' : "") + '</div><div class="small mut" style="margin-top:6px;line-height:1.6">' + sellosTxt(c) + ' · ' + c.visitas + ' visitas' + (c.ultimaVisita ? ' · última ' + haceTxt(c.ultimaVisita) : '') + (c.cumple ? ' · cumple ' + Number(c.cumple.split("-")[1]) + ' de ' + MESES[Number(c.cumple.split("-")[0]) - 1] : '') + '</div></div>';
+  h += '<label class="l">Mandarle mensaje</label><div class="chips" id="pPl">' + Object.keys(PLANT).filter(k => (k !== "premio" || premioListo(c)) && (k !== "extranamos" || c) && (k !== "cumple" || (c && c.cumple)) && (k !== "bienvenida" || c)).map(k => '<button class="chip" data-p="' + k + '">' + PLANT[k].n + '</button>').join("") + '</div>';
+  h += '<div class="ia" style="margin-top:12px"><b>✨ Respuesta con Claude</b><div class="small mut" style="margin:4px 0 8px">Pegá lo que te escribió y te sugiero qué contestar.</div><textarea id="pMsg" placeholder="Ej.: ¿cuánto el corte con barba? ¿tienen espacio el sábado?" style="min-height:70px"></textarea><div class="acts"><button class="btn sm" id="pIA">Sugerir respuesta</button></div><div id="pIAres"></div></div>';
+  h += '<label class="l">Volver a escribirle el</label><div class="row"><input type="date" id="pProx" value="' + esc(p.proximo || "") + '" style="flex:1"><button class="mini" data-d="1">Mañana</button><button class="mini" data-d="3">3 días</button><button class="mini" data-d="7">1 semana</button></div>';
+  h += '<label class="l">Notas</label><textarea id="pNotas" placeholder="Estilo que le gusta, cómo lo conociste, lo que te dijo…">' + esc(p.notas || "") + '</textarea>';
+  h += '<div class="row" style="margin-top:10px"><button class="btn dark sm" id="pEdit">Editar datos</button>' + (p.red === "instagram" && p.usuario ? '<button class="btn dark sm" data-open="https://instagram.com/' + esc(p.usuario.replace(/^@/, "")) + '">Ver su Instagram</button>' : '') + (p.red === "tiktok" && p.usuario ? '<button class="btn dark sm" data-open="https://www.tiktok.com/@' + esc(p.usuario.replace(/^@/, "")) + '">Ver su TikTok</button>' : '') + (p.tel ? '<button class="btn dark sm" data-open="tel:' + esc(soloNum(p.tel)) + '">Llamar</button>' : '') + '</div>';
+  const hi = (p.historial || []).slice().reverse();
+  h += '<h2>Historial</h2>' + (hi.length ? hi.slice(0, 25).map(x => '<div class="hist">' + esc(x.x) + '<small>' + fechaLarga(x.t) + ' · ' + hora(x.t) + '</small></div>').join("") : '<div class="empty">Aquí queda todo lo que hablen.</div>');
+  if (!p.virtual) h += '<button class="btn dark full" style="margin-top:20px;color:var(--warn)" id="pBorrar">Borrar de la lista</button>';
+  const C = hoja(p.nombre || p.usuario || "Contacto", h, "", guardarNotas);
+  hoja.re = mostrar;
+  C.onclick = async e => {
+    const b = e.target.closest("button"); if (!b) return;
+    if (b.dataset.e) { const q = R(); if (q.estado !== b.dataset.e) { q.historial = q.historial || []; q.historial.push({t:Date.now(), x:"Pasó a «" + estadoTxt(b.dataset.e) + "»"}); } q.estado = b.dataset.e; guardarPersona(q); p.estado = q.estado; C.querySelectorAll("#pEst .chip").forEach(x => x.classList.toggle("on", x === b)); }
+    if (b.dataset.p) { const q = R(); escribir(p, llenar(b.dataset.p, p)); q.historial = q.historial || []; q.historial.push({t:Date.now(), x:"Le escribiste: " + PLANT[b.dataset.p].n}); if (q.estado === "nuevo") q.estado = "conversando"; guardarPersona(q); }
+    if (b.dataset.d) { const f = new Date(Date.now() + Number(b.dataset.d) * DIA); $("#pProx").value = f.toISOString().slice(0, 10); toast("Te lo recuerdo el " + fechaLarga(f)); }
+    if (b.dataset.open) abrir(b.dataset.open);
+    if (b.dataset.usar) { escribir(p, b.closest(".opc").dataset.txt); const q = R(); q.historial = q.historial || []; q.historial.push({t:Date.now(), x:"Le respondiste: «" + b.closest(".opc").dataset.txt.slice(0, 80) + "»"}); if (q.estado === "nuevo") q.estado = "conversando"; guardarPersona(q); }
+    if (b.id === "pEdit") { guardarNotas(); hoja.alCerrar = null; editarPersona(R()); }
+    if (b.id === "pBorrar") { const q = D.personas.find(x => x.id === p.id); if (q) { q.borrado = true; guardarPersona(q); } hoja.alCerrar = null; cerrarHoja(); toast("Borrado"); }
+    if (b.id === "pIA") {
+      const m = $("#pMsg").value.trim(); if (!m) return toast("Pegá primero su mensaje");
+      b.disabled = true; b.innerHTML = '<span class="cargando"></span> Pensando…';
+      try {
+        const info = "Cliente: " + (p.nombre || p.usuario || "sin nombre") + ". Llegó por " + r.n + ". Estado: " + estadoTxt(p.estado) + "." + (c ? " Tarjeta Meraki: " + sellosTxt(c) + ", " + c.visitas + " visitas." : "") + (p.notas ? " Notas: " + p.notas : "");
+        const t = await claude(SIS(), info + "\n\nMe escribió:\n«" + m + "»\n\nDame 2 respuestas cortas que yo le pueda mandar tal cual (una más directa y otra más cálida), buscando que agende su cita. Respondé SOLO con JSON: {\"respuestas\":[\"...\",\"...\"]}", 700);
+        const j = sacarJSON(t);
+        $("#pIAres").innerHTML = (j.respuestas || []).map(x => '<div class="opc" data-txt="' + esc(x) + '">' + esc(x) + '<div class="acts"><button class="btn sm" data-usar="1">Mandar</button></div></div>').join("");
+        const q = R(); q.historial = q.historial || []; q.historial.push({t:Date.now(), x:"Te escribió: «" + m.slice(0, 120) + "»"}); guardarPersona(q);
+      } catch(err) { $("#pIAres").innerHTML = '<div class="small warn" style="margin-top:8px">' + esc(err.message) + '</div>'; }
+      b.disabled = false; b.textContent = "Sugerir respuesta";
+    }
+  };
+}
+function editarPersona(p) {
+  const nuevo = !p; p = p || {id:uid(), nombre:"", tel:"", red:"instagram", usuario:"", estado:"nuevo", notas:"", historial:[], creado:Date.now()};
+  let h = '<label class="l">Nombre</label><input type="text" id="eNom" value="' + esc(p.nombre) + '" placeholder="Cómo se llama">';
+  h += '<label class="l">¿Por dónde llegó?</label><div class="chips" id="eRed">' + ["instagram","facebook","whatsapp","tiktok","tarjeta","otro"].map(k => '<button class="chip' + (p.red === k ? " on" : "") + '" data-r="' + k + '">' + REDES[k].n + '</button>').join("") + '</div>';
+  h += '<label class="l">Usuario en la red (opcional)</label><input type="text" id="eUsr" value="' + esc(p.usuario || "") + '" placeholder="@usuario" autocapitalize="off">';
+  h += '<label class="l">WhatsApp (opcional)</label><input type="tel" id="eTel" value="' + esc(p.tel || "") + '" placeholder="7XXX XXXX">';
+  if (nuevo) h += '<label class="l">Lo que te escribió (opcional)</label><textarea id="eMsg" placeholder="Ej.: ¿cuánto cuesta el corte?" style="min-height:70px"></textarea>';
+  h += '<button class="btn full" style="margin-top:18px" id="eOk">' + (nuevo ? "Agregar" : "Guardar") + '</button>';
+  const C = hoja(nuevo ? "Nuevo contacto" : "Editar datos", h);
+  let red = p.red;
+  C.querySelector("#eRed").onclick = e => { const b = e.target.closest("[data-r]"); if (!b) return; red = b.dataset.r; C.querySelectorAll("#eRed .chip").forEach(x => x.classList.toggle("on", x === b)); };
+  C.querySelector("#eOk").onclick = () => {
+    const nom = $("#eNom").value.trim(), us = $("#eUsr").value.trim().replace(/^@/, "");
+    if (!nom && !us) return toast("Poné el nombre o el usuario");
+    Object.assign(p, {nombre:nom, usuario:us, tel:$("#eTel").value.trim(), red});
+    if (nuevo) { const m = $("#eMsg").value.trim(); if (m) p.historial.push({t:Date.now(), x:"Te escribió: «" + m + "»"}); }
+    guardarPersona(p); hoja.alCerrar = null; cerrarHoja();
+    if (nuevo) { toast("Agregado ✓"); if (vista === "gente") pintarGente(); }
+  };
+}
+
+/* ----- CONTENIDO ----- */
+let semana = inicioSemana(), pilarVer = null;
+function pintarCont() {
+  const fin = semana + 7 * DIA, a = new Date(semana), b = new Date(fin - DIA);
+  $("#semTxt").textContent = a.getDate() + " " + MESES[a.getMonth()].slice(0, 3) + " – " + b.getDate() + " " + MESES[b.getMonth()].slice(0, 3);
+  const P = postsEntre(semana, fin);
+  let s = "";
+  for (let i = 0; i < 7; i++) {
+    const t = semana + i * DIA, d = new Date(t), ps = postsEntre(t, t + DIA);
+    s += '<div class="dia' + (t === hoy0() ? " hoy" : "") + (d.getDay() === 1 ? " descanso" : "") + '" data-dia="' + t + '"><small>' + DIAS[d.getDay()] + '</small><b>' + d.getDate() + '</b>' + ps.map(p => '<i class="' + (p.estado === "publicado" ? "pub" : p.estado === "idea" ? "idea" : "") + '"></i>').join("") + '</div>';
+  }
+  $("#semana").innerHTML = s;
+  const L = P.slice().sort((x, y) => new Date(x.fecha) - new Date(y.fecha));
+  $("#posts").innerHTML = (L.length ? L.map(filaPost).join("") : '<div class="empty">Nada planeado esta semana. Tocá un día o «＋ Publicación».</div>') +
+    (() => { const ideas = D.posts.filter(p => !p.borrado && !p.fecha); return ideas.length ? '<h2>Ideas guardadas</h2>' + ideas.map(filaPost).join("") : ""; })();
+  pintarIdeas();
+  fotosLista();
+}
+function filaPost(p) {
+  const pil = PILARES[p.pilar], est = p.estado === "publicado" ? '<span class="tag cliente">✓ Publicado</span>' : p.estado === "idea" ? '<span class="tag">Idea</span>' : '<span class="tag nuevo">' + (p.fecha ? hora(p.fecha) : "Programado") + '</span>';
+  return '<div class="post" data-post="' + p.id + '"><div class="f" data-foto="' + p.id + '">' + (pil ? pil.e : "📣") + '</div><div class="t"><div class="n">' + esc(pil ? pil.n : "Publicación") + (p.fecha ? ' · ' + DIAS[new Date(p.fecha).getDay()] + ' ' + new Date(p.fecha).getDate() : '') + '</div><div class="m">' + esc(p.texto || p.idea || "Sin texto todavía") + '</div><div class="m">' + (p.redes || []).map(r => REDES[r] ? REDES[r].n : r).join(" · ") + (p.res ? ' · ❤️ ' + (p.res.likes || 0) + ' 💬 ' + (p.res.comentarios || 0) : '') + '</div></div>' + est + '</div>';
+}
+async function fotosLista() { for (const e of document.querySelectorAll("[data-foto]")) { const f = await fotos.leer(e.dataset.foto); if (f) e.outerHTML = '<img class="f" src="' + f + '" alt="">'; } }
+function pintarIdeas() {
+  const ks = Object.keys(PILARES); pilarVer = pilarVer || pilarSugerido();
+  $("#pilares").innerHTML = ks.map(k => '<button class="chip' + (pilarVer === k ? " on" : "") + '" data-pil="' + k + '">' + PILARES[k].e + " " + PILARES[k].n + '</button>').join("");
+  $("#ideas").innerHTML = PILARES[pilarVer].ideas.map((x, i) => '<div class="card" style="margin-top:8px"><div style="line-height:1.45">' + esc(x) + '</div><div class="acts"><button class="mini" data-idea="' + i + '">Usar esta idea</button></div></div>').join("");
+}
+$("#pilares").onclick = e => { const b = e.target.closest("[data-pil]"); if (b) { pilarVer = b.dataset.pil; pintarIdeas(); } };
+$("#ideas").onclick = e => { const b = e.target.closest("[data-idea]"); if (b) editarPost(null, {pilar:pilarVer, idea:PILARES[pilarVer].ideas[b.dataset.idea]}); };
+$("#semAnt").onclick = () => { semana -= 7 * DIA; pintarCont(); };
+$("#semSig").onclick = () => { semana += 7 * DIA; pintarCont(); };
+$("#semana").onclick = e => { const d = e.target.closest("[data-dia]"); if (!d) return; const t = Number(d.dataset.dia); const ps = postsEntre(t, t + DIA); if (ps.length === 1) return editarPost(ps[0]); const f = new Date(t); f.setHours(f.getDay() === 0 || f.getDay() === 6 ? 11 : 12, 0, 0, 0); editarPost(null, {fecha:f.toISOString()}); };
+$("#posts").onclick = e => { const d = e.target.closest("[data-post]"); if (d) editarPost(D.posts.find(p => p.id === d.dataset.post)); };
+$("#btnPost").onclick = () => editarPost(null);
+$("#btnPlan").onclick = planSemana;
+
+const localISO = t => { const d = new Date(t); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 16); };
+let fotoActual = null;
+async function editarPost(p, base) {
+  const nuevo = !p;
+  p = p || Object.assign({id:uid(), pilar:pilarSugerido(), redes:["instagram","facebook"], texto:"", hashtags:D.aj.hashtags, estado:"programado", fecha:null, recordar:true, creado:Date.now()}, base || {});
+  if (nuevo && !p.fecha) { const f = new Date(); f.setDate(f.getDate() + (f.getHours() >= 19 ? 1 : 0)); if (f.getDay() === 1) f.setDate(f.getDate() + 1); f.setHours(f.getHours() >= 12 && f.getHours() < 18 && f.toDateString() === new Date().toDateString() ? 19 : 12, 0, 0, 0); p.fecha = f.toISOString(); }
+  fotoActual = await fotos.leer(p.id);
+  let h = '<div class="foto" id="xFoto">' + (fotoActual ? '<img src="' + fotoActual + '" alt="">' : '📷 Tocá para elegir la foto') + '</div>';
+  if (p.idea) h += '<div class="card idea" style="margin-top:12px"><div class="small mut" style="font-weight:700">La idea</div><div style="margin-top:3px">' + esc(p.idea) + '</div></div>';
+  h += '<label class="l">Tipo de publicación</label><div class="chips" id="xPil">' + Object.keys(PILARES).map(k => '<button class="chip' + (p.pilar === k ? " on" : "") + '" data-k="' + k + '">' + PILARES[k].e + " " + PILARES[k].n + '</button>').join("") + '</div>';
+  h += '<label class="l">Dónde</label><div class="chips" id="xRed">' + ["instagram","facebook","tiktok","whatsapp"].map(k => '<button class="chip' + ((p.redes || []).includes(k) ? " on" : "") + '" data-k="' + k + '">' + (k === "whatsapp" ? "Estados de WhatsApp" : REDES[k].n) + '</button>').join("") + '</div>';
+  h += '<label class="l">Cuándo</label><input type="datetime-local" id="xFecha" value="' + (p.fecha ? localISO(p.fecha) : "") + '">';
+  h += '<label class="row l" style="margin-top:10px"><input type="checkbox" id="xRec"' + (p.recordar !== false ? " checked" : "") + ' style="width:20px;height:20px;accent-color:#d9b55c"> Avisarme a esa hora</label>';
+  h += '<div class="ia" style="margin-top:12px"><div class="row"><b>✨ Escribir con Claude</b><span class="sp"></span></div><div class="small mut" style="margin:4px 0 8px">Mira la foto y escribe el texto con tu estilo. Contale algo si querés (ej.: «fade con diseño, cliente de 10 años»).</div><input type="text" id="xNota" placeholder="Detalle opcional"><div class="acts"><button class="btn sm" id="xIA">Escribir texto</button></div><div id="xIAres"></div></div>';
+  h += '<label class="l">Texto</label><textarea id="xTxt" placeholder="Lo que va en la descripción">' + esc(p.texto || "") + '</textarea>';
+  h += '<label class="l">Hashtags</label><textarea id="xHash" style="min-height:60px">' + esc(p.hashtags || "") + '</textarea>';
+  h += '<h2>Publicar</h2>';
+  if (metaListo()) h += '<button class="btn full" id="xDirecto">🚀 Publicar ya en Instagram y Facebook</button><div class="small mut" style="margin:6px 0 10px;text-align:center">Directo, sin salir de la app</div>';
+  h += '<div class="redes" id="xComp">' + ["instagram","facebook","tiktok","whatsapp"].map(k => '<button class="red" data-k="' + k + '"><span style="background:' + REDES[k].c + '">' + REDES[k].i + '</span>' + REDES[k].n + '</button>').join("") + '</div>';
+  h += '<div class="small mut" style="margin-top:8px;line-height:1.45">Copio el texto y te abro la app con la foto. Allí solo pegás el texto y publicás.</div>';
+  h += '<h2>¿Cómo le fue?</h2><div class="row" style="flex-wrap:nowrap">' + [["likes","❤️ Likes"],["comentarios","💬 Coment."],["guardados","🔖 Guard."],["compartidos","↗ Compart."]].map(([k, n]) => '<div style="flex:1;min-width:0"><div class="small mut" style="margin-bottom:4px;white-space:nowrap">' + n + '</div><input type="number" inputmode="numeric" data-res="' + k + '" value="' + esc(p.res && p.res[k] != null ? p.res[k] : "") + '" style="padding:9px 8px"></div>').join("") + '</div>';
+  h += '<div class="row" style="margin-top:20px"><button class="btn dark sp" id="xIdea">Guardar como idea</button><button class="btn sp" id="xOk">Guardar</button></div>';
+  if (!nuevo) h += '<button class="btn dark full" style="margin-top:10px;color:var(--warn)" id="xBorrar">Borrar</button>';
+  const C = hoja(nuevo ? "Nueva publicación" : (PILARES[p.pilar] ? PILARES[p.pilar].n : "Publicación"), h);
+  const leer = () => {
+    p.pilar = (C.querySelector("#xPil .on") || {}).dataset ? C.querySelector("#xPil .on").dataset.k : p.pilar;
+    p.redes = [...C.querySelectorAll("#xRed .on")].map(b => b.dataset.k);
+    const f = $("#xFecha").value; p.fecha = f ? new Date(f).toISOString() : null;
+    p.recordar = $("#xRec").checked; p.texto = $("#xTxt").value; p.hashtags = $("#xHash").value;
+    const res = {}; let hay = false; C.querySelectorAll("[data-res]").forEach(i => { if (i.value !== "") { res[i.dataset.res] = Number(i.value); hay = true; } }); if (hay) p.res = res;
+  };
+  const final = () => [$("#xTxt").value.trim(), $("#xHash").value.trim()].filter(Boolean).join("\n\n");
+  const guardarYa = estado => { leer(); if (estado) p.estado = estado; if (p.estado === "idea" && p.fecha && estado !== "idea") p.estado = "programado"; if (p.res && p.estado !== "publicado") p.estado = "publicado"; guardarPost(p); if (fotoActual) fotos.poner(p.id, fotoActual); };
+  C.onclick = async e => {
+    const b = e.target.closest("button, #xFoto"); if (!b) return;
+    if (b.id === "xFoto") { window.onFoto = f => { if (!f) return; fotoActual = f; $("#xFoto").innerHTML = '<img src="' + f + '" alt="">'; }; if (APP) Android.elegirFoto(); else { const i = document.createElement("input"); i.type = "file"; i.accept = "image/*"; i.onchange = () => { const r = new FileReader(); r.onload = () => window.onFoto(r.result); r.readAsDataURL(i.files[0]); }; i.click(); } }
+    if (b.closest("#xPil") && b.dataset.k) C.querySelectorAll("#xPil .chip").forEach(x => x.classList.toggle("on", x === b));
+    if (b.closest("#xRed") && b.dataset.k) b.classList.toggle("on");
+    if (b.id === "xIA") {
+      b.disabled = true; b.innerHTML = '<span class="cargando"></span> Escribiendo…';
+      try {
+        leer();
+        const cont = [];
+        if (fotoActual) { const chica = await achicar(fotoActual); if (chica) cont.push({type:"image", source:{type:"base64", media_type:"image/jpeg", data:chica.split(",")[1]}}); }
+        cont.push({type:"text", text:"Escribí el texto para una publicación de Meraki en " + (p.redes.length ? p.redes.map(r => REDES[r].n).join(", ") : "Instagram") + ". Tipo: " + (PILARES[p.pilar] ? PILARES[p.pilar].n : "libre") + "." + (p.idea ? " Idea: " + p.idea + "." : "") + ($("#xNota").value ? " Detalle: " + $("#xNota").value + "." : "") + (fotoActual ? " Mirá la foto y mencioná lo que se ve (estilo de corte, detalles) sin inventar." : "") + " Que enganche en la primera línea, cierre invitando a agendar por mensaje y sea corto (máximo 5 líneas). Dame 2 opciones distintas y 8 a 12 hashtags locales y del estilo. Respondé SOLO con JSON: {\"opciones\":[\"...\",\"...\"],\"hashtags\":\"#... #...\"}"});
+        const j = sacarJSON(await claude(SIS(), cont, 1000));
+        $("#xIAres").innerHTML = (j.opciones || []).map(x => '<div class="opc" data-txt="' + esc(x) + '">' + esc(x) + '<div class="acts"><button class="btn sm" data-usartxt="1">Usar este</button></div></div>').join("");
+        if (j.hashtags) $("#xHash").value = j.hashtags;
+      } catch(err) { $("#xIAres").innerHTML = '<div class="small warn" style="margin-top:8px">' + esc(err.message) + '</div>'; }
+      b.disabled = false; b.textContent = "Escribir otra vez";
+    }
+    if (b.dataset.usartxt) { $("#xTxt").value = b.closest(".opc").dataset.txt; toast("Listo, ya está en el texto"); }
+    if (b.closest("#xComp") && b.dataset.k) {
+      const k = b.dataset.k; if (!fotoActual && k !== "whatsapp") toast("Sin foto: solo copio el texto");
+      const r = APP ? Android.compartir(final(), fotoActual || "", REDES[k].pk) : (navigator.clipboard && navigator.clipboard.writeText(final()), "ok");
+      if (r === "ok") { toast(k === "instagram" || k === "tiktok" ? "Texto copiado: pegalo en la descripción" : "Texto copiado"); leer(); p.estado = "publicado"; if (!p.fecha || new Date(p.fecha) > new Date()) p.fecha = new Date().toISOString(); p.redes = [...new Set((p.redes || []).concat(k))]; guardarPost(p); if (fotoActual) fotos.poner(p.id, fotoActual); }
+      else toast(r);
+    }
+    if (b.id === "xDirecto") {
+      leer(); const donde = (p.redes || []).filter(r => r === "instagram" || r === "facebook"); if (!donde.length) return toast("Marcá Instagram o Facebook en «Dónde»");
+      if (!fotoActual) return toast("Elegí la foto primero");
+      b.disabled = true; b.innerHTML = '<span class="cargando"></span> Publicando…';
+      try { const ok = await publicarMeta(p, donde, final(), fotoActual); p.estado = "publicado"; p.fecha = new Date().toISOString(); guardarPost(p); fotos.poner(p.id, fotoActual); toast("¡Publicado en " + ok.join(" y ") + "! 🎉"); hoja.alCerrar = null; cerrarHoja(); }
+      catch(err) { toast(err.message); b.disabled = false; b.textContent = "🚀 Publicar ya en Instagram y Facebook"; }
+    }
+    if (b.id === "xIdea") { guardarYa("idea"); hoja.alCerrar = null; cerrarHoja(); toast("Idea guardada"); }
+    if (b.id === "xOk") { guardarYa(); hoja.alCerrar = null; cerrarHoja(); toast(p.estado === "publicado" ? "Guardado ✓" : p.recordar && p.fecha ? "Te aviso el " + fechaLarga(p.fecha) + " a las " + hora(p.fecha) : "Guardado"); }
+    if (b.id === "xBorrar") { p.borrado = true; guardarPost(p); fotos.quitar(p.id); hoja.alCerrar = null; cerrarHoja(); toast("Borrado"); }
+  };
+}
+function alarmas() {
+  if (!APP) return;
+  const L = D.posts.filter(p => !p.borrado && p.estado === "programado" && p.recordar !== false && p.fecha && new Date(p.fecha) > new Date()).map(p => ({id:"post_" + p.id, ms:new Date(p.fecha).getTime(), texto:"Hoy toca publicar: " + (PILARES[p.pilar] ? PILARES[p.pilar].n : "tu publicación")}));
+  // seguimientos: aviso a las 9 am del día que dijiste
+  D.personas.filter(p => !p.borrado && p.proximo).forEach(p => { const f = new Date(p.proximo + "T09:00:00"); if (f > new Date()) L.push({id:"seg_" + p.id, ms:f.getTime(), texto:"Escribile a " + (p.nombre || p.usuario || "tu contacto")}); });
+  Android.sincronizar(JSON.stringify(L));
+}
+async function planSemana() {
+  hojaIA("Plan de la semana", async () => {
+    const a = analisis(), ult = D.posts.filter(p => !p.borrado && p.estado === "publicado").slice(-10).map(p => (PILARES[p.pilar] ? PILARES[p.pilar].n : "otro") + ": " + (p.texto || "").slice(0, 80));
+    const t = await claude(SIS(), "Armame un plan de " + D.aj.meta + " publicaciones para la semana que viene (de martes a domingo, el lunes descanso). Tipos posibles: " + Object.entries(PILARES).map(([k, v]) => k + " = " + v.n).join(", ") + ".\n" + (a ? "Lo que mejor me funciona: " + (a.pilar && PILARES[a.pilar.k] ? PILARES[a.pilar.k].n : "") + ", día " + (a.dia ? DIAS_L[a.dia.k] : "") + ", " + (a.franja ? a.franja.k : "") + ".\n" : "") + (ult.length ? "Mis últimas publicaciones:\n" + ult.join("\n") + "\n" : "") + "Variá los tipos, poné la hora ideal para El Salvador y una idea concreta que yo pueda grabar con mi teléfono en la barbería. Respondé SOLO con JSON: {\"plan\":[{\"dia\":\"martes\",\"hora\":\"12:00\",\"tipo\":\"antes\",\"idea\":\"...\",\"texto\":\"borrador corto\"}]}", 1800);
+    const j = sacarJSON(t), plan = j.plan || [];
+    window.__plan = plan;
+    return plan.map(x => "• " + x.dia + " " + x.hora + " · " + (PILARES[x.tipo] ? PILARES[x.tipo].n : x.tipo) + "\n  " + x.idea).join("\n\n");
+  }, '<button class="btn full" style="margin-top:12px" id="planOk">Ponerlo en el calendario</button>', C => {
+    C.querySelector("#planOk").onclick = () => {
+      const plan = window.__plan || [], base = inicioSemana(Date.now() + 7 * DIA); let n = 0;
+      plan.forEach(x => { const i = DIAS_L.indexOf(String(x.dia).toLowerCase()); if (i < 0) return; const f = new Date(base + ((i + 6) % 7) * DIA); const [hh, mm] = String(x.hora || "12:00").split(":").map(Number); f.setHours(hh || 12, mm || 0, 0, 0); guardarPost({id:uid(), pilar:PILARES[x.tipo] ? x.tipo : "antes", idea:x.idea, texto:x.texto || "", hashtags:D.aj.hashtags, redes:["instagram","facebook"], estado:"programado", fecha:f.toISOString(), recordar:true, creado:Date.now()}); n++; });
+      semana = base; hoja.alCerrar = null; cerrarHoja(); ir("cont"); toast(n + " publicaciones en tu calendario");
+    };
+  });
+}
+function hojaIA(titulo, fn, extra, alListo) {
+  const C = hoja(titulo, '<div class="ia"><div id="iaT"><span class="cargando"></span> Claude está pensando…</div></div><div id="iaX"></div>');
+  fn().then(t => { C.querySelector("#iaT").style.whiteSpace = "pre-wrap"; C.querySelector("#iaT").style.lineHeight = "1.55"; C.querySelector("#iaT").textContent = t; if (extra) { C.querySelector("#iaX").innerHTML = extra; alListo && alListo(C); } })
+    .catch(e => { C.querySelector("#iaT").innerHTML = '<span class="warn">' + esc(e.message) + '</span>'; });
+}
+
+/* ----- BANDEJA (Instagram y Facebook) ----- */
+let bTab = "comentarios", bDatos = {};
+function pintarBandeja() {
+  const B = $("#bandeja");
+  if (!metaListo()) { B.innerHTML = guiaMeta(); conectarGuia(B); return; }
+  B.innerHTML = '<div class="row" style="margin-top:8px"><h2 style="margin:0">' + esc(D.meta.igUser ? "@" + D.meta.igUser : D.meta.pageName) + '</h2><span class="sp"></span>' + (D.meta.seguidores != null ? '<span class="tag">' + D.meta.seguidores + ' seguidores</span>' : '') + '</div>' +
+    '<div class="chips" style="margin-top:12px" id="bTabs">' + [["comentarios","Comentarios"],["mensajes","Mensajes"],["posts","Mis posts"]].map(([k, n]) => '<button class="chip' + (bTab === k ? " on" : "") + '" data-b="' + k + '">' + n + '</button>').join("") + '</div><div id="bC"><div class="empty"><span class="cargando"></span></div></div>';
+  B.querySelector("#bTabs").onclick = e => { const b = e.target.closest("[data-b]"); if (b) { bTab = b.dataset.b; pintarBandeja(); } };
+  ({comentarios:cargarComentarios, mensajes:cargarMensajes, posts:cargarPosts})[bTab]().catch(e => { $("#bC").innerHTML = '<div class="card" style="margin-top:12px"><div class="warn" style="font-weight:700">No se pudo leer</div><div class="small mut" style="margin-top:6px">' + esc(e.message) + '</div><div class="small mut" style="margin-top:8px">Si dice que falta un permiso, generá el token otra vez marcando todos los permisos de la guía (Ajustes → Instagram y Facebook).</div></div>'; });
+}
+async function medios() {
+  if (bDatos.medios && Date.now() - bDatos.mediosT < 120000) return bDatos.medios;
+  const L = [];
+  if (D.meta.ig) { const r = await graph(D.meta.ig + "/media", {fields:"id,caption,media_type,media_url,thumbnail_url,permalink,timestamp,like_count,comments_count", limit:"20"}); (r.data || []).forEach(m => L.push({red:"instagram", id:m.id, texto:m.caption || "", foto:m.media_type === "VIDEO" ? m.thumbnail_url : m.media_url, link:m.permalink, t:m.timestamp, likes:m.like_count || 0, com:m.comments_count || 0})); }
+  try { const r = await graph(D.meta.page + "/posts", {fields:"id,message,full_picture,permalink_url,created_time,reactions.summary(true).limit(0),comments.summary(true).limit(0)", limit:"15"}); (r.data || []).forEach(m => L.push({red:"facebook", id:m.id, texto:m.message || "", foto:m.full_picture, link:m.permalink_url, t:m.created_time, likes:m.reactions && m.reactions.summary ? m.reactions.summary.total_count : 0, com:m.comments && m.comments.summary ? m.comments.summary.total_count : 0})); } catch(e) {}
+  L.sort((a, b) => new Date(b.t) - new Date(a.t));
+  bDatos.medios = L; bDatos.mediosT = Date.now();
+  // los resultados reales alimentan «Lo que te funciona»
+  L.forEach(m => { const p = D.posts.find(x => x.igId === m.id || x.fbId === m.id); if (p) { p.res = Object.assign({}, p.res, {likes:m.likes, comentarios:m.com}); p.u = Date.now(); } else if (!D.posts.find(x => x.ext === m.red + m.id)) D.posts.push({id:uid(), ext:m.red + m.id, pilar:"", texto:m.texto, fecha:m.t, estado:"publicado", redes:[m.red], res:{likes:m.likes, comentarios:m.com}, u:Date.now(), importado:true}); });
+  guardar();
+  return L;
+}
+async function cargarPosts() {
+  const L = await medios();
+  $("#bC").innerHTML = L.length ? L.map(m => '<div class="post"><img class="f" src="' + esc(m.foto || "") + '" alt="" onerror="this.style.visibility=\'hidden\'"><div class="t"><div class="n">' + REDES[m.red].n + ' · ' + fechaLarga(m.t) + '</div><div class="m">' + esc(m.texto || "Sin texto") + '</div><div class="m">❤️ ' + m.likes + ' · 💬 ' + m.com + '</div></div><button class="mini" data-open="' + esc(m.link) + '">Ver</button></div>').join("") + '<div class="small mut" style="margin-top:10px;text-align:center">Estos números ya cuentan para «Lo que te funciona». Marcá el tipo de cada post en Contenido para que el análisis sea mejor.</div>' : '<div class="empty">Todavía no hay publicaciones.</div>';
+  $("#bC").onclick = e => { const b = e.target.closest("[data-open]"); if (b) abrir(b.dataset.open); };
+}
+async function cargarComentarios() {
+  const L = (await medios()).filter(m => m.com > 0).slice(0, 8), C = [];
+  await Promise.all(L.map(async m => {
+    try {
+      const r = m.red === "instagram" ? await graph(m.id + "/comments", {fields:"id,text,username,timestamp,replies{id,username}", limit:"25"}) : await graph(m.id + "/comments", {fields:"id,message,from,created_time,comments.limit(5){from}", limit:"25"});
+      (r.data || []).forEach(c => {
+        const autor = m.red === "instagram" ? c.username : c.from && c.from.name;
+        const resp = m.red === "instagram" ? (c.replies && c.replies.data || []).some(x => x.username === D.meta.igUser) : (c.comments && c.comments.data || []).some(x => x.from && x.from.id === D.meta.page);
+        if (autor === D.meta.igUser || (c.from && c.from.id === D.meta.page)) return;
+        C.push({red:m.red, id:c.id, autor:autor || "Alguien", texto:c.text || c.message || "", t:c.timestamp || c.created_time, respondido:resp, post:m});
+      });
+    } catch(e) {}
+  }));
+  C.sort((a, b) => a.respondido - b.respondido || new Date(b.t) - new Date(a.t));
+  const pend = C.filter(c => !c.respondido).length; const d = $("#dotBand"); d.textContent = pend; d.style.display = pend ? "flex" : "none";
+  $("#bC").innerHTML = C.length ? C.map((c, i) => '<div class="card" style="margin-top:8px"><div class="row"><b>' + esc(c.autor) + '</b><span class="tag" style="color:' + REDES[c.red].c + '">' + REDES[c.red].n + '</span><span class="sp"></span>' + (c.respondido ? '<span class="small ok">✓ respondido</span>' : '<span class="small warn">sin responder</span>') + '</div><div style="margin-top:6px;line-height:1.4">' + esc(c.texto) + '</div><div class="small mut" style="margin-top:4px">En: «' + esc((c.post.texto || "").slice(0, 50)) + '» · ' + haceTxt(c.t) + '</div><div class="acts"><button class="btn sm" data-r="' + i + '">Responder</button><button class="mini" data-ia="' + i + '">✨ Sugerir</button><button class="mini" data-crm="' + i + '">＋ CRM</button></div><div data-box="' + i + '"></div></div>').join("") : '<div class="empty">No hay comentarios recientes.</div>';
+  $("#bC").onclick = e => {
+    const b = e.target.closest("button"); if (!b) return;
+    if (b.dataset.r || b.dataset.ia) cajaRespuesta(b.dataset.r || b.dataset.ia, C[b.dataset.r || b.dataset.ia], !!b.dataset.ia, async (c, txt) => { if (c.red === "instagram") await graph(c.id + "/replies", {message:txt}, "POST"); else await graph(c.id + "/comments", {message:txt}, "POST"); });
+    if (b.dataset.crm) aCrm(C[b.dataset.crm].autor, C[b.dataset.crm].red, C[b.dataset.crm].texto);
+  };
+}
+async function cargarMensajes() {
+  const C = [];
+  for (const plat of ["instagram", "messenger"]) {
+    try {
+      const r = await graph(D.meta.page + "/conversations", {platform:plat, fields:"id,updated_time,participants,messages.limit(6){message,from,created_time}", limit:"20"});
+      (r.data || []).forEach(c => {
+        const yo = [D.meta.page, D.meta.ig];
+        const otro = (c.participants && c.participants.data || []).find(p => !yo.includes(p.id)) || {};
+        const msgs = (c.messages && c.messages.data || []).slice().reverse();
+        const ult = msgs[msgs.length - 1];
+        C.push({red:plat === "instagram" ? "instagram" : "facebook", id:c.id, autor:otro.username || otro.name || "Alguien", autorId:otro.id, msgs, t:c.updated_time, pendiente:ult && ult.from && !yo.includes(ult.from.id)});
+      });
+    } catch(e) { if (plat === "instagram") bDatos.errMsg = e.message; }
+  }
+  C.sort((a, b) => b.pendiente - a.pendiente || new Date(b.t) - new Date(a.t));
+  $("#bC").innerHTML = C.length ? C.map((c, i) => '<div class="card" style="margin-top:8px"><div class="row"><b>' + esc(c.autor) + '</b><span class="tag" style="color:' + REDES[c.red].c + '">' + REDES[c.red].n + '</span><span class="sp"></span>' + (c.pendiente ? '<span class="small warn">te toca</span>' : '<span class="small mut">' + haceTxt(c.t) + '</span>') + '</div>' + c.msgs.slice(-3).map(m => '<div class="msg' + (m.from && [D.meta.page, D.meta.ig].includes(m.from.id) ? " yo" : "") + '">' + esc(m.message || "📎") + '<small>' + hora(m.created_time) + '</small></div>').join("") + '<div class="acts"><button class="btn sm" data-r="' + i + '">Responder</button><button class="mini" data-ia="' + i + '">✨ Sugerir</button><button class="mini" data-crm="' + i + '">＋ CRM</button></div><div data-box="' + i + '"></div></div>').join("") :
+    '<div class="empty">No hay mensajes.' + (bDatos.errMsg ? '<br><br><span class="small">' + esc(bDatos.errMsg) + '</span>' : '') + '</div>';
+  $("#bC").onclick = e => {
+    const b = e.target.closest("button"); if (!b) return;
+    const i = b.dataset.r || b.dataset.ia;
+    if (i != null) cajaRespuesta(i, Object.assign({}, C[i], {texto:C[i].msgs.filter(m => m.from && m.from.id === C[i].autorId).slice(-2).map(m => m.message).join("\n")}), !!b.dataset.ia, async (c, txt) => graph(D.meta.page + "/messages", {recipient:JSON.stringify({id:c.autorId}), messaging_type:"RESPONSE", message:JSON.stringify({text:txt})}, "POST"));
+    if (b.dataset.crm) aCrm(C[b.dataset.crm].autor, C[b.dataset.crm].red, C[b.dataset.crm].msgs.map(m => m.message).filter(Boolean).slice(-1)[0] || "");
+  };
+}
+function cajaRespuesta(i, c, conIA, enviar) {
+  const box = document.querySelector('[data-box="' + i + '"]');
+  box.innerHTML = '<textarea style="margin-top:10px;min-height:80px" placeholder="Tu respuesta…"></textarea><div class="acts"><button class="btn sm" data-env>Enviar</button><button class="mini" data-pre>Precios</button><button class="mini" data-age>Agendar</button></div>';
+  const ta = box.querySelector("textarea");
+  box.onclick = async e => {
+    e.stopPropagation();
+    const b = e.target.closest("button"); if (!b) return;
+    if (b.hasAttribute("data-pre")) ta.value = llenar("precios", {nombre:c.autor});
+    if (b.hasAttribute("data-age")) ta.value = llenar("agendar", {nombre:c.autor});
+    if (b.hasAttribute("data-env")) {
+      if (!ta.value.trim()) return toast("Escribí la respuesta");
+      b.disabled = true; b.innerHTML = '<span class="cargando"></span>';
+      try { await enviar(c, ta.value.trim()); toast("Enviado ✓"); box.innerHTML = '<div class="small ok" style="margin-top:8px">✓ Respondiste: ' + esc(ta.value.trim()) + '</div>'; bDatos.mediosT = 0; }
+      catch(err) { toast(err.message); b.disabled = false; b.textContent = "Enviar"; }
+    }
+  };
+  if (conIA) {
+    ta.value = "Claude está pensando…"; ta.disabled = true;
+    claude(SIS(), (c.autor ? "Me escribió " + c.autor + " por " + REDES[c.red].n + ":\n" : "") + "«" + c.texto + "»" + (c.post ? "\n(Comentó en mi publicación: «" + (c.post.texto || "").slice(0, 120) + "»)" : "") + "\n\nEscribí UNA respuesta corta (1 a 3 líneas) lista para mandar, que invite a agendar si tiene sentido. Solo el texto, nada más.", 400)
+      .then(t => { ta.value = t.replace(/^["«]|["»]$/g, ""); }).catch(e => { ta.value = ""; toast(e.message); }).finally(() => ta.disabled = false);
+  }
+}
+function aCrm(autor, red, texto) {
+  const ya = D.personas.find(p => !p.borrado && p.usuario && p.usuario.toLowerCase() === String(autor).toLowerCase());
+  if (ya) { toast("Ya está en tu CRM"); verPersona(gente().find(p => p.id === ya.id)); return; }
+  const p = {id:uid(), nombre:"", usuario:autor, red, tel:"", estado:"nuevo", notas:"", historial:texto ? [{t:Date.now(), x:"Te escribió: «" + texto.slice(0, 200) + "»"}] : [], creado:Date.now()};
+  guardarPersona(p); toast("Agregado a tu gente ✓"); verPersona(gente().find(x => x.id === p.id));
+}
+function guiaMeta() {
+  const permisos = "pages_show_list, pages_read_engagement, pages_manage_posts, pages_manage_engagement, pages_messaging, instagram_basic, instagram_content_publish, instagram_manage_comments, instagram_manage_messages, business_management";
+  return '<h2 style="margin-top:8px">Conectá Instagram y Facebook</h2><div class="card small" style="line-height:1.5">Así publicás directo, ves comentarios y mensajes, y respondés desde aquí. Se hace <b>una sola vez</b> desde la compu o el navegador (10 minutos).</div>' +
+    '<div class="card" style="margin-top:10px">' + [
+      "Tu Instagram tiene que ser <b>profesional</b> (Empresa o Creador) y estar vinculado a tu página de Facebook de Meraki. Revisalo en Instagram → Configuración → Tipo de cuenta.",
+      "Entrá a <b>developers.facebook.com</b> con tu Facebook → <b>Mis apps</b> → <b>Crear app</b>. Ponele «Meraki CRM». En casos de uso elegí <b>Administrar todo en tu página</b> y también <b>Administrar mensajes y contenido en Instagram</b>. Si pide portfolio comercial, elegí el de Meraki.",
+      "Con la app en modo <b>Desarrollo</b> alcanza: como sos el dueño, Meta no tiene que revisarla para usarla con tus propias cuentas.",
+      "Andá a <b>Herramientas → Explorador de la API Graph</b>. Arriba a la derecha elegí tu app «Meraki CRM». En <b>Permisos</b> agregá: <code>" + permisos + "</code>. Tocá <b>Generate Access Token</b> y aceptá todo con tu página de Meraki y tu Instagram.",
+      "Ese token dura poco. Para que dure: abrí <b>Herramientas → Depurador de tokens de acceso</b>, pegá el token, tocá <b>Depurar</b> y abajo <b>Ampliar token de acceso</b>. Copiá el token largo nuevo.",
+      "Pegalo aquí abajo y tocá Conectar. La app saca sola el token de tu página, que <b>no vence</b>."
+    ].map((t, i) => '<div class="paso"><b class="n">' + (i + 1) + '</b><div>' + t + '</div></div>').join("") + '</div>' +
+    '<div class="row" style="margin-top:10px"><button class="btn dark sm" id="mPerm">Copiar permisos</button><button class="btn dark sm" data-open="https://developers.facebook.com/apps/">Abrir Meta for Developers</button><button class="btn dark sm" data-open="https://developers.facebook.com/tools/explorer/">Explorador</button><button class="btn dark sm" data-open="https://developers.facebook.com/tools/debug/accesstoken/">Depurador</button></div>' +
+    '<label class="l">Token de Meta</label><textarea id="mTok" style="min-height:80px" placeholder="EAAG…"></textarea><button class="btn full" style="margin-top:10px" id="mOk">Conectar</button><div id="mRes"></div>' +
+    '<div class="card small mut" style="margin-top:14px;line-height:1.5"><b style="color:var(--txt)">TikTok y WhatsApp:</b> TikTok no deja que apps personales publiquen en público sin una revisión larga, y WhatsApp normal no tiene conexión. Para esas dos, la app te prepara la foto y el texto y te abre la app para publicar.</div>';
+}
+function conectarGuia(B) {
+  B.onclick = async e => {
+    const b = e.target.closest("button"); if (!b) return;
+    if (b.dataset.open) abrir(b.dataset.open);
+    if (b.id === "mPerm") { const t = "pages_show_list,pages_read_engagement,pages_manage_posts,pages_manage_engagement,pages_messaging,instagram_basic,instagram_content_publish,instagram_manage_comments,instagram_manage_messages,business_management"; APP ? Android.copiar(t) : navigator.clipboard.writeText(t); toast("Permisos copiados"); }
+    if (b.id === "mOk") {
+      b.disabled = true; b.innerHTML = '<span class="cargando"></span> Conectando…';
+      try { const m = await conectarMeta($("#mTok").value); toast("¡Conectado con " + (m.igUser ? "@" + m.igUser : m.pageName) + "!"); bDatos = {}; pintarBandeja(); }
+      catch(err) { $("#mRes").innerHTML = '<div class="small warn" style="margin-top:8px">' + esc(err.message) + '</div>'; b.disabled = false; b.textContent = "Conectar"; }
+    }
+  };
+}
+
+/* ----- AJUSTES ----- */
+function pintarAjustes() {
+  const A = $("#ajustes"), aj = D.aj;
+  let h = '<h2 style="margin-top:8px">Tarjeta Meraki</h2><div class="card">';
+  if (aj.rt) h += '<div class="row"><b class="ok">✓ Conectado</b><span class="sp"></span><button class="mini" id="aSync">Actualizar</button></div><div class="small mut" style="margin-top:6px">' + D.tm.clientes.length + ' clientes · actualizado ' + (D.tm.cuando ? hora(D.tm.cuando) : "—") + (D.tm.error ? ' · <span class="warn">' + esc(D.tm.error) + '</span>' : '') + '</div>' +
+    (aj.crmNube === false ? '<div class="small" style="margin-top:12px;line-height:1.5"><b class="warn">Falta un permiso para guardar el CRM en tu Firebase</b> (así no perdés nada si cambiás de teléfono). En Firebase → Firestore → Reglas, pegá esto debajo de <code>match /databases/{database}/documents {</code> y tocá Publicar:<pre style="white-space:pre-wrap;background:var(--card2);padding:10px;border-radius:10px;font-size:11.5px;color:var(--gold2)">' + esc(REGLA_CRM) + '</pre><div class="row"><button class="mini" id="aRegla">Copiar regla</button><button class="mini" id="aProbar">Ya la puse</button></div></div>' : aj.crmNube ? '<div class="small ok" style="margin-top:6px">✓ Tu CRM se respalda en tu Firebase</div>' : '') +
+    '<button class="btn dark sm" style="margin-top:10px" id="aSalir">Desconectar</button>';
+  else h += '<div class="small mut" style="line-height:1.5">Entrá con tu cuenta de Google de la barbería para ver tus clientes, sellos, cumpleaños y quién no viene.</div><button class="btn full" style="margin-top:10px" data-entrar>Conectar Tarjeta Meraki</button>';
+  h += '</div>';
+  h += '<h2>Claude (inteligencia artificial)</h2><div class="card"><div class="small mut" style="line-height:1.5">Escribe tus textos, mira tus fotos, sugiere respuestas y arma tu semana. Sacá tu clave en <b>console.anthropic.com</b> → API Keys (necesita saldo; cada texto cuesta centavos).</div><label class="l">Clave</label><input type="password" id="aClave" value="' + esc(aj.claude || "") + '" placeholder="sk-ant-…" autocomplete="off"><label class="l">Modelo</label><select id="aModelo">' + [["claude-sonnet-5-5","Sonnet 5.5 · el mejor balance"],["claude-haiku-5-5","Haiku 5.5 · el más barato"],["claude-opus-5-5","Opus 5.5 · el más inteligente"]].map(([k, n]) => '<option value="' + k + '"' + (aj.modelo === k ? " selected" : "") + '>' + n + '</option>').join("") + '</select><div class="row" style="margin-top:10px"><button class="btn sm" id="aClOk">Guardar y probar</button><button class="mini" data-open="https://console.anthropic.com/settings/keys">Sacar clave</button></div><div id="aClRes"></div></div>';
+  h += '<h2>Instagram y Facebook</h2><div class="card">' + (metaListo() ? '<div class="row"><b class="ok">✓ ' + esc(D.meta.igUser ? "@" + D.meta.igUser : "") + (D.meta.pageName ? " · " + esc(D.meta.pageName) : "") + '</b></div>' + (D.meta.paginas && D.meta.paginas.length > 1 ? '<label class="l">Página</label><select id="aPag">' + D.meta.paginas.map(p => '<option value="' + p.id + '"' + (p.id === D.meta.page ? " selected" : "") + '>' + esc(p.name) + '</option>').join("") + '</select><div class="small mut" style="margin-top:4px">Para cambiar de página pegá el token otra vez en Bandeja.</div>' : '') + '<button class="btn dark sm" style="margin-top:10px" id="aMetaX">Desconectar</button>' : '<div class="small mut">No conectado.</div><button class="btn dark sm" style="margin-top:10px" id="aMetaIr">Ver cómo conectar</button>') + '</div>';
+  h += '<h2>Tu negocio</h2><div class="card"><label class="l" style="margin-top:0">Publicaciones por semana (meta)</label><div class="chips" id="aMeta">' + [2,3,4,5,7].map(n => '<button class="chip' + (aj.meta === n ? " on" : "") + '" data-n="' + n + '">' + n + '</button>').join("") + '</div>' +
+    '<label class="l">Tu Instagram</label><input type="text" id="aIg" value="' + esc(aj.ig) + '" placeholder="@merakibarbershop" autocapitalize="off">' +
+    '<label class="l">Horario</label><input type="text" id="aHor" value="' + esc(aj.horario) + '" placeholder="Martes a domingo, 9 am a 7 pm">' +
+    '<label class="l">Ubicación (para mandarla)</label><input type="text" id="aUbi" value="' + esc(aj.ubicacion) + '" placeholder="Dirección o enlace de Google Maps">' +
+    '<label class="l">Lo que Claude sabe de Meraki</label><textarea id="aCtx" style="min-height:180px">' + esc(aj.contexto) + '</textarea>' +
+    '<label class="l">Tus hashtags de siempre</label><textarea id="aHash" style="min-height:70px">' + esc(aj.hashtags) + '</textarea>' +
+    '<button class="btn full" style="margin-top:12px" id="aNeg">Guardar</button></div>';
+  h += '<h2>Respaldo</h2><div class="card"><div class="small mut" style="line-height:1.5">' + D.personas.filter(p => !p.borrado).length + ' contactos y ' + D.posts.filter(p => !p.borrado).length + ' publicaciones. ' + (aj.crmNube ? "Se respaldan solos en tu Firebase (las fotos quedan en el teléfono)." : "Copiá el respaldo y guardalo en tus notas o en Drive.") + '</div><div class="row" style="margin-top:10px"><button class="mini" id="aExp">Copiar respaldo</button><button class="mini" id="aImp">Pegar respaldo</button></div></div>';
+  h += '<div class="small mut" style="text-align:center;margin:24px 0 8px">Meraki CRM ' + (APP ? Android.version() : "web") + '</div>';
+  A.innerHTML = h;
+  A.onclick = async e => {
+    const b = e.target.closest("button"); if (!b) return;
+    if (b.hasAttribute("data-entrar")) entrarTarjeta();
+    if (b.dataset.open) abrir(b.dataset.open);
+    if (b.id === "aSync") { await traerTarjeta(true); pintarAjustes(); toast("Actualizado"); }
+    if (b.id === "aSalir") { D.aj.rt = ""; D.tm = {clientes:[], cfg:D.tm.cfg, cuando:0}; ficha = null; guardar(); pintarAjustes(); }
+    if (b.id === "aRegla") { APP ? Android.copiar(REGLA_CRM) : navigator.clipboard.writeText(REGLA_CRM); toast("Regla copiada"); }
+    if (b.id === "aProbar") { D.aj.crmNube = undefined; const t = await token(); if (t) { await bajarCrm(t); if (D.aj.crmNube !== false) { subirTodo(); toast("¡Funciona! Respaldo activado ✓"); } else toast("Todavía no: revisá la regla"); } guardar(); pintarAjustes(); }
+    if (b.id === "aClOk") {
+      D.aj.claude = $("#aClave").value.trim(); D.aj.modelo = $("#aModelo").value; guardar();
+      $("#aClRes").innerHTML = '<div class="small mut" style="margin-top:8px"><span class="cargando"></span> Probando…</div>';
+      try { const t = await claude(SIS(), "Saludame en una línea como el community manager de Meraki.", 80); $("#aClRes").innerHTML = '<div class="small ok" style="margin-top:8px">✓ ' + esc(t) + '</div>'; }
+      catch(err) { $("#aClRes").innerHTML = '<div class="small warn" style="margin-top:8px">' + esc(err.message) + '</div>'; }
+    }
+    if (b.id === "aMetaX") { D.meta = {}; guardar(); pintarAjustes(); }
+    if (b.id === "aMetaIr") ir("bandeja");
+    if (b.closest("#aMeta") && b.dataset.n) { D.aj.meta = Number(b.dataset.n); guardar(); A.querySelectorAll("#aMeta .chip").forEach(x => x.classList.toggle("on", x === b)); }
+    if (b.id === "aNeg") { Object.assign(D.aj, {ig:$("#aIg").value.trim().replace(/^@/, ""), horario:$("#aHor").value.trim(), ubicacion:$("#aUbi").value.trim(), contexto:$("#aCtx").value.trim() || CONTEXTO, hashtags:$("#aHash").value.trim()}); guardar(); toast("Guardado ✓"); }
+    if (b.id === "aExp") { const t = JSON.stringify({personas:D.personas, posts:D.posts.map(sinFoto), hechos:D.hechos}); APP ? Android.copiar(t) : navigator.clipboard.writeText(t); toast("Respaldo copiado"); }
+    if (b.id === "aImp") { const C = hoja("Pegar respaldo", '<textarea id="rTxt" style="min-height:200px" placeholder="Pegá aquí el respaldo"></textarea><button class="btn full" style="margin-top:10px" id="rOk">Restaurar</button>'); C.querySelector("#rOk").onclick = () => { try { const o = JSON.parse($("#rTxt").value); (o.personas || []).forEach(p => { if (!D.personas.find(x => x.id === p.id)) D.personas.push(p); }); (o.posts || []).forEach(p => { if (!D.posts.find(x => x.id === p.id)) D.posts.push(p); }); Object.assign(D.hechos, o.hechos || {}); guardar(); subirTodo(); cerrarHoja(); toast("Restaurado ✓"); } catch(err) { toast("Ese texto no es un respaldo"); } }; }
+  };
+  const pg = $("#aPag"); if (pg) pg.onchange = () => toast("Pegá el token otra vez en Bandeja para cambiar de página");
+}
+function entrarTarjeta() { if (APP) Android.entrarTarjeta(); else abrir("https://josemontes20201234-pixel.github.io/crm/login.html"); toast("Entrá con tu cuenta de Google y tocá «Volver a Meraki CRM»"); }
+
+/* ================================================================ arranque */
+$("#btnSync").onclick = async () => { await traerTarjeta(true); bDatos = {}; pintarTodo(); toast(D.aj.rt ? "Actualizado" : "Conectá Tarjeta Meraki en Ajustes"); };
+window.alVolver = () => { traerTarjeta(false).then(pintarTodo); };
+pintarTodo();
+traerTarjeta(false).then(() => { pintarTodo(); alarmas(); });
+</script>
+</body>
+</html>

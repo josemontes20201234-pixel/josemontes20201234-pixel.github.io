@@ -1,0 +1,28 @@
+plugins { id 'com.android.application' }
+def build = (System.getenv("GITHUB_RUN_NUMBER") ?: "1") as Integer
+android {
+    namespace 'com.josemontes.crm'
+    compileSdk 34
+    defaultConfig {
+        applicationId 'com.josemontes.crm'
+        minSdk 26
+        targetSdk 34
+        versionCode build
+        versionName "1.0." + build
+    }
+    signingConfigs {
+        release {
+            // Firma fija para que cada versión nueva se instale encima de la anterior.
+            // La llave está cifrada (AES-256); su contraseña vive solo en el secreto ENFOQUE_KEY_PASSWORD de GitHub (misma llave que Meraki Enfoque).
+            storeFile file('meraki-enfoque-2026.jks')
+            storePassword System.getenv('ENFOQUE_KEY_PASSWORD')
+            keyAlias 'meraki'
+            keyPassword System.getenv('ENFOQUE_KEY_PASSWORD')
+        }
+    }
+    buildTypes {
+        release { minifyEnabled false; signingConfig signingConfigs.release }
+    }
+    lint { checkReleaseBuilds false; abortOnError false }
+    compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
+}

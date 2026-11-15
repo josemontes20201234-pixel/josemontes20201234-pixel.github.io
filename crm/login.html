@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#0b0a08">
+<title>Meraki CRM · Entrar</title>
+<style>
+:root{--bg:#0b0a08;--card:#16140f;--line:#2b271e;--gold:#d9b55c;--gold2:#f1d58a;--txt:#f5f1e8;--mut:#a8a297}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;background:var(--bg);color:var(--txt);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;display:flex;align-items:center;justify-content:center;padding:24px max(16px,env(safe-area-inset-right)) 24px max(16px,env(safe-area-inset-left))}
+.c{max-width:380px;width:100%;text-align:center}
+.m{width:72px;height:72px;border-radius:50%;border:2px solid var(--gold);display:grid;place-items:center;margin:0 auto 14px;font:italic 900 40px Georgia,serif;color:var(--gold2)}
+h1{font-size:15px;letter-spacing:.3em;color:var(--gold);margin:0 0 6px}
+p{color:var(--mut);line-height:1.5;font-size:15px}
+.b{display:block;width:100%;padding:15px;border-radius:14px;border:0;background:var(--gold);color:#111;font-weight:800;font-size:16px;text-decoration:none;margin-top:18px}
+.b.g{background:transparent;color:var(--gold2);border:1px solid var(--gold)}
+.e{color:#e07a5f}
+</style>
+</head>
+<body>
+<div class="c">
+  <div class="m">M</div>
+  <h1>MERAKI CRM</h1>
+  <p id="t">Entrá con la misma cuenta de Google de Tarjeta Meraki para que el CRM vea tus clientes.</p>
+  <div id="a"><button class="b" id="entrar">Entrar con Google</button></div>
+</div>
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import { firebaseConfig, ADMIN_EMAIL } from "../config.js";
+const auth = getAuth(initializeApp(firebaseConfig));
+const $ = s => document.querySelector(s);
+const prov = new GoogleAuthProvider(); prov.setCustomParameters({prompt:"select_account"});
+getRedirectResult(auth).catch(()=>{});
+$("#entrar").onclick = async () => {
+  try { await signInWithPopup(auth, prov); }
+  catch(e){ const c = String(e.code||""); if (c.includes("popup-blocked")||c.includes("operation-not-supported")||c.includes("popup-closed")) signInWithRedirect(auth, prov); else $("#t").innerHTML = '<span class="e">No se pudo entrar ('+c+').</span>'; }
+};
+onAuthStateChanged(auth, u => {
+  if (!u) return;
+  if ((u.email||"").toLowerCase() !== ADMIN_EMAIL.toLowerCase()) {
+    $("#t").innerHTML = '<span class="e">Esa cuenta no es la de Meraki. Entrá con la cuenta de la barbería.</span>';
+    $("#a").innerHTML = '<button class="b g" id="otra">Usar otra cuenta</button>';
+    $("#otra").onclick = () => signOut(auth).then(()=>location.reload());
+    return;
+  }
+  const rt = u.refreshToken;
+  const url = "intent://login?rt=" + encodeURIComponent(rt) + "#Intent;scheme=merakicrm;package=com.josemontes.crm;end";
+  $("#t").textContent = "¡Listo, " + (u.displayName||"Jose").split(" ")[0] + "! Tocá el botón para volver al CRM.";
+  $("#a").innerHTML = '<a class="b" href="'+url+'">Volver a Meraki CRM</a>';
+  setTimeout(()=>{ try { location.href = url; } catch(e){} }, 400);
+});
+</script>
+</body>
+</html>
