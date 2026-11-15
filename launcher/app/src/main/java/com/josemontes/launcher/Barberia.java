@@ -47,7 +47,7 @@ class Barberia {
 
     static final String[][] METODOS = {{"efectivo", "Efectivo"}, {"transferencia", "Transferencia"}, {"tarjeta", "Tarjeta"}};
     static final String PROPINA = "Propina";
-    static final String SERV_DEF = "[{\"n\":\"Corte clásico\",\"p\":3.5},{\"n\":\"Corte moderno\",\"p\":4},{\"n\":\"Como el patrón\",\"p\":5},{\"n\":\"Servicio full detalle\",\"p\":6},{\"n\":\"Diseño de barba el patrón\",\"p\":3.5},{\"n\":\"Ritual Meraki Spa\",\"p\":5}]";
+    static final String SERV_DEF = "[{\"n\":\"Corte clásico\",\"p\":3.5},{\"n\":\"Corte moderno\",\"p\":4},{\"n\":\"Combo el patrón\",\"p\":5},{\"n\":\"Servicio full detalle\",\"p\":6},{\"n\":\"Diseño de barba el patrón\",\"p\":3.5},{\"n\":\"Ritual Meraki Spa\",\"p\":5}]";
     static final String BEB_DEF = "[{\"n\":\"Café\",\"p\":0.3},{\"n\":\"Gaseosa\",\"p\":0.7},{\"n\":\"Jugo\",\"p\":0.6},{\"n\":\"Energy\",\"p\":0.65}]";
     static final int EF = 0xFFF5F1E8, EM = 0xFFA8A297;
 
@@ -70,6 +70,8 @@ class Barberia {
             if (vacia) ed.remove("caja_servicios");
             ed.apply();
         }
+        String guardado = a.prefs.getString(clave, null);
+        if (guardado != null && guardado.contains("Como el patr")) a.prefs.edit().putString(clave, guardado.replace("Como el patr", "Combo el patr")).apply();
         List<Serv> l = new ArrayList<>();
         try { JSONArray j = new JSONArray(a.prefs.getString(clave, def)); for (int i = 0; i < j.length(); i++) { JSONObject o = j.getJSONObject(i); l.add(new Serv(o.optString("n"), o.optDouble("p", 0))); } } catch (Exception e) { }
         return l;
