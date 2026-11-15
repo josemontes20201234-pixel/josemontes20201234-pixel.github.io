@@ -96,6 +96,7 @@ public class Servicio extends AccessibilityService {
 
     final BroadcastReceiver rx = new BroadcastReceiver() {
         @Override public void onReceive(Context c, Intent i) {
+            anotar("Pantalla: " + (Intent.ACTION_SCREEN_OFF.equals(i.getAction()) ? "apagada" : Intent.ACTION_SCREEN_ON.equals(i.getAction()) ? "encendida" : "desbloqueada") + (bloqueadaAhora() ? " (bloqueada)" : ""));
             if (Intent.ACTION_SCREEN_OFF.equals(i.getAction())) { cerrarPanel(); quitarFranja(); }
             else { actualizarFranja(); if (Intent.ACTION_USER_PRESENT.equals(i.getAction()) && host != null) host.refrescarEnFondo(); }
         }
@@ -180,6 +181,11 @@ public class Servicio extends AccessibilityService {
     }
 
     /** ¿Está abierto el panel de Samsung (o la pantalla de bloqueo)? */
+    boolean bloqueadaAhora() {
+        KeyguardManager km = (KeyguardManager) getSystemService(KEYGUARD_SERVICE);
+        return km != null && km.isKeyguardLocked();
+    }
+
     boolean sombraAbierta() {
         try {
             int alto = getResources().getDisplayMetrics().heightPixels;
@@ -316,7 +322,7 @@ public class Servicio extends AccessibilityService {
                 return true;
             }
         });
-        try { wm.addView(v, lp); franja = v; motivo("puesta (" + zona + ")"); } catch (Exception e) { franja = null; motivo("no se pudo poner: " + e); }
+        try { wm.addView(v, lp); franja = v; motivo("puesta (" + zona + ")" + (bloqueadaAhora() ? " con la pantalla bloqueada" : "")); } catch (Exception e) { franja = null; motivo("no se pudo poner: " + e); }
     }
 
     /** Cierra el panel de Samsung si se abrió detrás del nuestro. */
