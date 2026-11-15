@@ -183,6 +183,8 @@ public class Servicio extends AccessibilityService {
     boolean sombraAbierta() {
         try {
             int alto = getResources().getDisplayMetrics().heightPixels;
+            KeyguardManager km = (KeyguardManager) getSystemService(KEYGUARD_SERVICE);
+            boolean bloqueada = km != null && km.isKeyguardLocked();
             Rect r = new Rect();
             for (AccessibilityWindowInfo w : getWindows()) {
                 if (w.getType() != AccessibilityWindowInfo.TYPE_SYSTEM) continue;
@@ -190,10 +192,24 @@ public class Servicio extends AccessibilityService {
                 if (r.height() < alto / 2) continue;
                 AccessibilityNodeInfo n = w.getRoot();
                 if (n == null || n.getPackageName() == null || !SYSTEMUI.contentEquals(n.getPackageName())) continue;
+                // Con la pantalla bloqueada, la pantalla de bloqueo ES una ventana grande de Samsung:
+                // sólo cuenta como «panel abierto» si se ven sus botones (linterna, modo avión…)
+                if (bloqueada) { if (hayBotonesVisibles(n, 0)) return true; continue; }
                 // One UI nuevo deja ventanas grandes de Samsung puestas aunque no se vean: sólo cuenta si está al frente
                 if (w.isFocused() || w.isActive() || n.isVisibleToUser() && n.getChildCount() > 0 && hayAlgoVisible(n)) return true;
             }
         } catch (Exception e) { }
+        return false;
+    }
+
+    /** ¿Se ven botones del panel de Samsung (para saber si lo bajaron sobre la pantalla de bloqueo)? */
+    static boolean hayBotonesVisibles(AccessibilityNodeInfo n, int prof) {
+        if (n == null || prof > 25) return false;
+        if (n.isVisibleToUser()) {
+            String t = limpio(n.getText()), d = limpio(n.getContentDescription());
+            for (String x : CUADRICULA) if (t.startsWith(x) || d.startsWith(x)) return true;
+        }
+        for (int i = 0; i < n.getChildCount(); i++) if (hayBotonesVisibles(n.getChild(i), prof + 1)) return true;
         return false;
     }
 
