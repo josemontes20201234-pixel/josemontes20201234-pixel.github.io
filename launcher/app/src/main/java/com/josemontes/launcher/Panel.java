@@ -122,6 +122,8 @@ class Panel {
     Panel(MainActivity a) { this.a = a; }
 
     boolean abierto() { return capa != null && capa.getParent() != null; }
+    /** Mientras Meraki Panel toca un botón de Samsung, el fondo se pone negro del todo para que no se vea el panel de Samsung detrás. */
+    void tapar(boolean si) { if (capa != null) capa.setBackgroundColor(si ? 0xFF000000 : (a.externo ? 0x9E000000 : 0x73000000)); }
     boolean editando() { return ed != null && ed.getParent() != null; }
 
     // ================================================================ preferencias

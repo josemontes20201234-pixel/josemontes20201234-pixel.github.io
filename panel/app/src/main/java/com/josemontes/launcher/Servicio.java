@@ -631,6 +631,7 @@ public class Servicio extends AccessibilityService {
         ocupado = true;
         intentosMover = 0;
         final Boolean antes = estadoDe(id);
+        try { if (host != null) host.panel().tapar(true); } catch (Exception e) { }
         boolean abrio = performGlobalAction(GLOBAL_ACTION_QUICK_SETTINGS);
         anotar("  abrir el panel de Samsung: " + (abrio ? "sí" : "NO") + " · estaba " + (antes == null ? "?" : antes ? "encendido" : "apagado"));
         final long t0 = SystemClock.uptimeMillis();
@@ -732,6 +733,7 @@ public class Servicio extends AccessibilityService {
     }
 
     void terminar(boolean cerrarElDeSamsung) {
+        try { if (host != null) host.panel().tapar(false); } catch (Exception e) { }
         if (cerrarElDeSamsung) performGlobalAction(GLOBAL_ACTION_DISMISS_NOTIFICATION_SHADE);
         ocupado = false;
         if (host != null && host.panel != null) { host.panel.refrescar(); ui.postDelayed(() -> { if (host != null && host.panel != null) host.panel.refrescar(); }, 700); }
