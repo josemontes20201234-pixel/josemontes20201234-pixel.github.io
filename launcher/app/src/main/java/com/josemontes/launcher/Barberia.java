@@ -47,26 +47,38 @@ class Barberia {
 
     static final String[][] METODOS = {{"efectivo", "Efectivo"}, {"transferencia", "Transferencia"}, {"tarjeta", "Tarjeta"}};
     static final String PROPINA = "Propina";
-    static final String SERV_DEF = "[{\"n\":\"Corte\",\"p\":0},{\"n\":\"Corte + barba\",\"p\":0},{\"n\":\"Barba\",\"p\":0},{\"n\":\"Cejas\",\"p\":0},{\"n\":\"Diseño\",\"p\":0},{\"n\":\"Corte de niño\",\"p\":0}]";
+    static final String SERV_DEF = "[{\"n\":\"Corte clásico\",\"p\":3.5},{\"n\":\"Corte moderno\",\"p\":4},{\"n\":\"Como el patrón\",\"p\":5},{\"n\":\"Servicio full detalle\",\"p\":6},{\"n\":\"Diseño de barba el patrón\",\"p\":3.5},{\"n\":\"Ritual Meraki Spa\",\"p\":5}]";
+    static final String BEB_DEF = "[{\"n\":\"Café\",\"p\":0.3},{\"n\":\"Gaseosa\",\"p\":0.7},{\"n\":\"Jugo\",\"p\":0.6},{\"n\":\"Energy\",\"p\":0.65}]";
     static final int EF = 0xFFF5F1E8, EM = 0xFFA8A297;
 
     // ================================================================ servicios y ventas
     static class Serv { String n; double p; Serv(String n, double p) { this.n = n; this.p = p; } }
     static class Venta {
-        long t; String s, m, c; double p;
-        JSONObject json() { JSONObject o = new JSONObject(); try { o.put("t", t); o.put("s", s); o.put("p", p); o.put("m", m); if (c != null && !c.isEmpty()) o.put("c", c); } catch (Exception e) { } return o; }
-        static Venta de(JSONObject o) { Venta v = new Venta(); v.t = o.optLong("t"); v.s = o.optString("s"); v.p = o.optDouble("p", 0); v.m = o.optString("m", "efectivo"); v.c = o.optString("c", ""); return v; }
+        long t; String s, m, c, g; double p;
+        JSONObject json() { JSONObject o = new JSONObject(); try { o.put("t", t); o.put("s", s); o.put("p", p); o.put("m", m); if (c != null && !c.isEmpty()) o.put("c", c); if (g != null && !g.isEmpty()) o.put("g", g); } catch (Exception e) { } return o; }
+        static Venta de(JSONObject o) { Venta v = new Venta(); v.t = o.optLong("t"); v.s = o.optString("s"); v.p = o.optDouble("p", 0); v.m = o.optString("m", "efectivo"); v.c = o.optString("c", ""); v.g = o.optString("g", ""); return v; }
     }
 
-    List<Serv> servicios() {
+    List<Serv> servicios() { return lista("caja_servicios", SERV_DEF); }
+    List<Serv> bebidas() { return lista("caja_bebidas", BEB_DEF); }
+    List<Serv> lista(String clave, String def) {
+        if (!a.prefs.getBoolean("caja_precios_v2", false)) {
+            // sus precios de Meraki (nov 2026): si la lista vieja no tenía precios, se cambia por la nueva
+            boolean vacia = true;
+            try { JSONArray j = new JSONArray(a.prefs.getString("caja_servicios", "[]")); for (int i = 0; i < j.length(); i++) if (j.getJSONObject(i).optDouble("p", 0) > 0) vacia = false; } catch (Exception e) { }
+            SharedPreferences.Editor ed = a.prefs.edit().putBoolean("caja_precios_v2", true);
+            if (vacia) ed.remove("caja_servicios");
+            ed.apply();
+        }
         List<Serv> l = new ArrayList<>();
-        try { JSONArray j = new JSONArray(a.prefs.getString("caja_servicios", SERV_DEF)); for (int i = 0; i < j.length(); i++) { JSONObject o = j.getJSONObject(i); l.add(new Serv(o.optString("n"), o.optDouble("p", 0))); } } catch (Exception e) { }
+        try { JSONArray j = new JSONArray(a.prefs.getString(clave, def)); for (int i = 0; i < j.length(); i++) { JSONObject o = j.getJSONObject(i); l.add(new Serv(o.optString("n"), o.optDouble("p", 0))); } } catch (Exception e) { }
         return l;
     }
-    void guardarServicios(List<Serv> l) {
+    void guardarServicios(List<Serv> l) { guardarLista("caja_servicios", l); }
+    void guardarLista(String clave, List<Serv> l) {
         JSONArray j = new JSONArray();
         for (Serv s : l) { JSONObject o = new JSONObject(); try { o.put("n", s.n); o.put("p", s.p); } catch (Exception e) { } j.put(o); }
-        a.prefs.edit().putString("caja_servicios", j.toString()).apply();
+        a.prefs.edit().putString(clave, j.toString()).apply();
     }
 
     static String claveMes(long t) { return "caja_" + new SimpleDateFormat("yyyy-MM", Locale.ROOT).format(new Date(t)); }
@@ -96,7 +108,8 @@ class Barberia {
     static long inicioMes(long t) { Calendar c = Calendar.getInstance(); c.setTimeInMillis(inicioDia(t)); c.set(Calendar.DAY_OF_MONTH, 1); return c.getTimeInMillis(); }
     static double suma(List<Venta> l) { double s = 0; for (Venta v : l) s += v.p; return s; }
     static double propinas(List<Venta> l) { double s = 0; for (Venta v : l) if (PROPINA.equals(v.s)) s += v.p; return s; }
-    static int servicios(List<Venta> l) { int n = 0; for (Venta v : l) if (!PROPINA.equals(v.s)) n++; return n; }
+    static int servicios(List<Venta> l) { int n = 0; for (Venta v : l) if (!PROPINA.equals(v.s) && !"b".equals(v.g)) n++; return n; }
+    static double enBebidas(List<Venta> l) { double s = 0; for (Venta v : l) if ("b".equals(v.g)) s += v.p; return s; }
     static String plata(double v) { return Math.abs(v - Math.rint(v)) < 0.005 ? "$" + (long) Math.rint(v) : String.format(Locale.US, "$%.2f", v); }
     static String nombreMetodo(String m) { for (String[] x : METODOS) if (x[0].equals(m)) return x[1]; return "Efectivo"; }
 
@@ -418,7 +431,7 @@ class Barberia {
         List<Venta> l = entre(hoy, masDias(hoy, 1));
         contenido.addView(a.texto(plata(suma(l)), 52, a.acento, a.tf(true)), a.lp(-2, -2, 4));
         int n = servicios(l);
-        nota(n + (n == 1 ? " servicio" : " servicios") + " hoy" + (propinas(l) > 0 ? " · " + plata(propinas(l)) + " en propinas" : ""));
+        nota(n + (n == 1 ? " servicio" : " servicios") + " hoy" + (enBebidas(l) > 0 ? " · " + plata(enBebidas(l)) + " en bebidas" : "") + (propinas(l) > 0 ? " · " + plata(propinas(l)) + " en propinas" : ""));
         // método de pago para lo próximo que anote
         titulo("Cómo paga");
         LinearLayout ms = new LinearLayout(a);
@@ -426,23 +439,9 @@ class Barberia {
         contenido.addView(ms, a.lp(-1, -2, 8));
         // servicios
         titulo("Tocá lo que hiciste");
-        List<Serv> ss = servicios();
-        LinearLayout fila = null;
-        for (int i = 0; i < ss.size(); i++) {
-            if (i % 2 == 0) { fila = new LinearLayout(a); contenido.addView(fila, a.lp(-1, -2, 8)); }
-            final Serv s = ss.get(i);
-            LinearLayout b = new LinearLayout(a);
-            b.setOrientation(LinearLayout.VERTICAL);
-            b.setPadding(a.dp(14), a.dp(14), a.dp(14), a.dp(14));
-            b.setBackground(a.caja(0x1AFFFFFF, 16, 0x26FFFFFF));
-            b.addView(a.texto(s.n, 16, EF, a.tf(true)));
-            b.addView(a.texto(s.p > 0 ? plata(s.p) : "Poné el precio", 13.5f, s.p > 0 ? a.acento : EM, a.tf(false)), a.lp(-2, -2, 4));
-            b.setOnClickListener(v -> anotarServicio(s.n, s.p));
-            LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(0, -2, 1f);
-            if (i % 2 == 0) p.rightMargin = a.dp(4); else p.leftMargin = a.dp(4);
-            fila.addView(b, p);
-        }
-        if (fila != null && ss.size() % 2 == 1) fila.addView(new View(a), new LinearLayout.LayoutParams(0, 1, 1f));
+        cuadricula(servicios(), "");
+        titulo("Bebidas");
+        cuadricula(bebidas(), "b");
         LinearLayout ex = new LinearLayout(a);
         TextView otro = boton("＋ Otro monto", false, a.acento); otro.setTextColor(EF); otro.setBackground(a.caja(0, 99, 0x33FFFFFF));
         otro.setOnClickListener(v -> otroMonto());
@@ -459,6 +458,25 @@ class Barberia {
             SimpleDateFormat hf = new SimpleDateFormat(android.text.format.DateFormat.is24HourFormat(a) ? "HH:mm" : "h:mm a", MainActivity.ES);
             for (Venta v : l) contenido.addView(filaVenta(hf.format(new Date(v.t)), v), a.lp(-1, -2, 6));
         }
+    }
+
+    void cuadricula(List<Serv> ss, String g) {
+        LinearLayout fila = null;
+        for (int i = 0; i < ss.size(); i++) {
+            if (i % 2 == 0) { fila = new LinearLayout(a); contenido.addView(fila, a.lp(-1, -2, 8)); }
+            final Serv s = ss.get(i);
+            LinearLayout b = new LinearLayout(a);
+            b.setOrientation(LinearLayout.VERTICAL);
+            b.setPadding(a.dp(14), a.dp(14), a.dp(14), a.dp(14));
+            b.setBackground(a.caja(0x1AFFFFFF, 16, 0x26FFFFFF));
+            b.addView(a.texto(s.n, 16, EF, a.tf(true)));
+            b.addView(a.texto(s.p > 0 ? plata(s.p) : "Poné el precio", 13.5f, s.p > 0 ? a.acento : EM, a.tf(false)), a.lp(-2, -2, 4));
+            b.setOnClickListener(v -> anotarServicio(s.n, s.p, g));
+            LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(0, -2, 1f);
+            if (i % 2 == 0) p.rightMargin = a.dp(4); else p.leftMargin = a.dp(4);
+            fila.addView(b, p);
+        }
+        if (fila != null && ss.size() % 2 == 1) fila.addView(new View(a), new LinearLayout.LayoutParams(0, 1, 1f));
     }
 
     View filaVenta(String hora, Venta v) {
@@ -491,13 +509,14 @@ class Barberia {
     }
     static double num(String s) { try { return Double.parseDouble(s.replace(',', '.').replace("$", "").trim()); } catch (Exception x) { return 0; } }
 
-    void anotarServicio(String n, double p) {
-        if (p > 0) guardarNueva(n, p);
-        else pedirMonto(n + ": ¿cuánto cobraste?", 0, m -> guardarNueva(n, m));
+    void anotarServicio(String n, double p, String g) {
+        if (p > 0) guardarNueva(n, p, g);
+        else pedirMonto(n + ": ¿cuánto cobraste?", 0, m -> guardarNueva(n, m, g));
     }
 
-    void guardarNueva(String s, double p) {
-        Venta v = new Venta(); v.t = System.currentTimeMillis(); v.s = s; v.p = p; v.m = metodo; v.c = "";
+    void guardarNueva(String s, double p) { guardarNueva(s, p, ""); }
+    void guardarNueva(String s, double p, String g) {
+        Venta v = new Venta(); v.t = System.currentTimeMillis(); v.s = s; v.p = p; v.m = metodo; v.c = ""; v.g = g;
         anotar(v);
         a.toast(s + " · " + plata(p) + " anotado");
         pintar();
@@ -619,9 +638,17 @@ class Barberia {
     }
 
     void pintarServicios() {
-        final List<Serv> l = servicios();
         contenido.addView(a.etiqueta("Tus servicios y precios", a.acento), a.lp(-2, -2, 6));
         nota("Tocá uno para cambiar su nombre o precio. Si el precio está en 0, te pregunta cuánto cobraste cada vez.");
+        editarLista("caja_servicios", servicios(), "＋ Agregar servicio");
+        contenido.addView(a.etiqueta("Bebidas", a.acento), a.lp(-2, -2, 22));
+        editarLista("caja_bebidas", bebidas(), "＋ Agregar bebida");
+        TextView listo = boton("Listo", false, a.acento); listo.setTextColor(EF); listo.setBackground(a.caja(0, 99, 0x33FFFFFF));
+        listo.setOnClickListener(v -> { pestana = "hoy"; pintar(); });
+        contenido.addView(listo, a.lp(-1, -2, 18));
+    }
+
+    void editarLista(String clave, List<Serv> l, String textoMas) {
         for (int i = 0; i < l.size(); i++) {
             final int k = i; final Serv s = l.get(i);
             LinearLayout f = new LinearLayout(a);
@@ -631,19 +658,16 @@ class Barberia {
             LinearLayout tx = new LinearLayout(a); tx.setOrientation(LinearLayout.VERTICAL);
             tx.addView(a.texto(s.n, 15.5f, EF, a.tf(false)));
             tx.addView(a.texto(s.p > 0 ? plata(s.p) : "Sin precio fijo", 12.5f, s.p > 0 ? a.acento : EM, a.tf(false)), a.lp(-2, -2, 2));
-            tx.setOnClickListener(v -> editarServicio(l, k));
+            tx.setOnClickListener(v -> editarServicio(clave, l, k));
             f.addView(tx, new LinearLayout.LayoutParams(0, -2, 1f));
-            f.addView(chico("↑", k > 0, () -> { l.add(k - 1, l.remove(k)); guardarServicios(l); pintar(); }));
-            f.addView(chico("↓", k < l.size() - 1, () -> { l.add(k + 1, l.remove(k)); guardarServicios(l); pintar(); }));
-            f.addView(chico("✕", true, () -> { l.remove(k); guardarServicios(l); pintar(); }));
+            f.addView(chico("↑", k > 0, () -> { l.add(k - 1, l.remove(k)); guardarLista(clave, l); pintar(); }));
+            f.addView(chico("↓", k < l.size() - 1, () -> { l.add(k + 1, l.remove(k)); guardarLista(clave, l); pintar(); }));
+            f.addView(chico("✕", true, () -> { l.remove(k); guardarLista(clave, l); pintar(); }));
             contenido.addView(f, a.lp(-1, -2, 6));
         }
-        TextView mas = boton("＋ Agregar servicio", true, a.acento);
-        mas.setOnClickListener(v -> editarServicio(l, -1));
-        contenido.addView(mas, a.lp(-1, -2, 14));
-        TextView listo = boton("Listo", false, a.acento); listo.setTextColor(EF); listo.setBackground(a.caja(0, 99, 0x33FFFFFF));
-        listo.setOnClickListener(v -> { pestana = "hoy"; pintar(); });
-        contenido.addView(listo, a.lp(-1, -2, 8));
+        TextView mas = boton(textoMas, true, a.acento);
+        mas.setOnClickListener(v -> editarServicio(clave, l, -1));
+        contenido.addView(mas, a.lp(-1, -2, 10));
     }
 
     View chico(String s, boolean activo, Runnable r) {
@@ -654,7 +678,7 @@ class Barberia {
         return t;
     }
 
-    void editarServicio(List<Serv> l, int k) {
+    void editarServicio(String clave, List<Serv> l, int k) {
         LinearLayout f = new LinearLayout(a); f.setOrientation(LinearLayout.VERTICAL); f.setPadding(a.dp(22), a.dp(8), a.dp(22), 0);
         EditText n = new EditText(a); n.setHint("Nombre (ej. Corte + barba)"); n.setSingleLine(true); n.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
         EditText p = new EditText(a); p.setHint("Precio (0 = preguntar cada vez)"); p.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
@@ -665,7 +689,7 @@ class Barberia {
             if (nn.isEmpty()) { a.toast("Poné el nombre."); return; }
             Serv s = new Serv(nn, num(p.getText().toString()));
             if (k >= 0) l.set(k, s); else l.add(s);
-            guardarServicios(l); pintar();
+            guardarLista(clave, l); pintar();
         }).setNegativeButton("Cancelar", null).show();
     }
 
