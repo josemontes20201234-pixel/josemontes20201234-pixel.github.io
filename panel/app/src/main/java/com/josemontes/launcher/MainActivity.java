@@ -311,7 +311,10 @@ class MainActivity extends ContextWrapper {
                 if (checkSelfPermission("android.permission.WRITE_SECURE_SETTINGS") == android.content.pm.PackageManager.PERMISSION_GRANTED) {
                     try {
                         android.content.ContentResolver cr = getContentResolver();
-                        boolean on = android.provider.Settings.Secure.getInt(cr, "reduce_bright_colors_activated", 0) == 1;
+                        // Android no deja LEER esta clave (sólo escribirla): se usa lo último que se supo
+                        Boolean leido = null;
+                        try { leido = android.provider.Settings.Secure.getInt(cr, "reduce_bright_colors_activated", 0) == 1; } catch (SecurityException ignorar) { }
+                        boolean on = leido != null ? leido : prefs.getBoolean("conocido_tenue", false);
                         android.provider.Settings.Secure.putInt(cr, "reduce_bright_colors_activated", on ? 0 : 1);
                         prefs.edit().putBoolean("conocido_tenue", !on).apply();
                         Servicio.anotar("«tenue»: directo con el permiso → " + (on ? "apagado" : "encendido"));
