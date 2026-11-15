@@ -306,7 +306,21 @@ class MainActivity extends ContextWrapper {
                 if (ok && prender && panel != null) ui.postDelayed(() -> panel.abrirIntent(new Intent(android.provider.Settings.ACTION_BLUETOOTH_SETTINGS)), 250);
                 return ok;
             }
-            case "datos": case "avion": case "ubicacion": case "ahorro": case "hotspot": case "nfc": case "oscuro": case "tenue": {
+            case "tenue": {
+                // Con el permiso dado una vez desde la computadora (adb), se cambia directo: al instante y sin abrir el panel de Samsung
+                if (checkSelfPermission("android.permission.WRITE_SECURE_SETTINGS") == android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                    try {
+                        android.content.ContentResolver cr = getContentResolver();
+                        boolean on = android.provider.Settings.Secure.getInt(cr, "reduce_bright_colors_activated", 0) == 1;
+                        android.provider.Settings.Secure.putInt(cr, "reduce_bright_colors_activated", on ? 0 : 1);
+                        prefs.edit().putBoolean("conocido_tenue", !on).apply();
+                        Servicio.anotar("«tenue»: directo con el permiso → " + (on ? "apagado" : "encendido"));
+                        return true;
+                    } catch (Throwable e) { Servicio.anotar("«tenue»: el permiso falló (" + e + ") → panel de Samsung"); }
+                }
+            }
+            // sin el permiso: sigue abajo, tocando el botón de Samsung
+            case "datos": case "avion": case "ubicacion": case "ahorro": case "hotspot": case "nfc": case "oscuro": {
                 Servicio s = Servicio.yo;
                 if (s == null || srv == null) { Servicio.anotar("«" + id + "»: " + (s == null ? "el servicio no está activo" : "el panel no está encima de todo") + " → ventanita"); return false; }
                 return s.tocarBotonSamsung(id, ventanita);
