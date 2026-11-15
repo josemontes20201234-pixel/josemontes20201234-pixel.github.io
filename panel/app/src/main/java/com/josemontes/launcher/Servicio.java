@@ -232,8 +232,7 @@ public class Servicio extends AccessibilityService {
         if (pausada) { motivo("apartada (panel de Samsung abierto)"); return; }
         if (raizPuesta) return;
         if (!prefs().getBoolean("activo", true)) { motivo("apagada en «Panel Meraki encendido»"); return; }
-        KeyguardManager km = (KeyguardManager) getSystemService(KEYGUARD_SERVICE);
-        if (km != null && km.isKeyguardLocked()) { motivo("pantalla bloqueada"); return; }
+        // También con la pantalla bloqueada (Jose lo pidió): lo que abre apps o ajustes pide desbloquear igual
         String zona = prefs().getString("zona", "derecha");
         int ancho = getResources().getDisplayMetrics().widthPixels;
         int sb = getResources().getIdentifier("status_bar_height", "dimen", "android");
