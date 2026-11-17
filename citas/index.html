@@ -1,0 +1,264 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Citas · Meraki Barbershop</title>
+<meta name="description" content="Apartá tu cita en Meraki Barbershop, Apopa.">
+<meta name="theme-color" content="#0d0c0a">
+<link rel="icon" href="../icon-192.png">
+<meta property="og:title" content="Apartá tu cita · Meraki Barbershop">
+<meta property="og:description" content="Elegí tu servicio, el día y la hora. Apopa, martes a domingo.">
+<meta property="og:image" content="https://josemontes20201234-pixel.github.io/icon-512.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@0,6..96,500;0,6..96,700;1,6..96,500&family=Manrope:wght@400;500;600;700;800&display=swap">
+<style>
+:root{
+  --bg:#0d0c0a; --surface:#16140f; --surface2:#1f1c15; --line:#332d20;
+  --fg:#f1ead9; --muted:#a59b84; --gold:#c9a24a; --gold-hi:#e6c46d; --ink:#1a1408;
+  --ok:#6fbf8a; --bad:#d9675a; --wa:#3fbf6a;
+  --f-display:"Bodoni Moda","Didot","Times New Roman",serif;
+  --f-body:"Manrope",system-ui,-apple-system,"Segoe UI",sans-serif;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{background:var(--bg);margin:0}
+body{color:var(--fg);font-family:var(--f-body);font-size:16px;line-height:1.5;-webkit-tap-highlight-color:transparent;
+  padding:env(safe-area-inset-top,0px) max(16px,env(safe-area-inset-right,0px)) 60px max(16px,env(safe-area-inset-left,0px));
+  background-image:radial-gradient(ellipse 700px 380px at 50% -80px,rgba(201,162,74,.16),transparent 70%)}
+.wrap{max-width:560px;margin:0 auto}
+button,input,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+[hidden]{display:none!important}
+:focus-visible{outline:2px solid var(--gold-hi);outline-offset:2px}
+header{text-align:center;padding-block:34px 18px}
+.m{width:68px;height:68px;border-radius:50%;border:2px solid var(--gold);display:grid;place-items:center;margin:0 auto 14px;
+  font:italic 700 38px/1 var(--f-display);color:var(--gold-hi)}
+h1{font:500 30px/1.15 var(--f-display);margin:0;text-wrap:balance}
+.sub{color:var(--muted);margin-top:6px;font-size:15px}
+.paso{margin-top:26px}
+.paso h2{display:flex;align-items:center;gap:10px;font:700 12px/1 var(--f-body);letter-spacing:.18em;text-transform:uppercase;color:var(--gold);margin:0 0 12px}
+.paso h2 b{width:24px;height:24px;border-radius:50%;border:1px solid var(--gold);display:grid;place-items:center;font-size:12px;letter-spacing:0}
+.serv{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.op{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px;text-align:left;min-width:0}
+.op .n{font-weight:700;line-height:1.25}
+.op .p{color:var(--gold-hi);font-weight:700;margin-top:4px;font-variant-numeric:tabular-nums}
+.op.on{border-color:var(--gold);background:linear-gradient(160deg,rgba(201,162,74,.18),rgba(201,162,74,.04))}
+.dias{display:flex;gap:8px;overflow-x:auto;padding-bottom:6px;scrollbar-width:none;margin-inline:-4px;padding-inline:4px}
+.dias::-webkit-scrollbar{display:none}
+.dia{flex:none;width:64px;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:10px 0;text-align:center}
+.dia .d{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;font-weight:700}
+.dia .n{font:500 24px/1.2 var(--f-display)}
+.dia .s{font-size:11px;color:var(--muted)}
+.dia.on{border-color:var(--gold);background:var(--gold);color:var(--ink)}
+.dia.on .d,.dia.on .s{color:var(--ink)}
+.dia:disabled{opacity:.35}
+.horas{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px}
+.hr{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 0;font-weight:700;font-variant-numeric:tabular-nums}
+.hr.on{background:var(--gold);color:var(--ink);border-color:var(--gold)}
+.hr:disabled{opacity:.3;text-decoration:line-through}
+.nota{color:var(--muted);font-size:14px;margin-top:10px}
+label{display:block;font-size:13px;color:var(--muted);font-weight:600;margin:12px 0 6px}
+input,textarea{width:100%;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:13px 14px;outline:none}
+input:focus,textarea:focus{border-color:var(--gold)}
+textarea{min-height:70px;resize:vertical}
+.res{margin-top:26px;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:16px}
+.res .k{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.14em;font-weight:700}
+.res .v{font:500 21px/1.3 var(--f-display);margin-top:4px}
+.btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;border:0;border-radius:14px;padding:16px;font-weight:800;font-size:16px;background:var(--gold);color:var(--ink);margin-top:14px;text-decoration:none}
+.btn:disabled{opacity:.45}
+.btn.wa{background:var(--wa);color:#06210f}
+.btn.g{background:transparent;color:var(--gold-hi);border:1px solid var(--gold)}
+.err{color:var(--bad);font-size:14px;margin-top:10px}
+.ok{text-align:center;padding-top:20px}
+.ok .c{width:74px;height:74px;border-radius:50%;background:rgba(111,191,138,.14);border:2px solid var(--ok);display:grid;place-items:center;margin:0 auto 14px;color:var(--ok);font-size:36px}
+.carg{display:inline-block;width:16px;height:16px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:g .8s linear infinite;vertical-align:-3px}
+@keyframes g{to{transform:rotate(360deg)}}
+footer{text-align:center;color:var(--muted);font-size:13px;margin-top:40px;line-height:1.7}
+.mia{background:var(--surface);border:1px solid var(--gold);border-radius:16px;padding:14px 16px;margin-top:6px}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <div class="m">M</div>
+  <h1>Apartá tu cita</h1>
+  <div class="sub">Meraki Barbershop · Apopa<br>Martes a domingo · 6:00 a.m. a 5:00 p.m.</div>
+</header>
+
+<div id="mia"></div>
+
+<main id="form">
+  <section class="paso">
+    <h2><b>1</b>¿Qué te hacemos?</h2>
+    <div class="serv" id="serv"></div>
+  </section>
+  <section class="paso">
+    <h2><b>2</b>¿Qué día?</h2>
+    <div class="dias" id="dias"></div>
+  </section>
+  <section class="paso">
+    <h2><b>3</b>¿A qué hora?</h2>
+    <div class="horas" id="horas"><div class="nota">Elegí un día primero.</div></div>
+    <div class="nota">Cada cita es de una hora para atenderte con calma.</div>
+  </section>
+  <section class="paso">
+    <h2><b>4</b>Tus datos</h2>
+    <label for="nom">Tu nombre</label>
+    <input id="nom" autocomplete="name" maxlength="50" placeholder="Nombre y apellido">
+    <label for="tel">Tu WhatsApp</label>
+    <input id="tel" type="tel" inputmode="numeric" autocomplete="tel" maxlength="9" placeholder="7XXX XXXX">
+    <label for="nt">¿Algo que debamos saber? (opcional)</label>
+    <textarea id="nt" maxlength="180" placeholder="Ej.: quiero el mismo corte de la otra vez"></textarea>
+  </section>
+  <div class="res" id="res" hidden></div>
+  <button class="btn" id="ok" disabled>Apartar mi cita</button>
+  <div class="err" id="err"></div>
+</main>
+
+<section id="listo" hidden></section>
+
+<footer>Meraki Barbershop · Apopa, San Salvador<br>¿Dudas? WhatsApp <b>6061 8603</b></footer>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getFirestore, collection, query, where, getDocs, writeBatch, doc, Timestamp, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { firebaseConfig } from "../config.js";
+
+const db = getFirestore(initializeApp(firebaseConfig));
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+const WA_MERAKI = "50360618603";
+const SERVICIOS = [
+  ["Corte clásico", "3.50"], ["Corte moderno", "4.00"], ["Combo el patrón", "5.00"],
+  ["Servicio full detalle", "6.00"], ["Diseño de barba el patrón", "3.50"], ["Ritual Meraki Spa", "5.00"]
+];
+const HORAS = [6,7,8,9,10,11,13,14,15,16];   // de 12 a 1 es almuerzo
+const DIAS_ADELANTE = 14;
+const DS = ["Dom","Lun","Mar","Mié","Jue","Vie","Sáb"];
+const DL = ["domingo","lunes","martes","miércoles","jueves","viernes","sábado"];
+const MS = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
+
+// Todo en hora de El Salvador (UTC-6, sin horario de verano)
+const SV = 6 * 3600e3;
+const ahoraSV = () => new Date(Date.now() - SV);                 // usar getUTC* para leer la fecha en El Salvador
+const ymd = d => d.toISOString().slice(0, 10);
+const instante = (f, h) => new Date(f + "T" + String(h).padStart(2, "0") + ":00:00-06:00");
+const idDe = (f, h) => f + "_" + String(h).padStart(2, "0");
+const hTxt = h => (h % 12 || 12) + ":00 " + (h < 12 ? "a.m." : "p.m.");
+const fTxt = f => { const d = new Date(f + "T12:00:00Z"); return DL[d.getUTCDay()] + " " + d.getUTCDate() + " de " + MS[d.getUTCMonth()]; };
+
+const sel = {serv:null, dia:null, hora:null};
+let ocupado = new Set();
+
+/* ---------- tu cita guardada en este teléfono ---------- */
+function miCita() {
+  try {
+    const c = JSON.parse(localStorage.getItem("meraki_cita") || "null");
+    if (c && instante(c.f, c.h).getTime() > Date.now()) return c;
+  } catch(e) {}
+  return null;
+}
+function pintarMia() {
+  const c = miCita();
+  $("#mia").innerHTML = c ? '<div class="mia"><div class="nota" style="margin:0">Ya tenés cita apartada</div><div style="font:500 20px/1.3 var(--f-display);margin-top:2px">' + esc(fTxt(c.f)) + ', ' + hTxt(c.h) + '</div><div class="nota" style="margin-top:4px">' + esc(c.s) + '. Para cambiarla o cancelarla escribinos al WhatsApp.</div></div>' : "";
+}
+
+/* ---------- servicios ---------- */
+$("#serv").innerHTML = SERVICIOS.map((s, i) => '<button class="op" data-i="' + i + '"><div class="n">' + esc(s[0]) + '</div><div class="p">$' + s[1] + '</div></button>').join("");
+$("#serv").onclick = e => { const b = e.target.closest(".op"); if (!b) return; sel.serv = SERVICIOS[b.dataset.i][0]; $("#serv").querySelectorAll(".op").forEach(x => x.classList.toggle("on", x === b)); revisar(); };
+
+/* ---------- días ---------- */
+function diasDisponibles() {
+  const L = [], hoy = ahoraSV();
+  for (let i = 0; i <= DIAS_ADELANTE; i++) {
+    const d = new Date(hoy.getTime() + i * 864e5);
+    const f = ymd(d);
+    L.push({f, dow:d.getUTCDay(), n:d.getUTCDate(), i});
+  }
+  return L;
+}
+function libres(f) { return HORAS.filter(h => instante(f, h).getTime() > Date.now() + 3600e3 && !ocupado.has(idDe(f, h))); }
+function pintarDias() {
+  $("#dias").innerHTML = diasDisponibles().map(d => {
+    const cerrado = d.dow === 1, n = cerrado ? 0 : libres(d.f).length;
+    const s = cerrado ? "cerrado" : n ? n + (n === 1 ? " libre" : " libres") : "lleno";
+    return '<button class="dia' + (sel.dia === d.f ? " on" : "") + '" data-f="' + d.f + '"' + (cerrado || !n ? " disabled" : "") + '><div class="d">' + (d.i === 0 ? "Hoy" : d.i === 1 ? "Mañ." : DS[d.dow]) + '</div><div class="n">' + d.n + '</div><div class="s">' + s + '</div></button>';
+  }).join("");
+}
+$("#dias").onclick = e => { const b = e.target.closest(".dia"); if (!b || b.disabled) return; sel.dia = b.dataset.f; sel.hora = null; pintarDias(); pintarHoras(); revisar(); };
+
+/* ---------- horas ---------- */
+function pintarHoras() {
+  if (!sel.dia) return;
+  const L = libres(sel.dia);
+  $("#horas").innerHTML = HORAS.map(h => '<button class="hr' + (sel.hora === h ? " on" : "") + '" data-h="' + h + '"' + (L.includes(h) ? "" : " disabled") + '>' + hTxt(h) + '</button>').join("");
+}
+$("#horas").onclick = e => { const b = e.target.closest(".hr"); if (!b || b.disabled) return; sel.hora = Number(b.dataset.h); pintarHoras(); revisar(); };
+
+/* ---------- datos ---------- */
+const telLimpio = () => $("#tel").value.replace(/\D/g, "").replace(/^503(?=\d{8}$)/, "");
+["nom", "tel"].forEach(id => $("#" + id).addEventListener("input", revisar));
+function revisar() {
+  const listo = sel.serv && sel.dia && sel.hora != null && $("#nom").value.trim().length >= 2 && /^[67]\d{7}$/.test(telLimpio());
+  $("#ok").disabled = !listo;
+  if (sel.serv && sel.dia && sel.hora != null) {
+    $("#res").hidden = false;
+    $("#res").innerHTML = '<div class="k">Tu cita</div><div class="v">' + esc(fTxt(sel.dia)) + ', ' + hTxt(sel.hora) + '</div><div class="nota" style="margin-top:4px">' + esc(sel.serv) + '</div>';
+  } else $("#res").hidden = true;
+}
+
+/* ---------- traer horas ocupadas ---------- */
+async function cargar() {
+  const desde = Timestamp.fromDate(new Date(Date.now() - 3600e3));
+  try {
+    const s = await getDocs(query(collection(db, "ocupado"), where("cuando", ">=", desde)));
+    ocupado = new Set(s.docs.map(d => d.id));
+    $("#err").textContent = "";
+  } catch(e) {
+    $("#err").textContent = "No pudimos ver las horas libres. Revisá tu internet o escribinos al WhatsApp.";
+  }
+  pintarDias(); pintarHoras(); revisar();
+}
+
+/* ---------- apartar ---------- */
+$("#ok").onclick = async () => {
+  const id = idDe(sel.dia, sel.hora), cuando = Timestamp.fromDate(instante(sel.dia, sel.hora));
+  const nombre = $("#nom").value.trim().replace(/\s+/g, " ").slice(0, 50), tel = telLimpio(), nota = $("#nt").value.trim().slice(0, 180);
+  $("#ok").disabled = true; $("#ok").innerHTML = '<span class="carg"></span> Apartando…'; $("#err").textContent = "";
+  try {
+    const b = writeBatch(db);
+    b.set(doc(db, "citas", id), {nombre, tel, servicio:sel.serv, nota, cuando, creado:serverTimestamp()});
+    b.set(doc(db, "ocupado", id), {cuando});
+    await b.commit();
+  } catch(e) {
+    $("#ok").textContent = "Apartar mi cita";
+    $("#err").textContent = "Esa hora la acaban de apartar o ya no está disponible. Elegí otra, por favor.";
+    sel.hora = null; await cargar(); return;
+  }
+  const c = {f:sel.dia, h:sel.hora, s:sel.serv};
+  try { localStorage.setItem("meraki_cita", JSON.stringify(c)); localStorage.setItem("meraki_yo", JSON.stringify({nombre, tel})); } catch(e) {}
+  const msg = "Hola Meraki 💈 Soy " + nombre + ". Aparté cita para el " + fTxt(sel.dia) + " a las " + hTxt(sel.hora) + " (" + sel.serv + ").";
+  const ini = instante(sel.dia, sel.hora), fin = new Date(ini.getTime() + 3600e3);
+  const gc = d => d.toISOString().replace(/[-:]/g, "").replace(/\.\d+/, "");
+  const cal = "https://calendar.google.com/calendar/render?action=TEMPLATE&text=" + encodeURIComponent("Cita en Meraki Barbershop") + "&dates=" + gc(ini) + "/" + gc(fin) + "&details=" + encodeURIComponent(sel.serv + ". Si no podés llegar avisá al WhatsApp 6061 8603.") + "&location=" + encodeURIComponent("Meraki Barbershop, Apopa");
+  $("#form").hidden = true; $("#mia").innerHTML = "";
+  $("#listo").hidden = false;
+  $("#listo").innerHTML = '<div class="ok"><div class="c">✓</div><h1>¡Listo, ' + esc(nombre.split(" ")[0]) + '!</h1><div class="sub">Tu cita quedó apartada</div></div>' +
+    '<div class="res"><div class="k">Te esperamos</div><div class="v">' + esc(fTxt(sel.dia)) + ', ' + hTxt(sel.hora) + '</div><div class="nota" style="margin-top:4px">' + esc(sel.serv) + ' · Meraki Barbershop, Apopa</div></div>' +
+    '<a class="btn wa" href="https://wa.me/' + WA_MERAKI + '?text=' + encodeURIComponent(msg) + '" target="_blank" rel="noopener">Avisarle a Meraki por WhatsApp</a>' +
+    '<a class="btn g" href="' + esc(cal) + '" target="_blank" rel="noopener">Guardar en mi calendario</a>' +
+    '<div class="nota" style="text-align:center;margin-top:16px">Si no podés venir, avisanos por WhatsApp para darle tu hora a alguien más.</div>';
+  scrollTo(0, 0);
+};
+
+/* ---------- arranque ---------- */
+try { const yo = JSON.parse(localStorage.getItem("meraki_yo") || "null"); if (yo) { $("#nom").value = yo.nombre || ""; $("#tel").value = yo.tel || ""; } } catch(e) {}
+const q = new URLSearchParams(location.search);
+if (q.get("s")) { const i = SERVICIOS.findIndex(s => s[0].toLowerCase().startsWith(q.get("s").toLowerCase())); if (i >= 0) { sel.serv = SERVICIOS[i][0]; $("#serv").children[i].classList.add("on"); } }
+pintarMia(); pintarDias(); cargar();
+</script>
+</body>
+</html>

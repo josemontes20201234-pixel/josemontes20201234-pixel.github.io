@@ -128,6 +128,19 @@ code{background:var(--card2);border:1px solid var(--line);border-radius:6px;padd
 .msg.yo{background:#3a2f17;margin-left:auto}
 .msg small{display:block;color:var(--mut);font-size:11px;margin-top:3px}
 .ok{color:var(--ok)}.warn{color:var(--warn)}
+.cdias{display:flex;gap:8px;overflow-x:auto;padding-bottom:6px;scrollbar-width:none;margin-top:10px}
+.cdia{flex:none;width:58px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:8px 0;text-align:center;color:var(--txt)}
+.cdia .d{font-size:11px;color:var(--mut);font-weight:800;text-transform:uppercase}
+.cdia .n{font-size:20px;font-weight:800}
+.cdia .c{font-size:11px;color:var(--gold2);font-weight:700;min-height:14px}
+.cdia.on{background:var(--gold);border-color:var(--gold);color:#111}.cdia.on .d,.cdia.on .c{color:#111}
+.cdia.cerr{opacity:.4}
+.slot{display:flex;gap:12px;padding:12px 0;border-bottom:1px solid var(--line);align-items:flex-start}
+.slot:last-child{border-bottom:0}
+.slot .h{width:72px;flex:none;white-space:nowrap;font-weight:800;color:var(--gold2);font-variant-numeric:tabular-nums;padding-top:2px}
+.slot .t{flex:1;min-width:0}
+.slot.libre .h{color:var(--mut)}
+.slot.pasado{opacity:.45}
 </style>
 </head>
 <body>
@@ -147,6 +160,8 @@ code{background:var(--card2);border:1px solid var(--line);border-radius:6px;padd
       <div class="stat"><b id="sNuevos">0</b><span>nuevos de redes</span></div>
       <div class="stat"><b id="sSemana">0/3</b><span>posts esta semana</span></div>
     </div>
+    <h2>Citas</h2>
+    <div class="card" id="hoyCitas"></div>
     <h2>A quién escribirle hoy</h2>
     <div class="card" id="tareas"></div>
     <h2>Contenido</h2>
@@ -176,6 +191,9 @@ code{background:var(--card2);border:1px solid var(--line);border-radius:6px;padd
     <div style="margin-top:12px"><button class="btn ghost full" id="btnPlan">✨ Que Claude me arme la semana</button></div>
   </section>
 
+  <!-- ============ CITAS ============ -->
+  <section class="view" id="v-citas"><div id="citas"></div></section>
+
   <!-- ============ BANDEJA (Meta) ============ -->
   <section class="view" id="v-bandeja"><div id="bandeja"></div></section>
 
@@ -187,6 +205,7 @@ code{background:var(--card2);border:1px solid var(--line);border-radius:6px;padd
   <button data-v="hoy" class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/></svg>Hoy<span class="dot" id="dotHoy"></span></button>
   <button data-v="gente"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18.5 14.8c1.6.8 2.6 2.5 3 5.2"/></svg>Gente</button>
   <button data-v="cont"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="18" height="18" rx="4"/><circle cx="9" cy="9" r="2"/><path d="M21 15l-5-5L5 21"/></svg>Contenido</button>
+  <button data-v="citas"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/><path d="M8 14h3v3H8z"/></svg>Citas<span class="dot" id="dotCit"></span></button>
   <button data-v="bandeja"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg>Bandeja<span class="dot" id="dotBand"></span></button>
   <button data-v="ajustes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>Ajustes</button>
 </div></nav>
@@ -380,7 +399,7 @@ const cumpleEn = c => { if (!c || !c.cumple) return null; const [m, d] = c.cumpl
 const PLANT = {
   respuesta:{n:"Responder", t:"¡Qué onda{, nombre}! Gracias por escribirnos a Meraki Barbershop 💈 ¿En qué te ayudamos?"},
   precios:{n:"Precios", t:"¡Hola{, nombre}! Estos son nuestros precios 💈\n\n✂️ Corte clásico $3.50\n✂️ Corte moderno $4.00\n🔥 Combo el patrón $5.00\n⭐ Servicio full detalle $6.00\n🧔 Diseño de barba el patrón $3.50\n🧖 Ritual Meraki Spa $5.00\n\nAceptamos efectivo, transferencia y tarjeta por acercamiento. ¿Te apartamos tu espacio?"},
-  agendar:{n:"Agendar", t:"¡Claro{, nombre}! ¿Qué día y a qué hora te queda mejor? Te apartamos tu espacio en Meraki 💈"},
+  agendar:{n:"Agendar", t:"¡Claro{, nombre}! Apartá tu hora aquí, elegís el día y la hora que te quede 💈\nhttps://josemontes20201234-pixel.github.io/citas/"},
   seguimiento:{n:"Seguimiento", t:"¡Qué onda{, nombre}! ¿Siempre te apartamos tu espacio esta semana? Decime qué día te queda 💈"},
   extranamos:{n:"Te extrañamos", t:"¡{nombre}! Hace rato no te vemos por Meraki 👀 Tu tarjeta va en {sellos} sellos. Esta semana te esperamos, ¿te apartamos un espacio?"},
   premio:{n:"Premio listo", t:"{nombre}, ¡completaste tu Tarjeta Meraki! 🏆 En tu próxima visita tenés {premio}. Escribime para apartarte tu espacio."},
@@ -463,7 +482,7 @@ async function claude(sistema, contenido, max = 1200) {
   if (r.estado !== 200) throw new Error(r.estado === 401 ? "La clave de Claude no sirve. Revisala en Ajustes." : r.estado === 400 && /credit|balance/i.test(r.texto) ? "Tu cuenta de Claude no tiene saldo." : errorDe(r));
   return (r.json.content || []).filter(b => b.type === "text").map(b => b.text).join("\n").trim();
 }
-const SIS = () => "Sos el community manager de Meraki Barbershop. Escribís en español salvadoreño con voseo (vos, tenés, vení), cálido, seguro y con estilo premium, sin exagerar con los emojis (2 a 4 máximo). Nunca inventés precios, horarios ni promociones que no estén aquí.\n\nDatos del negocio:\n" + D.aj.contexto + (D.aj.ubicacion ? "\nUbicación: " + D.aj.ubicacion : "") + (D.aj.horario ? "\nHorario: " + D.aj.horario : "") + (D.aj.ig ? "\nInstagram: @" + D.aj.ig.replace(/^@/, "") : "");
+const SIS = () => "Sos el community manager de Meraki Barbershop. Escribís en español salvadoreño con voseo (vos, tenés, vení), cálido, seguro y con estilo premium, sin exagerar con los emojis (2 a 4 máximo). Nunca inventés precios, horarios ni promociones que no estén aquí.\n\nDatos del negocio:\n" + D.aj.contexto + (D.aj.ubicacion ? "\nUbicación: " + D.aj.ubicacion : "") + (D.aj.horario ? "\nHorario: " + D.aj.horario : "") + (D.aj.ig ? "\nInstagram: @" + D.aj.ig.replace(/^@/, "") : "") + "\nCitas: el cliente aparta su hora en " + LINK_CITAS + " (citas de una hora, de 6 a.m. a 5 p.m., almuerzo de 12 a 1; lunes cerrado).";
 const sacarJSON = t => { const m = t.match(/\{[\s\S]*\}|\[[\s\S]*\]/); return JSON.parse(m ? m[0] : t); };
 function achicar(dataUrl, lado = 1024) {
   return new Promise(ok => { const im = new Image(); im.onload = () => { const s = Math.min(1, lado / Math.max(im.width, im.height)); const c = document.createElement("canvas"); c.width = Math.round(im.width * s); c.height = Math.round(im.height * s); c.getContext("2d").drawImage(im, 0, 0, c.width, c.height); ok(c.toDataURL("image/jpeg", .85)); }; im.onerror = () => ok(null); im.src = dataUrl; });
@@ -516,9 +535,9 @@ async function publicarMeta(post, donde, textoFinal, foto) {
 let vista = "hoy";
 function ir(v) { vista = v; document.querySelectorAll(".view").forEach(e => e.classList.toggle("on", e.id === "v-" + v)); document.querySelectorAll("nav button").forEach(b => b.classList.toggle("on", b.dataset.v === v)); pintar(); scrollTo(0, 0); }
 document.querySelectorAll("nav button").forEach(b => b.onclick = () => ir(b.dataset.v));
-function pintar() { ({hoy:pintarHoy, gente:pintarGente, cont:pintarCont, bandeja:pintarBandeja, ajustes:pintarAjustes})[vista](); }
+function pintar() { ({hoy:pintarHoy, gente:pintarGente, cont:pintarCont, citas:pintarCitas, bandeja:pintarBandeja, ajustes:pintarAjustes})[vista](); }
 function pintarTodo() { pintar(); puntitos(); }
-function puntitos() { const n = tareasHoy().length; const d = $("#dotHoy"); d.textContent = n; d.style.display = n && vista !== "hoy" ? "flex" : "none"; }
+function puntitos() { const nc = citasNuevas().length, dc = $("#dotCit"); dc.textContent = nc; dc.style.display = nc && vista !== "citas" ? "flex" : "none"; const n = tareasHoy().length; const d = $("#dotHoy"); d.textContent = n; d.style.display = n && vista !== "hoy" ? "flex" : "none"; }
 
 /* ----- HOY ----- */
 function pintarHoy() {
@@ -538,6 +557,7 @@ function pintarHoy() {
   if (!T.length && D.aj.rt) html += '<div class="empty">✓ Estás al día con tu gente. Buen momento para crear contenido.</div>';
   if (T.length > 12) html += '<div class="empty">Y ' + (T.length - 12) + ' más. Terminá estos primero.</div>';
   $("#tareas").innerHTML = html;
+  pintarHoyCitas();
   $("#tareas").onclick = e => {
     const b = e.target.closest("button"); if (!b) return;
     if (b.hasAttribute("data-entrar")) return entrarTarjeta();
@@ -807,6 +827,7 @@ function alarmas() {
   const L = D.posts.filter(p => !p.borrado && p.estado === "programado" && p.recordar !== false && p.fecha && new Date(p.fecha) > new Date()).map(p => ({id:"post_" + p.id, ms:new Date(p.fecha).getTime(), texto:"Hoy toca publicar: " + (PILARES[p.pilar] ? PILARES[p.pilar].n : "tu publicación")}));
   // seguimientos: aviso a las 9 am del día que dijiste
   D.personas.filter(p => !p.borrado && p.proximo).forEach(p => { const f = new Date(p.proximo + "T09:00:00"); if (f > new Date()) L.push({id:"seg_" + p.id, ms:f.getTime(), texto:"Escribile a " + (p.nombre || p.usuario || "tu contacto")}); });
+  D.citas.lista.forEach(c => { const ms = new Date(c.cuando).getTime() - 30 * 60000; if (ms > Date.now()) L.push({id:"cita_" + c.id, ms, texto:"En 30 min: " + (c.nombre || "cita") + " · " + (c.servicio || "") + " (" + hora(c.cuando) + ")"}); });
   Android.sincronizar(JSON.stringify(L));
 }
 async function planSemana() {
@@ -1006,11 +1027,213 @@ function pintarAjustes() {
 }
 function entrarTarjeta() { if (APP) Android.entrarTarjeta(); else abrir("https://josemontes20201234-pixel.github.io/crm/login.html"); toast("Entrá con tu cuenta de Google y tocá «Volver a Meraki CRM»"); }
 
+/* ================================================================ CITAS (página pública + agenda) */
+const LINK_CITAS = "https://josemontes20201234-pixel.github.io/citas/";
+const HORAS_C = [6,7,8,9,10,11,13,14,15,16];          // bloques de una hora; de 12 a 1 almuerzo
+const SERV_C = ["Corte clásico","Corte moderno","Combo el patrón","Servicio full detalle","Diseño de barba el patrón","Ritual Meraki Spa"];
+const JOSE_OK = 'request.auth != null && request.auth.token.email_verified == true && request.auth.token.email.lower() == "josemontes20201234@gmail.com"';
+const REGLA_CITAS =
+'    // ===== Citas: página pública y Meraki CRM =====\n' +
+'    match /ocupado/{id} {\n' +
+'      allow read: if true;\n' +
+"      allow create: if id.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}_[0-9]{2}$')\n" +
+"        && request.resource.data.keys().hasOnly(['cuando'])\n" +
+'        && request.resource.data.cuando is timestamp\n' +
+'        && request.resource.data.cuando > request.time\n' +
+"        && request.resource.data.cuando < request.time + duration.value(16, 'd')\n" +
+'        && existsAfter(/databases/$(database)/documents/citas/$(id));\n' +
+'      allow read, write: if ' + JOSE_OK + ';\n' +
+'    }\n' +
+'    match /citas/{id} {\n' +
+"      allow create: if request.resource.data.keys().hasOnly(['nombre', 'tel', 'servicio', 'nota', 'cuando', 'creado'])\n" +
+'        && request.resource.data.nombre is string && request.resource.data.nombre.size() >= 2 && request.resource.data.nombre.size() <= 50\n' +
+"        && request.resource.data.tel is string && request.resource.data.tel.matches('^[67][0-9]{7}$')\n" +
+'        && request.resource.data.servicio is string && request.resource.data.servicio.size() <= 40\n' +
+'        && request.resource.data.nota is string && request.resource.data.nota.size() <= 180\n' +
+'        && request.resource.data.creado == request.time\n' +
+'        && getAfter(/databases/$(database)/documents/ocupado/$(id)).data.cuando == request.resource.data.cuando;\n' +
+'      allow read, write: if ' + JOSE_OK + ';\n' +
+'    }';
+
+D.citas = Object.assign({lista:[], bloq:[], cuando:0, vistas:null, error:""}, D.citas || {});
+let diaC = null;
+const SVms = 6 * 3600e3;
+const ymdSV = t => new Date(t - SVms).toISOString().slice(0, 10);
+const instanteC = (f, h) => new Date(f + "T" + String(h).padStart(2, "0") + ":00:00-06:00");
+const idC = (f, h) => f + "_" + String(h).padStart(2, "0");
+const hTxtC = h => (h % 12 || 12) + ":00 " + (h < 12 ? "am" : "pm");
+const FS_DOC = "projects/meraki-barbershop/databases/(default)/documents/";
+const campos = o => { const f = {}; for (const k in o) { const v = o[k]; f[k] = v instanceof Date ? {timestampValue:v.toISOString()} : typeof v === "boolean" ? {booleanValue:v} : {stringValue:String(v == null ? "" : v)}; } return f; };
+
+async function consulta(col, desdeISO, t) {
+  const r = await http("POST", FS + ":runQuery", {headers:{Authorization:"Bearer " + t}, body:{structuredQuery:{from:[{collectionId:col}],
+    where:{fieldFilter:{field:{fieldPath:"cuando"}, op:"GREATER_THAN_OR_EQUAL", value:{timestampValue:desdeISO}}}, orderBy:[{field:{fieldPath:"cuando"}}]}}});
+  if (r.estado !== 200 || !Array.isArray(r.json)) return {error:r};
+  return {docs:r.json.filter(x => x.document).map(x => docA(x.document))};
+}
+async function traerCitas() {
+  if (!D.aj.rt) return;
+  const t = await token(); if (!t) return;
+  const desde = instanteC(ymdSV(Date.now()), 0).toISOString();
+  const [c, o] = await Promise.all([consulta("citas", desde, t), consulta("ocupado", desde, t)]);
+  if (c.error) { D.citas.error = c.error.estado === 403 ? "regla" : errorDe(c.error); guardar(); return; }
+  D.citas.error = "";
+  D.citas.lista = c.docs.map(x => ({id:x.id, nombre:x.nombre || "", tel:x.tel || "", servicio:x.servicio || "", nota:x.nota || "", cuando:x.cuando, creado:x.creado || null, jose:!!x.jose}));
+  const conCita = new Set(D.citas.lista.map(x => x.id));
+  D.citas.bloq = o.docs ? o.docs.filter(x => !conCita.has(x.id)).map(x => x.id) : [];
+  if (D.citas.vistas === null) D.citas.vistas = [...conCita];      // la primera vez no avisamos de las viejas
+  const nuevas = citasNuevas();
+  D.citas.cuando = Date.now(); guardar();
+  if (nuevas.length) toast("📅 " + (nuevas.length === 1 ? "Cita nueva: " + nuevas[0].nombre + " · " + fechaCorta(nuevas[0].cuando) : nuevas.length + " citas nuevas"));
+  if (APP) alarmas();
+}
+function citasNuevas() { const v = new Set(D.citas.vistas || []); return D.citas.lista.filter(c => !v.has(c.id) && !c.jose); }
+const fechaCorta = t => { const f = ymdSV(new Date(t).getTime()), h = ymdSV(Date.now()), m = ymdSV(Date.now() + DIA); return (f === h ? "hoy" : f === m ? "mañana" : fechaLarga(t)) + " " + hora(t); };
+async function escribirFS(writes) {
+  const t = await token(); if (!t) { toast("Conectá Tarjeta Meraki primero"); return false; }
+  const r = await http("POST", FS + ":commit", {headers:{Authorization:"Bearer " + t}, body:{writes}});
+  if (r.estado !== 200) { toast(r.estado === 403 ? "Falta pegar la regla de citas en Firebase" : r.estado === 409 || /exist|precondition/i.test(r.texto) ? "Esa hora ya está ocupada" : "No se pudo: " + errorDe(r)); return false; }
+  return true;
+}
+const crear = (col, id, obj) => ({update:{name:FS_DOC + col + "/" + id, fields:campos(obj)}, currentDocument:{exists:false}});
+const borrarW = (col, id) => ({delete:FS_DOC + col + "/" + id});
+const tarjetaDe = tel => { const n = soloNum(tel).slice(-8); return n.length === 8 ? D.tm.clientes.find(c => soloNum(c.telefono).slice(-8) === n) : null; };
+function recordatorio(c) {
+  const f = ymdSV(new Date(c.cuando).getTime()), cuando = f === ymdSV(Date.now()) ? "hoy" : f === ymdSV(Date.now() + DIA) ? "mañana" : "el " + fechaLarga(c.cuando);
+  return "¡Qué onda " + (primerNombre(c.nombre) || "") + "! 💈 Te recordamos tu cita en Meraki Barbershop " + cuando + " a las " + hora(c.cuando) + " (" + (c.servicio || "tu servicio") + ").\nSi no podés venir, avisanos por aquí para darle tu hora a alguien más. ¡Te esperamos!";
+}
+const waCita = (c, texto) => { if (!soloNum(c.tel)) { if (APP) Android.copiar(texto); toast("No dejó WhatsApp: texto copiado"); return; } abrir("https://wa.me/" + telSV(c.tel) + "?text=" + encodeURIComponent(texto)); };
+function compartirCitas() {
+  const t = "Apartá tu cita en Meraki Barbershop 💈 Elegí tu servicio, el día y la hora que te quede:\n" + LINK_CITAS;
+  if (APP) { Android.compartir(t, "", ""); } else { navigator.clipboard.writeText(t); toast("Enlace copiado"); }
+}
+
+/* ----- HOY: tarjetita de citas ----- */
+function pintarHoyCitas() {
+  const el = $("#hoyCitas"); if (!el) return;
+  if (!D.aj.rt) { el.innerHTML = '<div class="mut small">Conectá Tarjeta Meraki en Ajustes para ver tus citas.</div>'; return; }
+  if (D.citas.error === "regla") { el.innerHTML = '<div class="small">Falta activar las citas en Firebase. <button class="mini" data-ir="citas">Ver cómo</button></div>'; el.onclick = e => { if (e.target.closest("[data-ir]")) ir("citas"); }; return; }
+  const h = ymdSV(Date.now()), m = ymdSV(Date.now() + DIA);
+  const hoyL = D.citas.lista.filter(c => ymdSV(new Date(c.cuando).getTime()) === h && new Date(c.cuando).getTime() > Date.now() - 3600e3);
+  const manL = D.citas.lista.filter(c => ymdSV(new Date(c.cuando).getTime()) === m);
+  let x = "";
+  if (hoyL.length) x += hoyL.map(c => '<div class="slot"><div class="h">' + hora(c.cuando) + '</div><div class="t"><b>' + esc(c.nombre) + '</b><div class="mut small">' + esc(c.servicio) + (c.nota ? " · " + esc(c.nota) : "") + '</div></div><button class="mini" data-wa="' + c.id + '">WhatsApp</button></div>').join("");
+  else x += '<div class="mut small">No tenés citas hoy.</div>';
+  const pend = manL.filter(c => !hecho("rec_" + c.id, 2));
+  if (pend.length) x += '<div class="small" style="margin-top:12px;font-weight:800">Mañana: recordales su cita</div>' + pend.map(c => '<div class="slot"><div class="h">' + hora(c.cuando) + '</div><div class="t"><b>' + esc(c.nombre) + '</b><div class="mut small">' + esc(c.servicio) + '</div></div><button class="btn sm" data-rec="' + c.id + '">Recordar</button></div>').join("");
+  else if (manL.length) x += '<div class="mut small" style="margin-top:10px">Mañana: ' + manL.length + (manL.length === 1 ? " cita" : " citas") + ' ✓ ya les recordaste</div>';
+  x += '<div class="acts" style="margin-top:12px"><button class="mini" data-ir="citas">Ver agenda</button><button class="mini" data-comp>Compartir página de citas</button></div>';
+  el.innerHTML = x;
+  el.onclick = e => {
+    const b = e.target.closest("button"); if (!b) return;
+    const c = D.citas.lista.find(z => z.id === (b.dataset.wa || b.dataset.rec));
+    if (b.dataset.ir) ir("citas");
+    if (b.hasAttribute("data-comp")) compartirCitas();
+    if (b.dataset.wa && c) waCita(c, "¡Qué onda " + primerNombre(c.nombre) + "! Te escribimos de Meraki Barbershop 💈 ");
+    if (b.dataset.rec && c) { waCita(c, recordatorio(c)); D.hechos["rec_" + c.id] = new Date().toISOString(); guardar(); pintarHoyCitas(); }
+  };
+}
+
+/* ----- pestaña CITAS ----- */
+function pintarCitas() {
+  D.citas.vistas = D.citas.lista.map(c => c.id); guardar(); puntitos();
+  const A = $("#citas");
+  let h = '<div class="row"><h2 style="margin:8px 0 0">Tus citas</h2><span class="sp"></span><button class="btn sm" id="cComp">Compartir página</button></div>';
+  if (!D.aj.rt) { A.innerHTML = h + '<div class="card" style="margin-top:12px"><div class="small" style="line-height:1.5">Para ver tus citas, conectá Tarjeta Meraki (es la misma cuenta de Google).</div><button class="btn full" style="margin-top:10px" data-entrar>Conectar</button></div>'; A.onclick = e => { if (e.target.closest("[data-entrar]")) entrarTarjeta(); if (e.target.closest("#cComp")) compartirCitas(); }; return; }
+  if (D.citas.error === "regla") {
+    h += '<div class="card" style="margin-top:12px"><b>Falta un paso en Firebase</b><div class="small mut" style="line-height:1.55;margin-top:6px">Para que tus clientes puedan apartar y vos veás las citas, pegá la regla de citas:<br>1. Tocá <b style="color:var(--txt)">Copiar regla</b>.<br>2. Abrí Firebase → <b style="color:var(--txt)">Firestore Database → Rules</b>.<br>3. Pegala justo debajo de la regla del CRM (<span style="color:var(--txt)">match /crm/{d} {…}</span>), sin borrar nada.<br>4. Tocá <b style="color:var(--txt)">Publish</b> y volvé aquí.</div>' +
+      '<div class="acts" style="margin-top:10px"><button class="btn sm" id="cRegla">Copiar regla</button><button class="mini" data-open="https://console.firebase.google.com/project/meraki-barbershop/firestore/rules">Abrir Firebase</button><button class="mini" id="cProbar">Ya la pegué, probar</button></div></div>';
+  } else if (D.citas.error) h += '<div class="card warn small" style="margin-top:12px">No se pudieron traer las citas: ' + esc(D.citas.error) + '</div>';
+  // días
+  const hoyF = ymdSV(Date.now());
+  if (!diaC) diaC = hoyF;
+  h += '<div class="cdias" id="cDias">';
+  for (let i = 0; i <= 14; i++) {
+    const f = ymdSV(Date.now() + i * DIA), d = new Date(f + "T12:00:00Z"), dow = d.getUTCDay();
+    const n = D.citas.lista.filter(c => c.id.startsWith(f)).length;
+    h += '<button class="cdia' + (f === diaC ? " on" : "") + (dow === 1 ? " cerr" : "") + '" data-f="' + f + '"><div class="d">' + (i === 0 ? "Hoy" : i === 1 ? "Mañ." : DIAS[dow]) + '</div><div class="n">' + d.getUTCDate() + '</div><div class="c">' + (dow === 1 ? "cerrado" : n ? n + (n === 1 ? " cita" : " citas") : "") + '</div></button>';
+  }
+  h += '</div>';
+  const dSel = new Date(diaC + "T12:00:00Z");
+  h += '<div class="small mut" style="margin:10px 0 6px">' + DIAS_L[dSel.getUTCDay()].replace(/^./, x => x.toUpperCase()) + ' ' + dSel.getUTCDate() + ' de ' + MESES[dSel.getUTCMonth()] + '</div>';
+  if (dSel.getUTCDay() === 1) h += '<div class="card"><div class="empty">Lunes: descansás. La página no deja apartar este día.</div></div>';
+  else {
+    h += '<div class="card">';
+    HORAS_C.forEach(hr => {
+      if (hr === 13) h += '<div class="slot"><div class="h" style="color:var(--mut)">12:00 pm</div><div class="t mut small" style="padding-top:2px">Almuerzo</div></div>';
+      const id = idC(diaC, hr), c = D.citas.lista.find(z => z.id === id), bl = D.citas.bloq.includes(id), pas = instanteC(diaC, hr).getTime() < Date.now() - 3600e3;
+      if (c) {
+        const tj = tarjetaDe(c.tel);
+        h += '<div class="slot' + (pas ? " pasado" : "") + '"><div class="h">' + hTxtC(hr) + '</div><div class="t"><b>' + esc(c.nombre) + '</b>' + (c.jose ? ' <span class="tag">la anotaste vos</span>' : '') +
+          '<div class="mut small">' + esc(c.servicio) + (c.tel ? ' · ' + esc(soloNum(c.tel).replace(/^(\d{4})(\d{4})$/, "$1 $2")) : '') + '</div>' + (c.nota ? '<div class="small" style="margin-top:3px">“' + esc(c.nota) + '”</div>' : '') +
+          (tj ? '<div style="margin-top:5px"><span class="tag cliente">Tarjeta Meraki · ' + tj.sellos + '/' + D.tm.cfg.meta + ' sellos</span></div>' : '') +
+          (pas ? '' : '<div class="acts"><button class="mini" data-rec="' + id + '">Recordar</button><button class="mini" data-wa="' + id + '">WhatsApp</button><button class="mini" style="color:var(--warn)" data-cancel="' + id + '">Cancelar</button></div>') + '</div></div>';
+      } else if (bl) h += '<div class="slot' + (pas ? " pasado" : "") + '"><div class="h">' + hTxtC(hr) + '</div><div class="t mut">Bloqueada</div>' + (pas ? '' : '<button class="mini" data-desb="' + id + '">Desbloquear</button>') + '</div>';
+      else h += '<div class="slot libre' + (pas ? " pasado" : "") + '"><div class="h">' + hTxtC(hr) + '</div><div class="t mut small" style="padding-top:2px">' + (pas ? "—" : "Libre") + '</div>' + (pas ? '' : '<button class="mini" data-apartar="' + hr + '">Apartar</button><button class="mini" data-bloq="' + id + '">Bloquear</button>') + '</div>';
+    });
+    h += '</div><div class="acts" style="margin-top:10px"><button class="mini" id="cBloqDia">Bloquear lo libre de este día</button><button class="mini" id="cDesbDia">Desbloquear el día</button></div>';
+  }
+  h += '<div class="small mut" style="margin-top:14px;line-height:1.5">Tus clientes apartan en <b style="color:var(--txt)">' + LINK_CITAS.replace("https://", "") + '</b>. Te llega su aviso por WhatsApp y aquí aparece la cita; 30 minutos antes te suena una alarma.</div>';
+  A.innerHTML = h;
+  A.onclick = async e => {
+    const b = e.target.closest("button"); if (!b) return;
+    if (b.hasAttribute("data-entrar")) return entrarTarjeta();
+    if (b.dataset.open) return abrir(b.dataset.open);
+    if (b.id === "cComp") return compartirCitas();
+    if (b.id === "cRegla") { APP ? Android.copiar(REGLA_CITAS) : navigator.clipboard.writeText(REGLA_CITAS); return toast("Regla copiada"); }
+    if (b.id === "cProbar") { await traerCitas(); pintarCitas(); return toast(D.citas.error ? "Todavía no: revisá la regla" : "¡Listo! Las citas ya funcionan ✓"); }
+    if (b.dataset.f) { diaC = b.dataset.f; return pintarCitas(); }
+    const c = D.citas.lista.find(z => z.id === (b.dataset.rec || b.dataset.wa || b.dataset.cancel));
+    if (b.dataset.rec && c) { waCita(c, recordatorio(c)); D.hechos["rec_" + c.id] = new Date().toISOString(); guardar(); return; }
+    if (b.dataset.wa && c) return waCita(c, "¡Qué onda " + primerNombre(c.nombre) + "! Te escribimos de Meraki Barbershop 💈 ");
+    if (b.dataset.cancel && c) return cancelarCita(c);
+    if (b.dataset.bloq) { if (await escribirFS([crear("ocupado", b.dataset.bloq, {cuando:instanteC(b.dataset.bloq.slice(0, 10), Number(b.dataset.bloq.slice(11))), b:true})])) { await traerCitas(); pintarCitas(); toast("Hora bloqueada"); } return; }
+    if (b.dataset.desb) { if (await escribirFS([borrarW("ocupado", b.dataset.desb)])) { await traerCitas(); pintarCitas(); toast("Hora libre otra vez"); } return; }
+    if (b.dataset.apartar) return apartarCita(diaC, Number(b.dataset.apartar));
+    if (b.id === "cBloqDia") {
+      const W = HORAS_C.map(hr => idC(diaC, hr)).filter((id, i) => !D.citas.lista.some(c => c.id === id) && !D.citas.bloq.includes(id) && instanteC(diaC, HORAS_C[i]).getTime() > Date.now()).map(id => crear("ocupado", id, {cuando:instanteC(id.slice(0, 10), Number(id.slice(11))), b:true}));
+      if (!W.length) return toast("No hay horas libres que bloquear");
+      if (await escribirFS(W)) { await traerCitas(); pintarCitas(); toast("Día bloqueado (las citas que ya tenías se quedan)"); } return;
+    }
+    if (b.id === "cDesbDia") {
+      const W = D.citas.bloq.filter(id => id.startsWith(diaC)).map(id => borrarW("ocupado", id));
+      if (!W.length) return toast("Ese día no tiene horas bloqueadas");
+      if (await escribirFS(W)) { await traerCitas(); pintarCitas(); toast("Día desbloqueado"); } return;
+    }
+  };
+}
+function cancelarCita(c) {
+  const C = hoja("Cancelar cita", '<div class="card"><b>' + esc(c.nombre) + '</b><div class="mut small">' + esc(c.servicio) + ' · ' + esc(fechaCorta(c.cuando)) + '</div></div>' +
+    '<div class="small mut" style="margin:14px 2px;line-height:1.5">La hora queda libre otra vez en la página.</div>' +
+    '<button class="btn full" id="kAvisar">Cancelar y avisarle por WhatsApp</button><button class="btn dark full" style="margin-top:10px" id="kSolo">Cancelar sin avisar</button>');
+  const hacer = async avisar => {
+    if (!await escribirFS([borrarW("citas", c.id), borrarW("ocupado", c.id)])) return;
+    if (avisar) waCita(c, "¡Hola " + primerNombre(c.nombre) + "! Te escribimos de Meraki Barbershop 💈 Tuvimos que cancelar tu cita de " + fechaCorta(c.cuando) + ". Disculpá. ¿Te apartamos otra hora? Podés elegirla aquí: " + LINK_CITAS);
+    await traerCitas(); cerrarHoja(); if (vista === "citas") pintarCitas(); toast("Cita cancelada");
+  };
+  C.querySelector("#kAvisar").onclick = () => hacer(true);
+  C.querySelector("#kSolo").onclick = () => hacer(false);
+}
+function apartarCita(f, hr) {
+  const d = new Date(f + "T12:00:00Z");
+  const C = hoja("Apartar " + hTxtC(hr), '<div class="small mut" style="margin-bottom:8px">' + DIAS_L[d.getUTCDay()].replace(/^./, x => x.toUpperCase()) + ' ' + d.getUTCDate() + ' de ' + MESES[d.getUTCMonth()] + ' · ' + hTxtC(hr) + '</div>' +
+    '<label class="l">Nombre</label><input id="kNom" placeholder="Nombre del cliente"><label class="l">WhatsApp (opcional)</label><input id="kTel" type="tel" inputmode="numeric" placeholder="7XXX XXXX">' +
+    '<label class="l">Servicio</label><select id="kServ">' + SERV_C.map(s => '<option>' + esc(s) + '</option>').join("") + '</select><label class="l">Nota (opcional)</label><input id="kNota">' +
+    '<button class="btn full" style="margin-top:14px" id="kOk">Apartar</button>');
+  C.querySelector("#kOk").onclick = async () => {
+    const nombre = C.querySelector("#kNom").value.trim(); if (nombre.length < 2) return toast("Poné el nombre");
+    const id = idC(f, hr), cuando = instanteC(f, hr);
+    const ok = await escribirFS([crear("citas", id, {nombre, tel:soloNum(C.querySelector("#kTel").value).slice(-8), servicio:C.querySelector("#kServ").value, nota:C.querySelector("#kNota").value.trim(), cuando, creado:new Date(), jose:true}), crear("ocupado", id, {cuando})]);
+    if (!ok) return;
+    await traerCitas(); cerrarHoja(); if (vista === "citas") pintarCitas(); toast("Cita apartada ✓");
+  };
+}
+
 /* ================================================================ arranque */
-$("#btnSync").onclick = async () => { await traerTarjeta(true); bDatos = {}; pintarTodo(); toast(D.aj.rt ? "Actualizado" : "Conectá Tarjeta Meraki en Ajustes"); };
-window.alVolver = () => { traerTarjeta(false).then(pintarTodo); };
+$("#btnSync").onclick = async () => { await traerTarjeta(true).catch(() => {}); await traerCitas(); bDatos = {}; pintarTodo(); toast(D.aj.rt ? "Actualizado" : "Conectá Tarjeta Meraki en Ajustes"); };
+window.alVolver = () => { traerTarjeta(false).catch(() => {}).then(traerCitas).then(pintarTodo); };
 pintarTodo();
-traerTarjeta(false).then(() => { pintarTodo(); alarmas(); });
+traerTarjeta(false).catch(() => {}).then(traerCitas).then(() => { pintarTodo(); alarmas(); });
 </script>
 </body>
 </html>
