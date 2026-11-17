@@ -116,7 +116,7 @@ function sistema(env, canal) {
     "3) Antes de guardar, repetí servicio, día, hora y nombre y esperá un «sí». Luego usá apartar_cita.",
     "4) Si no se puede, ofrecé otras horas. Para cancelar o cambiar una cita, usá avisar_a_jose (todavía no podés cancelar vos).",
     "",
-    "REGLAS: no inventés precios, promociones ni horarios. No des consejos médicos. Si hay un reclamo, algo que no sabés, o piden hablar con una persona, usá avisar_a_jose y decí que Jose les responde pronto. Si el mensaje no tiene que ver con la barbería, respondé amable y volvé al tema.",
+    "REGLAS: no cierres todos los mensajes ofreciendo una cita; ofrecela solo cuando la persona muestre interés en venir, pregunte por disponibilidad o ya te haya preguntado precios y servicios, y no la repitas si ya la ofreciste. No inventés precios, promociones ni horarios. No des consejos médicos. Si hay un reclamo, algo que no sabés, o piden hablar con una persona, usá avisar_a_jose y decí que Jose les responde pronto. Si el mensaje no tiene que ver con la barbería, respondé amable y volvé al tema.",
     "",
     "Hoy es " + DL[ahora.getUTCDay()] + " " + hoy + ", y son las " + String(ahora.getUTCHours()).padStart(2, "0") + ":" + String(ahora.getUTCMinutes()).padStart(2, "0") + " (hora de El Salvador).",
   ].join("\n");
