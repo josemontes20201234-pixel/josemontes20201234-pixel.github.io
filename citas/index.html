@@ -218,7 +218,7 @@ async function cargar() {
     ocupado = new Set(s.docs.map(d => d.id));
     $("#err").textContent = "";
   } catch(e) {
-    $("#err").textContent = "No pudimos ver las horas libres. Revisá tu internet o escribinos al WhatsApp.";
+    $("#err").textContent = "No pudimos ver las horas libres. Revisá tu internet o escribinos al WhatsApp. (" + (e.code || e.message || e) + ")";
   }
   pintarDias(); pintarHoras(); revisar();
 }
@@ -235,7 +235,7 @@ $("#ok").onclick = async () => {
     await b.commit();
   } catch(e) {
     $("#ok").textContent = "Apartar mi cita";
-    $("#err").textContent = "Esa hora la acaban de apartar o ya no está disponible. Elegí otra, por favor.";
+    $("#err").textContent = "Esa hora la acaban de apartar o ya no está disponible. Elegí otra, por favor. (" + (e.code || e.message || e) + ")";
     sel.hora = null; await cargar(); return;
   }
   const c = {f:sel.dia, h:sel.hora, s:sel.serv};
