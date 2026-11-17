@@ -226,7 +226,7 @@ async function cargar() {
 /* ---------- apartar ---------- */
 $("#ok").onclick = async () => {
   const id = idDe(sel.dia, sel.hora), cuando = Timestamp.fromDate(instante(sel.dia, sel.hora));
-  const nombre = $("#nom").value.trim().replace(/\s+/g, " ").slice(0, 50), tel = telLimpio(), nota = $("#nt").value.trim().slice(0, 180);
+  const nombre = $("#nom").value.trim().replace(/\s+/g, " ").slice(0, 50).toLocaleLowerCase("es").replace(/(^|\s)\S/g, x => x.toLocaleUpperCase("es")), tel = telLimpio(), nota = $("#nt").value.trim().slice(0, 180);
   $("#ok").disabled = true; $("#ok").innerHTML = '<span class="carg"></span> Apartando…'; $("#err").textContent = "";
   try {
     const b = writeBatch(db);
