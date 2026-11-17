@@ -1,0 +1,17 @@
+name: Leo (Cloudflare Worker)
+on:
+  push:
+    branches: [main]
+    paths: ['leo/**', '.github/workflows/leo.yml']
+  workflow_dispatch:
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Publicar en Cloudflare
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: bcefe39d21eb6d4d1db006a3f7db17a9
+          workingDirectory: leo
