@@ -175,15 +175,32 @@ async function ejecutar(env, nombre, input, ctx) {
   return { error: "Herramienta desconocida." };
 }
 
+// Quita los bloques de "pensamiento" (están atados a una conversación y no deben guardarse).
+function limpiar(hist) {
+  const out = [];
+  for (const m of hist) {
+    if (typeof m.content === "string") { out.push(m); continue; }
+    const c = (m.content || []).filter((b) => b.type !== "thinking" && b.type !== "redacted_thinking");
+    if (c.length) out.push({ role: m.role, content: c });
+  }
+  return out;
+}
+
 // Corre la conversación: historial en KV + ciclo de herramientas.
 async function responder(env, canal, usuario, texto) {
   const clave = "h:" + canal + ":" + usuario;
   let hist = [];
-  try { hist = JSON.parse((await env.LEO.get(clave)) || "[]"); } catch {}
+  try { hist = limpiar(JSON.parse((await env.LEO.get(clave)) || "[]")); } catch {}
   hist.push({ role: "user", content: texto });
   let salida = "";
   for (let i = 0; i < 5; i++) {
-    const res = await llamarClaude(env, hist, canal);
+    let res;
+    try { res = await llamarClaude(env, hist, canal); }
+    catch (e) {
+      if (!/Claude 400/.test(String(e.message)) || hist.length <= 1) throw e;
+      hist = [{ role: "user", content: texto }]; // el historial guardado no sirve: se empieza limpio
+      res = await llamarClaude(env, hist, canal);
+    }
     hist.push({ role: "assistant", content: res.content });
     const usos = res.content.filter((b) => b.type === "tool_use");
     salida = res.content.filter((b) => b.type === "text").map((b) => b.text).join("\n").trim() || salida;
@@ -197,7 +214,7 @@ async function responder(env, canal, usuario, texto) {
     hist.push({ role: "user", content: resultados });
   }
   // Se guardan solo los últimos mensajes y se empieza siempre en un turno de texto del usuario.
-  let corte = hist.slice(-24);
+  let corte = limpiar(hist).slice(-24);
   while (corte.length && !(corte[0].role === "user" && typeof corte[0].content === "string")) corte.shift();
   await env.LEO.put(clave, JSON.stringify(corte), { expirationTtl: 7 * 86400 });
   return salida || "Dame un momento, por favor 🙏";
