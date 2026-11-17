@@ -41,5 +41,7 @@ jobs:
           workingDirectory: leo
           secrets: |
             LEO_ANTHROPIC_KEY
+            META_APP_SECRET
         env:
           LEO_ANTHROPIC_KEY: ${{ secrets.LEO_ANTHROPIC_KEY }}
+          META_APP_SECRET: ${{ secrets.META_APP_SECRET }}

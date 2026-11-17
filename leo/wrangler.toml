@@ -5,3 +5,4 @@ workers_dev = true
 
 [vars]
 PROBAR = "1"
+META_VERIFY_TOKEN = "meraki-leo-7df854ae7b4dd4f6"
