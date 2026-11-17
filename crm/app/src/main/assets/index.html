@@ -255,7 +255,7 @@ const PILARES = {
 const HASHTAGS = "#MerakiBarbershop #Apopa #BarberiaApopa #BarberSV #ElSalvador #SanSalvador #Barbershop #BarberLife #Fade #CorteDeCabello #Degradado #BarberoSalvadoreño";
 const CONTEXTO = "Meraki Barbershop es una barbería premium en Apopa, San Salvador, El Salvador. El barbero y dueño es Jose. Abre de martes a domingo; el lunes descansa.\n" +
   "Estilo de la marca: negro y dorado, elegante y cercano.\n" +
-  "Servicios: Corte clásico $3.50 · Corte moderno $4.00 · Combo el patrón $5.00 · Servicio full detalle $6.00 · Diseño de barba el patrón $3.50 · Ritual Meraki Spa $5.00.\n" +
+  "Servicios: Corte clásico $3.50 · Corte moderno $4.00 · Combo el patrón $5.00 · Servicio full detalle $6.00 · Diseño de barba el patrón $3.50 · Perfilado express $2.00 · Ritual Meraki Spa $5.00.\n" +
   "Bebidas: café $0.30 · gaseosa $0.70 · jugo $0.60 · energy $0.65.\n" +
   "Pagos: efectivo, transferencia y tarjeta (solo por acercamiento).\n" +
   "Tarjeta Meraki: tarjeta de sellos; al completar 8 sellos el corte va gratis. Club Meraki: membresías Flow, Plus y VIP.";
@@ -398,7 +398,7 @@ const cumpleEn = c => { if (!c || !c.cumple) return null; const [m, d] = c.cumpl
 /* ===== plantillas de mensaje ===== */
 const PLANT = {
   respuesta:{n:"Responder", t:"¡Qué onda{, nombre}! Gracias por escribirnos a Meraki Barbershop 💈 ¿En qué te ayudamos?"},
-  precios:{n:"Precios", t:"¡Hola{, nombre}! Estos son nuestros precios 💈\n\n✂️ Corte clásico $3.50\n✂️ Corte moderno $4.00\n🔥 Combo el patrón $5.00\n⭐ Servicio full detalle $6.00\n🧔 Diseño de barba el patrón $3.50\n🧖 Ritual Meraki Spa $5.00\n\nAceptamos efectivo, transferencia y tarjeta por acercamiento. ¿Te apartamos tu espacio?"},
+  precios:{n:"Precios", t:"¡Hola{, nombre}! Estos son nuestros precios 💈\n\n✂️ Corte clásico $3.50\n✂️ Corte moderno $4.00\n🔥 Combo el patrón $5.00\n⭐ Servicio full detalle $6.00\n🧔 Diseño de barba el patrón $3.50\n🪒 Perfilado express $2.00\n🧖 Ritual Meraki Spa $5.00\n\nAceptamos efectivo, transferencia y tarjeta por acercamiento. ¿Te apartamos tu espacio?"},
   agendar:{n:"Agendar", t:"¡Claro{, nombre}! Apartá tu hora aquí, elegís el día y la hora que te quede 💈\nhttps://josemontes20201234-pixel.github.io/citas/"},
   seguimiento:{n:"Seguimiento", t:"¡Qué onda{, nombre}! ¿Siempre te apartamos tu espacio esta semana? Decime qué día te queda 💈"},
   extranamos:{n:"Te extrañamos", t:"¡{nombre}! Hace rato no te vemos por Meraki 👀 Tu tarjeta va en {sellos} sellos. Esta semana te esperamos, ¿te apartamos un espacio?"},
@@ -1030,7 +1030,7 @@ function entrarTarjeta() { if (APP) Android.entrarTarjeta(); else abrir("https:/
 /* ================================================================ CITAS (página pública + agenda) */
 const LINK_CITAS = "https://josemontes20201234-pixel.github.io/citas/";
 const HORAS_C = [6,7,8,9,10,11,13,14,15,16];          // bloques de una hora; de 12 a 1 almuerzo
-const SERV_C = ["Corte clásico","Corte moderno","Combo el patrón","Servicio full detalle","Diseño de barba el patrón","Ritual Meraki Spa"];
+const SERV_C = ["Corte clásico","Corte moderno","Combo el patrón","Servicio full detalle","Diseño de barba el patrón","Perfilado express","Ritual Meraki Spa"];
 const JOSE_OK = 'request.auth != null && request.auth.token.email_verified == true && request.auth.token.email.lower() == "josemontes20201234@gmail.com"';
 const REGLA_CITAS =
 '    // ===== Citas: página pública y Meraki CRM =====\n' +

@@ -4,9 +4,15 @@
 const MODELO = "claude-sonnet-5-5";
 const FS_BASE = "https://firestore.googleapis.com/v1/projects/meraki-barbershop/databases/(default)/documents";
 const FS_KEY = "AIzaSyCysp_Pr9o-LYM5td9wOGLNNvsSKaEx2MQ"; // llave web pública de Firebase (las reglas protegen los datos)
+// [nombre, precio, qué incluye]. Las descripciones salen de la lista de precios de la pared.
 const SERVICIOS = [
-  ["Corte clásico", 3.5], ["Corte moderno", 4], ["Combo el patrón", 5],
-  ["Servicio full detalle", 6], ["Diseño de barba el patrón", 3.5], ["Ritual Meraki Spa", 5],
+  ["Corte clásico", 3.5, "corte a tijera o máquina, acabado limpio y perfilado de patillas"],
+  ["Corte moderno", 4, "degradados, cortes a cero, técnicas de tendencia y acabado con producto"],
+  ["Combo el patrón", 5, "corte moderno o clásico, perfilado de cejas y aplicación de tónico refrescante"],
+  ["Servicio full detalle", 6, "corte moderno o clásico, barba perfilada con navaja y toalla tibia de limpieza"],
+  ["Diseño de barba el patrón", 3.5, "diseño y definición de barba"],
+  ["Perfilado express", 2, "perfilado rápido"],
+  ["Ritual Meraki Spa", 5, "servicio de cuidado y relajación; si piden más detalle, Jose se lo explica"],
 ];
 const HORAS = [6, 7, 8, 9, 10, 11, 13, 14, 15, 16]; // bloques de una hora; 12 a 1 es almuerzo
 const DIAS_ADELANTE = 14;
@@ -97,7 +103,8 @@ function sistema(env, canal) {
     "- Meraki Barbershop, barbería premium en Apopa, San Salvador, El Salvador. Dueño y barbero: Jose.",
     "- Horario: martes a domingo, de 6:00 a. m. a 5:00 p. m. Lunes cerrado. Almuerzo de 12:00 a 1:00 p. m. (no hay citas a esa hora).",
     "- Citas de una hora. Se pueden apartar hasta " + DIAS_ADELANTE + " días adelante y con al menos una hora de aviso.",
-    "- Servicios y precios: " + SERVICIOS.map((s) => s[0] + " $" + s[1].toFixed(2)).join("; ") + ".",
+    "- Servicios y precios (con lo que incluye cada uno; explicalo con tus palabras, de forma profesional, sin agregar nada que no esté acá):",
+    ...SERVICIOS.map((s) => "  • " + s[0] + " $" + s[1].toFixed(2) + ": " + s[2] + "."),
     "- Se paga en efectivo o con tarjeta (cobro por tap en el teléfono).",
     "- WhatsApp del negocio: 6061-8603.",
     "- Tarjeta Meraki: tarjeta de fidelización con sellos por visita. Si preguntan por premios o sellos, decí que Jose se los revisa en persona.",

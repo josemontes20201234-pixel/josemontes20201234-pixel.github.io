@@ -43,6 +43,7 @@ h1{font:500 30px/1.15 var(--f-display);margin:0;text-wrap:balance}
 .op{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px;text-align:left;min-width:0}
 .op .n{font-weight:700;line-height:1.25}
 .op .p{color:var(--gold-hi);font-weight:700;margin-top:4px;font-variant-numeric:tabular-nums}
+.op .x{color:var(--muted);font-size:12.5px;line-height:1.4;margin-top:6px}
 .op.on{border-color:var(--gold);background:linear-gradient(160deg,rgba(201,162,74,.18),rgba(201,162,74,.04))}
 .dias{display:flex;gap:8px;overflow-x:auto;padding-bottom:6px;scrollbar-width:none;margin-inline:-4px;padding-inline:4px}
 .dias::-webkit-scrollbar{display:none}
@@ -132,8 +133,13 @@ const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt
 
 const WA_MERAKI = "50360618603";
 const SERVICIOS = [
-  ["Corte clásico", "3.50"], ["Corte moderno", "4.00"], ["Combo el patrón", "5.00"],
-  ["Servicio full detalle", "6.00"], ["Diseño de barba el patrón", "3.50"], ["Ritual Meraki Spa", "5.00"]
+  ["Corte clásico", "3.50", "Corte a tijera o máquina con acabado limpio y perfilado de patillas."],
+  ["Corte moderno", "4.00", "Degradados, cortes a cero y técnicas de tendencia, terminado con producto."],
+  ["Combo el patrón", "5.00", "Corte moderno o clásico, perfilado de cejas y tónico refrescante."],
+  ["Servicio full detalle", "6.00", "Corte moderno o clásico, barba perfilada con navaja y toalla tibia de limpieza."],
+  ["Diseño de barba el patrón", "3.50", "Diseño y definición de barba con acabado profesional."],
+  ["Perfilado express", "2.00", "Perfilado rápido para mantener tu línea impecable."],
+  ["Ritual Meraki Spa", "5.00", "Una experiencia de cuidado y relajación al estilo Meraki."]
 ];
 const HORAS = [6,7,8,9,10,11,13,14,15,16];   // de 12 a 1 es almuerzo
 const DIAS_ADELANTE = 14;
@@ -167,7 +173,7 @@ function pintarMia() {
 }
 
 /* ---------- servicios ---------- */
-$("#serv").innerHTML = SERVICIOS.map((s, i) => '<button class="op" data-i="' + i + '"><div class="n">' + esc(s[0]) + '</div><div class="p">$' + s[1] + '</div></button>').join("");
+$("#serv").innerHTML = SERVICIOS.map((s, i) => '<button class="op" data-i="' + i + '"><div class="n">' + esc(s[0]) + '</div><div class="p">$' + s[1] + '</div><div class="x">' + esc(s[2] || "") + '</div></button>').join("");
 $("#serv").onclick = e => { const b = e.target.closest(".op"); if (!b) return; sel.serv = SERVICIOS[b.dataset.i][0]; $("#serv").querySelectorAll(".op").forEach(x => x.classList.toggle("on", x === b)); revisar(); };
 
 /* ---------- días ---------- */
