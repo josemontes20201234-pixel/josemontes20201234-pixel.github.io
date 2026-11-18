@@ -346,6 +346,7 @@ async function procesarMeta(env, cuerpo) {
   const dato = JSON.parse(cuerpo);
   const tareas = [];
   await diag(env, "recibido", { tipo: dato.object, entradas: (dato.entry || []).length, mensajes: (dato.entry || []).reduce((n, e) => n + (e.messaging || []).length + (e.changes || []).length, 0) });
+  let revisarIG = false;
   for (const e of dato.entry || []) {
     // WhatsApp
     for (const c of e.changes || []) {
@@ -354,16 +355,106 @@ async function procesarMeta(env, cuerpo) {
         tareas.push(responder(env, "whatsapp", m.from, m.text.body).then((t) => enviarWhatsApp(env, m.from, t)));
       }
     }
-    // Instagram y Messenger
+    // Instagram: se revisa la bandeja (mismas reglas que cada minuto). Messenger: se contesta directo.
     for (const ev of e.messaging || []) {
       if (!ev.message || ev.message.is_echo || !ev.message.text) continue;
+      if (dato.object === "instagram") { revisarIG = true; continue; }
       if (ev.sender && ev.sender.id === e.id) continue; // lo que manda la misma cuenta del negocio
-      const canal = dato.object === "instagram" ? "instagram" : "messenger";
       const cuenta = (ev.recipient && ev.recipient.id) || e.id;
-      tareas.push(responder(env, canal, ev.sender.id, ev.message.text).then((t) => enviarMeta(env, canal, cuenta, ev.sender.id, t)));
+      tareas.push(responder(env, "messenger", ev.sender.id, ev.message.text).then((t) => enviarMeta(env, "messenger", cuenta, ev.sender.id, t)));
     }
   }
+  if (revisarIG) tareas.push(revisarInstagram(env, "aviso de Meta"));
   await Promise.allSettled(tareas);
+}
+
+/* ---------- Instagram: Leo revisa la bandeja (cada minuto y cuando Meta avise) ---------- */
+const VENTANA_MS = 2 * 3600e3;       // no se contestan mensajes de más de 2 horas
+const PAUSA_HUMANO_MS = 12 * 3600e3; // si Jose contestó a mano, Leo se calla 12 horas en ese chat
+const tiempo = (s) => Date.parse(String(s || "").replace(/([+-]\d\d)(\d\d)$/, "$1:$2")) || 0;
+
+// Instagram acepta hasta 1000 letras por mensaje: lo largo se manda en partes
+function trozos(texto, max = 950) {
+  let resto = String(texto || "").trim();
+  const partes = [];
+  while (resto.length > max) {
+    let corte = resto.lastIndexOf("\n", max);
+    if (corte < max * 0.5) corte = resto.lastIndexOf(". ", max) + 1;
+    if (corte < max * 0.5) corte = resto.lastIndexOf(" ", max);
+    if (corte <= 0) corte = max;
+    partes.push(resto.slice(0, corte).trim());
+    resto = resto.slice(corte).trim();
+  }
+  if (resto) partes.push(resto);
+  return partes;
+}
+
+async function graphIG(env, ruta) {
+  const r = await fetch("https://graph.facebook.com/v23.0/" + ruta, { headers: { authorization: "Bearer " + env.META_IG_TOKEN } });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error ? (j.error.code || "") + " " + (j.error.message || "") : String(r.status));
+  return j;
+}
+
+async function revisarInstagram(env, motivo) {
+  if (!env.META_IG_TOKEN || !env.IG_ID) return;
+  const ahora = Date.now();
+  let inicio = Number(await env.LEO.get("ig:inicio"));
+  if (!inicio) { inicio = ahora - (ahora % 1000); await env.LEO.put("ig:inicio", String(inicio)); } // lo de antes no se contesta (Meta da la hora en segundos)
+  const yo = String(env.IG_ID), yoUsuario = String(env.IG_USUARIO || "").toLowerCase();
+  const solo = String(env.LEO_SOLO || "").toLowerCase().split(",").map((x) => x.trim()).filter(Boolean);
+  const esNegocio = (f) => !!f && (String(f.id) === yo || (!!yoUsuario && String(f.username || "").toLowerCase() === yoUsuario));
+
+  let convs;
+  try { convs = (await graphIG(env, yo + "/conversations?platform=instagram&fields=updated_time&limit=10")).data || []; }
+  catch (e) { await diag(env, "revision", { motivo, error: String(e.message || e).slice(0, 200) }); return; }
+
+  const informe = [];
+  for (const c of convs) {
+    const act = tiempo(c.updated_time);
+    if (act < inicio || ahora - act > VENTANA_MS) continue;
+    const clave = "conv:" + c.id;
+    let estado = {};
+    try { estado = JSON.parse((await env.LEO.get(clave)) || "{}"); } catch {}
+    if (estado.visto === c.updated_time) continue; // nada nuevo en este chat
+    const guardar = (o) => env.LEO.put(clave, JSON.stringify(o), { expirationTtl: 7 * 86400 });
+    let msgs;
+    try { msgs = ((await graphIG(env, c.id + "?fields=" + encodeURIComponent("messages.limit(15){id,created_time,from,message}"))).messages || {}).data || []; }
+    catch (e) { informe.push({ paso: "leer chat", error: String(e.message || e).slice(0, 160) }); continue; }
+    msgs.reverse().sort((x, y) => tiempo(x.created_time) - tiempo(y.created_time)); // Meta los da del más nuevo al más viejo: se ponen en orden
+    const dicho = Array.isArray(estado.dicho) ? estado.dicho : [];
+    const nuevo = { ...estado, visto: c.updated_time };
+
+    // Lo que el cliente escribió después de la última respuesta del negocio
+    let iNeg = -1;
+    for (let i = msgs.length - 1; i >= 0; i--) if (esNegocio(msgs[i].from)) { iNeg = i; break; }
+    const pendientes = msgs.slice(iNeg + 1).filter((m) => !esNegocio(m.from) && m.message && tiempo(m.created_time) >= inicio && ahora - tiempo(m.created_time) <= VENTANA_MS);
+    if (!pendientes.length || pendientes[pendientes.length - 1].id === estado.ultimo) { await guardar(nuevo); continue; }
+
+    const cliente = pendientes[pendientes.length - 1].from || {};
+    if (solo.length && !solo.includes(String(cliente.username || "").toLowerCase())) {
+      informe.push({ paso: "sin contestar", por: "modo prueba: no es la cuenta de prueba" }); // sin datos del cliente
+      await guardar(nuevo); continue;
+    }
+    // Si Jose contestó a mano hace poco (mensaje del negocio que no mandó Leo), Leo no se mete
+    const manual = msgs.some((m) => esNegocio(m.from) && ahora - tiempo(m.created_time) <= PAUSA_HUMANO_MS && !dicho.includes(String(m.message || "").trim()));
+    if (manual) { informe.push({ paso: "sin contestar", por: "Jose está atendiendo ese chat" }); await guardar(nuevo); continue; }
+
+    nuevo.ultimo = pendientes[pendientes.length - 1].id;
+    await guardar(nuevo); // se marca antes de contestar para no contestar dos veces
+    let respuesta;
+    try { respuesta = await responder(env, "instagram", String(cliente.id), pendientes.map((m) => m.message).join("\n").slice(0, 1500)); }
+    catch (e) { informe.push({ paso: "pensar", error: String(e.message || e).slice(0, 160) }); continue; }
+    let ok = true;
+    for (const t of trozos(respuesta)) {
+      const fue = await enviarMeta(env, "instagram", yo, String(cliente.id), t);
+      if (fue) dicho.push(t); else ok = false;
+    }
+    nuevo.dicho = dicho.slice(-12);
+    await guardar(nuevo);
+    informe.push({ paso: ok ? "contestado" : "no se pudo mandar (ver ultimo_envio)" });
+  }
+  if (informe.length) await diag(env, "revision", { motivo, informe });
 }
 
 /* ---------- página de prueba (solo mientras PROBAR=1) ---------- */
@@ -389,7 +480,11 @@ add("Escribí como si fueras un cliente. Por ejemplo: «hola, cuánto cuesta un 
 </script></html>`;
 
 export default {
-  async fetch(request, env) {
+  async scheduled(controller, env, ctx) {
+    ctx.waitUntil(revisarInstagram(env, "cada minuto").catch((e) => console.log("revision error", String(e))));
+  },
+
+  async fetch(request, env, ctx) {
     const url = new URL(request.url);
     const json = (o, s = 200) => new Response(JSON.stringify(o), { status: s, headers: { "content-type": "application/json; charset=utf-8" } });
 
@@ -405,6 +500,9 @@ export default {
         ultimo_envio: await leer("diag:envio"),
         firmas_rechazadas: await leer("diag:firma"),
         ruta_instagram: await env.LEO.get("ruta:instagram"),
+        modo: env.LEO_SOLO ? "solo contesta a: " + env.LEO_SOLO : "contesta a todos",
+        revisa_desde: (await env.LEO.get("ig:inicio")) ? new Date(Number(await env.LEO.get("ig:inicio"))).toISOString() : null,
+        ultima_revision: await leer("diag:revision"),
         llave: await revisarLlave(env),
       });
     }
@@ -456,7 +554,7 @@ export default {
           await diag(env, "firma", { rechazada: true, veces: n + 1 });
           return new Response("Firma inválida", { status: 403 });
         }
-        try { await procesarMeta(env, cuerpo); } catch (e) { console.log("webhook error", String(e)); }
+        ctx.waitUntil(procesarMeta(env, cuerpo).catch((e) => console.log("webhook error", String(e))));
         return new Response("ok");
       }
     }
