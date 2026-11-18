@@ -14,6 +14,25 @@ const SERVICIOS = [
   ["Perfilado express", 2, "perfilado rápido"],
   ["Ritual Meraki Spa", 5, "servicio de cuidado y relajación; si piden más detalle, Jose se lo explica"],
 ];
+// Precios nuevos desde el martes 15 de diciembre de 2026 (aprobados por Jose el 18 nov). Valen según el DÍA DE LA CITA.
+// Antes va la «Semana Aniversario Meraki» (8 al 13 de diciembre): precios de siempre + boleto para rifar un full detalle.
+const CAMBIO_PRECIOS = "2026-12-15";
+const ANIVERSARIO = { desde: "2026-12-08", hasta: "2026-12-13" };
+const SERVICIOS_NUEVOS = [
+  ["Corte clásico", 4, "corte a tijera o máquina, acabado limpio y perfilado de patillas"],
+  ["Corte moderno", 5, "degradados, cortes a cero, técnicas de tendencia y acabado con producto"],
+  ["Combo el patrón", 6.5, "corte moderno o clásico, perfilado de cejas y aplicación de tónico refrescante"],
+  ["Servicio full detalle", 8, "corte moderno o clásico, barba perfilada con navaja y toalla tibia de limpieza"],
+  ["Diseño de barba Meraki", 4.5, "diseño y definición de barba"],
+  ["Perfilado express", 2.5, "perfilado rápido"],
+  ["Ritual Meraki Spa", 6.5, "servicio de cuidado y relajación; si piden más detalle, Jose se lo explica"],
+];
+const preciosPara = (fecha) => (String(fecha) >= CAMBIO_PRECIOS ? SERVICIOS_NUEVOS : SERVICIOS);
+const buscarServicio = (lista, nombre) => {
+  const n = String(nombre || "").toLowerCase().trim();
+  return lista.find((s) => s[0].toLowerCase() === n) || (n.startsWith("diseño de barba") ? lista.find((s) => s[0].toLowerCase().startsWith("diseño de barba")) : null);
+};
+const listaPrecios = (lista) => lista.map((s) => "  • " + s[0] + " $" + s[1].toFixed(2) + ": " + s[2] + ".");
 const HORAS = [6, 7, 8, 9, 10, 11, 13, 14, 15, 16]; // bloques de una hora; 12 a 1 es almuerzo
 const DIAS_ADELANTE = 14;
 const DL = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
@@ -76,8 +95,8 @@ async function apartarCita({ fecha, hora, nombre, tel, servicio, nota, otra }, e
   nombre = String(nombre || "").trim();
   tel = String(tel || "").replace(/\D/g, "").replace(/^503/, "");
   nota = String(nota || "").slice(0, 180);
-  const serv = SERVICIOS.find((s) => s[0].toLowerCase() === String(servicio || "").toLowerCase());
-  if (!serv) return { error: "Servicio no válido. Opciones: " + SERVICIOS.map((s) => s[0]).join(", ") };
+  const serv = buscarServicio(preciosPara(fecha), servicio); // el precio es el del día de la cita
+  if (!serv) return { error: "Servicio no válido. Opciones: " + preciosPara(fecha).map((s) => s[0]).join(", ") };
   if (nombre.length < 2 || nombre.length > 50) return { error: "Falta el nombre del cliente." };
   if (!/^[67]\d{7}$/.test(tel)) return { error: "El WhatsApp debe tener 8 dígitos y empezar con 6 o 7." };
   if (!HORAS.includes(hora)) return { error: "Esa hora no es de atención." };
@@ -134,7 +153,7 @@ function sistema(env, canal, extra = "") {
     "- Horario: martes a domingo, de 6:00 a. m. a 5:00 p. m. Lunes cerrado. Almuerzo de 12:00 a 1:00 p. m. (no hay citas a esa hora).",
     "- Citas de una hora. Se pueden apartar hasta " + DIAS_ADELANTE + " días adelante y con al menos una hora de aviso.",
     "- Servicios y precios (con lo que incluye cada uno; explicalo con tus palabras, de forma profesional, sin agregar nada que no esté acá):",
-    ...SERVICIOS.map((s) => "  • " + s[0] + " $" + s[1].toFixed(2) + ": " + s[2] + "."),
+    ...listaPrecios(preciosPara(hoy)),
     "- Se paga en efectivo o con tarjeta (cobro por tap en el teléfono).",
     "- WhatsApp del negocio: 6061-8603.",
     "- Tarjeta Meraki: tarjeta de fidelización con sellos por visita. Si preguntan por premios o sellos, decí que Jose se los revisa en persona.",
@@ -153,7 +172,14 @@ function sistema(env, canal, extra = "") {
     "",
     "Hoy es " + DL[ahora.getUTCDay()] + " " + hoy + ", y son las " + (ahora.getUTCHours() % 12 || 12) + ":" + String(ahora.getUTCMinutes()).padStart(2, "0") + (ahora.getUTCHours() < 12 ? " a. m." : " p. m.") + " (hora de El Salvador).",
   ];
-  const hora = lineas.pop() + (extra ? "\n" + extra : "");
+  const avisos = [];
+  // Desde que se puede apartar para el 15 de diciembre (14 días antes) Leo necesita saber los precios nuevos
+  if (hoy < CAMBIO_PRECIOS && hoy >= ymdSV(Date.parse(CAMBIO_PRECIOS + "T18:00:00Z") - DIAS_ADELANTE * 86400e3)) {
+    if (hoy >= ANIVERSARIO.desde && hoy <= ANIVERSARIO.hasta) avisos.push(
+      "SEMANA ANIVERSARIO MERAKI (del martes 8 al domingo 13 de diciembre): Meraki cumple un año en su local. Esta semana se cobran los precios de siempre y cada cliente que venga recibe un boleto para la rifa de un Servicio full detalle gratis el domingo 13. Desde el martes 15 de diciembre entran los precios nuevos (abajo). Contalo con alegría cuando hablen de precios o aparten cita esta semana, sin repetirlo en cada mensaje.");
+    avisos.push("Precios para citas del martes 15 de diciembre en adelante (" + (hoy >= ANIVERSARIO.desde ? "ya se pueden anunciar" : "todavía no los anunciés; usalos solo si alguien aparta para esas fechas") + "):", ...listaPrecios(SERVICIOS_NUEVOS));
+  }
+  const hora = lineas.pop() + (avisos.length ? "\n" + avisos.join("\n") : "") + (extra ? "\n" + extra : "");
   return [
     { type: "text", text: lineas.join("\n"), cache_control: { type: "ephemeral" } }, // fijo: se reutiliza entre mensajes
     { type: "text", text: hora },
@@ -176,7 +202,7 @@ const HERRAMIENTAS = [
         hora: { type: "integer", description: "Hora en formato 24 h: 6,7,8,9,10,11,13,14,15,16" },
         nombre: { type: "string" },
         tel: { type: "string", description: "WhatsApp de 8 dígitos" },
-        servicio: { type: "string", enum: SERVICIOS.map((s) => s[0]) },
+        servicio: { type: "string", enum: [...new Set([...SERVICIOS, ...SERVICIOS_NUEVOS].map((s) => s[0]))] },
         nota: { type: "string" },
         otra: { type: "boolean", description: "true solo si el cliente ya tiene una cita y confirmó que quiere OTRA además de esa" },
       },
