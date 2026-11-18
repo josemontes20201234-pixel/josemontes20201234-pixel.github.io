@@ -287,8 +287,8 @@ async function enviarMeta(env, canal, cuenta, para, texto, botones) { // Instagr
       res = await fetch(r.u, { method: "POST", headers: { "content-type": "application/json", authorization: "Bearer " + r.t }, body: JSON.stringify(cuerpo) });
     } catch (e) { fallos.push(r.n + ": " + String(e).slice(0, 120)); continue; }
     if (res.ok) {
-      if (r.n !== buena) { try { await env.LEO.put("ruta:" + canal, r.n); } catch {} }
-      await diag(env, "envio", { canal, ruta: r.n, ok: true });
+      // Solo se anota cuando cambia la ruta (KV gratis: 1000 escrituras al día; los fallos sí se anotan siempre)
+      if (r.n !== buena) { try { await env.LEO.put("ruta:" + canal, r.n); } catch {} await diag(env, "envio", { canal, ruta: r.n, ok: true }); }
       return true;
     }
     let err = "";
@@ -398,6 +398,7 @@ async function procesarMeta(env, cuerpo) {
 /* ---------- Instagram: Leo revisa la bandeja (cada minuto y cuando Meta avise) ---------- */
 const VENTANA_MS = 2 * 3600e3;       // no se contestan mensajes de más de 2 horas
 const PAUSA_HUMANO_MS = 12 * 3600e3; // si Jose contestó a mano, Leo se calla 12 horas en ese chat
+const REINTENTO_MS = 90e3;           // si un intento de contestar se cayó antes de mandar, se reintenta una vez a los 90 s
 const tiempo = (s) => Date.parse(String(s || "").replace(/([+-]\d\d)(\d\d)$/, "$1:$2")) || 0;
 
 // Instagram acepta hasta 1000 letras por mensaje: lo largo se manda en partes
@@ -506,22 +507,25 @@ async function revisarInstagram(env, motivo, memo = new Map()) {
     const act = tiempo(c.updated_time);
     if (act < inicio || ahora - act > VENTANA_MS) continue;
     const clave = "conv:" + c.id;
-    let estado = {};
-    try { estado = JSON.parse((await leer(clave)) || "{}"); } catch {}
-    if (estado.visto === c.updated_time) continue; // nada nuevo en este chat
-    const guardar = (o) => poner(clave, JSON.stringify(o), { expirationTtl: 7 * 86400 });
+    if (!memo.has(clave)) { let o = {}; try { o = JSON.parse((await env.LEO.get(clave)) || "{}"); } catch {} memo.set(clave, o); }
+    const estado = memo.get(clave);
+    // ¿Quedó a medias un intento de contestar (Cloudflare lo cortó o falló Claude/Meta antes de mandar)?
+    const aMedias = !!estado.ultimo && estado.listo !== estado.ultimo && estado.reintento !== estado.ultimo && ahora - (estado.intento || 0) > REINTENTO_MS;
+    if (estado.visto === c.updated_time && !aMedias) continue; // nada nuevo en este chat
+    const guardar = (o) => { memo.set(clave, o); return env.LEO.put(clave, JSON.stringify(o), { expirationTtl: 7 * 86400 }); };
     let msgs;
     try { msgs = ((await graphIG(env, c.id + "?fields=" + encodeURIComponent("messages.limit(15){id,created_time,from,message}"))).messages || {}).data || []; }
     catch (e) { informe.push({ paso: "leer chat", error: String(e.message || e).slice(0, 160) }); continue; }
     msgs.reverse().sort((x, y) => tiempo(x.created_time) - tiempo(y.created_time)); // Meta los da del más nuevo al más viejo: se ponen en orden
     const dicho = Array.isArray(estado.dicho) ? estado.dicho : [];
-    const nuevo = { ...estado, visto: c.updated_time };
+    const nuevo = { ...estado, visto: c.updated_time, listo: estado.ultimo }; // si no se contesta ahora, lo anterior queda cerrado
 
     // Lo que el cliente escribió después de la última respuesta del negocio
     let iNeg = -1;
     for (let i = msgs.length - 1; i >= 0; i--) if (esNegocio(msgs[i].from)) { iNeg = i; break; }
     const pendientes = msgs.slice(iNeg + 1).filter((m) => !esNegocio(m.from) && m.message && tiempo(m.created_time) >= inicio && ahora - tiempo(m.created_time) <= VENTANA_MS);
-    if (!pendientes.length || pendientes[pendientes.length - 1].id === estado.ultimo) { await guardar(nuevo); continue; }
+    const idUltimo = pendientes.length ? pendientes[pendientes.length - 1].id : null;
+    if (!idUltimo || (idUltimo === estado.ultimo && !aMedias)) { await guardar(nuevo); continue; }
 
     const cliente = pendientes[pendientes.length - 1].from || {};
     if (solo.length && !solo.includes(String(cliente.username || "").toLowerCase())) {
@@ -532,16 +536,17 @@ async function revisarInstagram(env, motivo, memo = new Map()) {
     const manual = msgs.some((m) => esNegocio(m.from) && ahora - tiempo(m.created_time) <= PAUSA_HUMANO_MS && !dicho.includes(String(m.message || "").trim()));
     if (manual) { informe.push({ paso: "sin contestar", por: "Jose está atendiendo ese chat" }); await guardar(nuevo); continue; }
 
-    nuevo.ultimo = pendientes[pendientes.length - 1].id;
+    if (idUltimo === estado.ultimo) { nuevo.reintento = idUltimo; informe.push({ paso: "reintento (el intento anterior se cayó)" }); }
+    nuevo.ultimo = idUltimo; nuevo.intento = Date.now(); delete nuevo.listo;
     await guardar(nuevo); // se marca antes de contestar para no contestar dos veces
     const tMsg = tiempo(pendientes[pendientes.length - 1].created_time), tVisto = Date.now(); // para medir cuánto tarda (sin datos del cliente)
     const escribiendo = accionMeta(env, yo, String(cliente.id), "typing_on"); // el cliente ve «escribiendo…» mientras Leo piensa
     let respuesta;
     try { respuesta = await responder(env, "instagram", String(cliente.id), pendientes.map((m) => m.message).join("\n").slice(0, 1500)); }
     catch (e) { informe.push({ paso: "pensar", error: String(e.message || e).slice(0, 160) }); continue; }
-    // Si pensó mucho rato, se revisa que nadie haya contestado mientras tanto (Jose a mano u otra revisión).
-    // Si fue rápido no hace falta, y así se ahorra 1 a 2 s de Meta.
-    if (Date.now() - tVisto > 6000) try {
+    // Se revisa que nadie haya contestado mientras Leo pensaba (Jose a mano, o la revisión del minuto anterior).
+    // En las revisiones de cada 8 s, si pensó rápido, no hace falta: así se ahorra 1 a 2 s de Meta.
+    if (motivo !== "cada 8 s" || Date.now() - tVisto > 6000) try {
       const tCliente = tiempo(pendientes[pendientes.length - 1].created_time);
       const recientes = ((await graphIG(env, c.id + "?fields=" + encodeURIComponent("messages.limit(5){id,created_time,from}"))).messages || {}).data || [];
       if (recientes.some((m) => esNegocio(m.from) && tiempo(m.created_time) > tCliente)) { informe.push({ paso: "ya estaba contestado" }); continue; }
@@ -562,6 +567,7 @@ async function revisarInstagram(env, motivo, memo = new Map()) {
       if (fue) { dicho.push(partes[i]); if (!tPrimero) tPrimero = Date.now(); } else ok = false;
     }
     nuevo.dicho = dicho.slice(-12);
+    if (ok) nuevo.listo = idUltimo;
     await guardar(nuevo);
     const seg = (x) => Math.round(x / 100) / 10;
     informe.push({ paso: ok ? "contestado" : "no se pudo mandar (ver ultimo_envio)", motivo, segundos: { en_verlo: seg(tVisto - tMsg), pensando: seg(tPensado - tVisto), mandando: seg(Date.now() - tPensado), primer_mensajito: tPrimero ? seg(tPrimero - tMsg) : null, total: seg(Date.now() - tMsg) }, burbujas: partes.length, botones: botones.length });
