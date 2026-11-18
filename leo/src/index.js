@@ -212,10 +212,15 @@ function soloTexto(hist) {
 }
 
 // Corre la conversación: historial en KV + ciclo de herramientas.
+// Una plática dura el día (hora de El Salvador): al día siguiente Leo saluda y empieza de cero, como un CRM.
 async function responder(env, canal, usuario, texto) {
   const clave = "h:" + canal + ":" + usuario;
+  const hoy = ymdSV(Date.now());
   let previo = [];
-  try { previo = soloTexto(JSON.parse((await env.LEO.get(clave)) || "[]")); } catch {}
+  try {
+    const g = JSON.parse((await env.LEO.get(clave)) || "null");
+    if (g && !Array.isArray(g) && g.dia === hoy) previo = soloTexto(g.hist); // la de otro día (o el formato viejo) no se usa
+  } catch {}
   let hist = soloTexto([...previo, { role: "user", content: texto }]);
   let salida = "";
   for (let i = 0; i < 5; i++) {
@@ -241,7 +246,7 @@ async function responder(env, canal, usuario, texto) {
   }
   // Se guarda lo que dijo el cliente y lo que Leo le mandó (últimos 20 turnos, empezando en el cliente).
   const corte = soloTexto(soloTexto([...previo, { role: "user", content: texto }, { role: "assistant", content: salida }]).slice(-20));
-  await env.LEO.put(clave, JSON.stringify(corte), { expirationTtl: 7 * 86400 });
+  await env.LEO.put(clave, JSON.stringify({ dia: hoy, hist: corte }), { expirationTtl: 2 * 86400 });
   return salida || "Dame un momento, por favor 🙏";
 }
 
@@ -400,7 +405,6 @@ async function procesarMeta(env, cuerpo) {
 
 /* ---------- Instagram: Leo revisa la bandeja (cada minuto y cuando Meta avise) ---------- */
 const VENTANA_MS = 2 * 3600e3;       // no se contestan mensajes de más de 2 horas
-const PAUSA_HUMANO_MS = 12 * 3600e3; // si Jose contestó a mano, Leo se calla 12 horas en ese chat
 const REINTENTO_MS = 90e3;           // si un intento de contestar se cayó antes de mandar, se reintenta una vez a los 90 s
 const tiempo = (s) => Date.parse(String(s || "").replace(/([+-]\d\d)(\d\d)$/, "$1:$2")) || 0;
 
@@ -592,11 +596,11 @@ async function revisarInstagram(env, motivo, memo = new Map()) {
       informe.push({ paso: "sin contestar", por: "modo prueba: no es la cuenta de prueba" }); // sin datos del cliente
       await guardar(nuevo); continue;
     }
-    // Si Jose contestó a mano hace poco (mensaje del negocio que no mandó Leo), Leo no se mete.
+    // Si Jose contestó a mano HOY en este chat (mensaje del negocio que no mandó Leo), Leo no se mete hasta mañana.
     // Lo de Leo se reconoce por el número de mensaje de Meta, o por el texto. Solo cuenta lo de después del arranque.
     const plano = (t) => String(t || "").replace(/\s+/g, " ").trim();
     const dichoPlano = dicho.map(plano);
-    const manual = msgs.some((m) => esNegocio(m.from) && tiempo(m.created_time) >= inicio && ahora - tiempo(m.created_time) <= PAUSA_HUMANO_MS
+    const manual = msgs.some((m) => esNegocio(m.from) && tiempo(m.created_time) >= inicio && ymdSV(tiempo(m.created_time)) === ymdSV(ahora)
       && !mios.includes(String(m.id)) && !dichoPlano.includes(plano(m.message)));
     if (manual) { informe.push({ paso: "sin contestar", por: "Jose está atendiendo ese chat" }); await guardar(nuevo); continue; }
 
