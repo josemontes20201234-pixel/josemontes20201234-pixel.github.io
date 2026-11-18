@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<meta name="referrer" content="no-referrer">
+<meta name="theme-color" content="#0b0a08">
+<title>Meraki CRM · Avisos de Leo</title>
+<style>
+body{margin:0;min-height:100vh;background:#0b0a08;color:#f5f1e8;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;display:flex;align-items:center;justify-content:center;padding:24px}
+.c{max-width:380px;width:100%;text-align:center}
+h1{font-size:15px;letter-spacing:.3em;color:#d9b55c;margin:0 0 10px}
+p{color:#a8a297;line-height:1.5;font-size:15px}
+a{display:block;padding:15px;border-radius:14px;background:#d9b55c;color:#111;font-weight:800;font-size:16px;text-decoration:none;margin-top:18px}
+</style>
+</head>
+<body>
+<div class="c">
+  <h1>MERAKI CRM</h1>
+  <p id="t">Abriendo Meraki CRM…</p>
+  <a id="b" href="#">Abrir Meraki CRM</a>
+</div>
+<script>
+// La clave viaja después del «#»: nunca se manda a ningún servidor; solo se le pasa a la app del teléfono.
+var clave = (location.hash.match(/clave=([A-Za-z0-9]+)/) || [])[1];
+var b = document.getElementById("b");
+if (!clave) { document.getElementById("t").textContent = "Este enlace no trae la clave. Pedile a Claude uno nuevo."; b.style.display = "none"; }
+else {
+  var destino = "intent://leo?clave=" + clave + "#Intent;scheme=merakicrm;package=com.josemontes.crm;end";
+  b.href = destino;
+  history.replaceState(null, "", location.pathname); // borra la clave de la barra de direcciones
+  document.getElementById("t").textContent = "Tocá el botón para activar los avisos de Leo en Meraki CRM.";
+  setTimeout(function () { try { location.href = destino; } catch (e) {} }, 400);
+}
+</script>
+</body>
+</html>

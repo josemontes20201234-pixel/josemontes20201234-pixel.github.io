@@ -43,6 +43,8 @@ public class MainActivity extends Activity {
     protected void onCreate(Bundle b) {
         super.onCreate(b);
         Alarmas.canal(this);
+        Leo.canal(this);
+        Leo.armar(this, 5000);
         web = new WebView(this);
         web.setBackgroundColor(0xFF0B0A08);
         WebSettings s = web.getSettings();
@@ -84,6 +86,20 @@ public class MainActivity extends Activity {
     /** Vuelve de la página de inicio de sesión (merakicrm://login) con la llave de Tarjeta Meraki. */
     private void leerLogin(Intent i) {
         if (i == null) return;
+        Uri dl = i.getData();
+        if (dl != null && "merakicrm".equals(dl.getScheme()) && "leo".equals(dl.getHost())) {
+            String clave = dl.getQueryParameter("clave");
+            if (clave != null && clave.length() >= 20) {
+                Leo.guardarClave(this, clave);
+                Toast.makeText(this, "🦁 Listo: los avisos de Leo te van a llegar aquí", Toast.LENGTH_LONG).show();
+                // Samsung duerme las apps en segundo plano: se pide (una vez) dejarla revisar siempre, para que los avisos no se atrasen.
+                android.os.PowerManager pm = getSystemService(android.os.PowerManager.class);
+                if (pm != null && !pm.isIgnoringBatteryOptimizations(getPackageName())) {
+                    try { startActivity(new Intent(android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.parse("package:" + getPackageName()))); } catch (Exception ignored) { }
+                }
+            }
+            return;
+        }
         String rt = i.getStringExtra("rt");
         Uri d = i.getData();
         if (rt == null && d != null && "merakicrm".equals(d.getScheme())) rt = d.getQueryParameter("rt");

@@ -1,0 +1,17 @@
+name: Leo · aviso de prueba
+on:
+  workflow_dispatch:
+jobs:
+  probar:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Mandar un aviso de prueba a la app Meraki CRM (sin datos de clientes)
+        env:
+          S: ${{ secrets.META_APP_SECRET }}
+        run: |
+          U=https://meraki-leo.merakibarbershop.workers.dev
+          echo "Avisos sin clave (debe ser 403): $(curl -s -o /dev/null -w '%{http_code}' $U/avisos)"
+          echo "¿Leo ya tiene la huella de la clave?"
+          curl -s -H "x-diag: $S" "$U/diag?ligero=1" | python3 -c "import sys,json; print((json.load(sys.stdin).get('claves') or {}).get('avisos_app'))"
+          echo "Aviso de prueba:"
+          curl -s -X POST -H "x-diag: $S" "$U/aviso-prueba"; echo

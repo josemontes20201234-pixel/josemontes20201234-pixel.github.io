@@ -234,11 +234,11 @@ async function ejecutar(env, nombre, input, ctx) {
   if (nombre === "horas_libres") return horasLibres(input.fecha);
   if (nombre === "apartar_cita") {
     const r = await apartarCita(input, env, ctx);
-    if (r.ok) await avisarJose(env, "📅 Nueva cita por Leo (" + ctx.canal + "): " + r.resumen);
+    if (r.ok && !r.ya_estaba_apartada) await avisarJose(env, "📅 Nueva cita por Leo (" + ctx.canal + "): " + r.resumen + (ctx.alias ? " · " + ctx.alias : ""));
     return r;
   }
   if (nombre === "avisar_a_jose") {
-    await avisarJose(env, "🦁 Leo te avisa (" + ctx.canal + "): " + input.motivo + (input.contacto ? " · Contacto: " + input.contacto : "") + " · Cliente: " + ctx.usuario);
+    await avisarJose(env, "🦁 Leo te avisa (" + ctx.canal + "): " + input.motivo + (input.contacto ? " · Contacto: " + input.contacto : "") + " · Cliente: " + (ctx.alias || ctx.usuario));
     return { ok: true };
   }
   return { error: "Herramienta desconocida." };
@@ -262,7 +262,7 @@ function soloTexto(hist) {
 
 // Corre la conversación: historial en KV + ciclo de herramientas.
 // Una plática dura el día (hora de El Salvador): al día siguiente Leo saluda y empieza de cero, como un CRM.
-async function responder(env, canal, usuario, texto) {
+async function responder(env, canal, usuario, texto, alias = "") {
   const clave = "h:" + canal + ":" + usuario;
   const hoy = ymdSV(Date.now());
   let previo = [];
@@ -290,7 +290,7 @@ async function responder(env, canal, usuario, texto) {
     const resultados = [];
     for (const u of usos) {
       let out;
-      try { out = await ejecutar(env, u.name, u.input, { canal, usuario }); } catch (e) { out = { error: String(e.message || e) }; }
+      try { out = await ejecutar(env, u.name, u.input, { canal, usuario, alias }); } catch (e) { out = { error: String(e.message || e) }; }
       resultados.push({ type: "tool_result", tool_use_id: u.id, content: JSON.stringify(out) });
     }
     hist.push({ role: "user", content: resultados });
@@ -410,8 +410,13 @@ async function revisarLlave(env) {
 }
 
 async function avisarJose(env, texto) {
-  const aviso = "[" + new Date().toISOString() + "] " + texto;
-  try { await env.LEO.put("aviso:" + Date.now(), aviso, { expirationTtl: 30 * 86400 }); } catch {}
+  const ts = Date.now();
+  const aviso = "[" + new Date(ts).toISOString() + "] " + texto;
+  const cabe = new TextEncoder().encode(JSON.stringify({ t: texto })).length <= 1000; // los metadatos de KV llegan hasta 1024 bytes
+  try {
+    await env.LEO.put("aviso:" + ts, aviso, { expirationTtl: 30 * 86400, ...(cabe ? { metadata: { t: texto } } : {}) });
+    await env.LEO.put("aviso:ultimo", String(ts), { expirationTtl: 30 * 86400 });
+  } catch {}
   if (env.JOSE_WA) { try { await enviarWhatsApp(env, env.JOSE_WA, texto); } catch {} }
 }
 
@@ -674,7 +679,7 @@ async function revisarInstagram(env, motivo, memo = new Map()) {
     const escribiendo = usoAppAhora() < 60 && !yaEscrita ? accionMeta(env, yo, String(cliente.id), "typing_on") : Promise.resolve();
     let respuesta = yaEscrita;
     if (!respuesta) {
-      try { respuesta = await responder(env, "instagram", String(cliente.id), pendientes.map((m) => m.message).join("\n").slice(0, 1500)); }
+      try { respuesta = await responder(env, "instagram", String(cliente.id), pendientes.map((m) => m.message).join("\n").slice(0, 1500), cliente.username ? "@" + cliente.username : ""); }
       catch (e) { informe.push({ paso: "pensar", error: String(e.message || e).slice(0, 160) }); continue; }
     }
     // Se revisa que nadie haya contestado mientras Leo pensaba (Jose a mano, o la revisión del minuto anterior).
@@ -759,12 +764,39 @@ export default {
 
     if (url.pathname === "/salud") return json({ ok: true, quien: "Leo", negocio: "Meraki Barbershop", cerebro: !!env.LEO_ANTHROPIC_KEY, meta: !!env.META_APP_SECRET });
 
+    // Avisos para la app Meraki CRM (citas nuevas, clientes que piden hablar con Jose). Tienen datos de clientes:
+    // van protegidos con su propia clave, que solo tiene la app de Jose. Casi siempre cuesta una sola lectura.
+    if (url.pathname === "/avisos") {
+      // En el código público solo está la huella (SHA-256) de la clave; la clave la tiene únicamente la app de Jose.
+      const huella = [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(request.headers.get("x-avisos") || "")))].map((b) => b.toString(16).padStart(2, "0")).join("");
+      if (!env.AVISOS_HASH || huella !== env.AVISOS_HASH) return new Response("No autorizado", { status: 403 });
+      const desde = Number(url.searchParams.get("desde")) || 0;
+      const ultimo = Number(await env.LEO.get("aviso:ultimo")) || 0;
+      const avisos = [];
+      if (ultimo > desde) {
+        const l = await env.LEO.list({ prefix: "aviso:1" });
+        const nuevas = l.keys.map((k) => ({ k, ts: Number(k.name.slice(6)) })).filter((x) => x.ts > desde).slice(-20);
+        for (const { k, ts } of nuevas) {
+          const texto = k.metadata && k.metadata.t ? k.metadata.t : String((await env.LEO.get(k.name)) || "").replace(/^\[[^\]]*\]\s*/, "");
+          if (texto) avisos.push({ ts, texto });
+        }
+      }
+      return new Response(JSON.stringify({ avisos, ahora: Date.now() }), { headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" } });
+    }
+
+    // Aviso de prueba (sin datos de clientes) para revisar que le llegan a la app de Jose
+    if (url.pathname === "/aviso-prueba" && request.method === "POST") {
+      if (!env.META_APP_SECRET || request.headers.get("x-diag") !== env.META_APP_SECRET) return new Response("No autorizado", { status: 403 });
+      await avisarJose(env, "🦁 Leo te avisa (prueba): Así te van a llegar los avisos de Leo. Si ves esto, ya quedó 👌");
+      return json({ ok: true });
+    }
+
     // Diagnóstico para revisar desde GitHub (sin llaves ni mensajes de clientes)
     if (url.pathname === "/diag") {
       if (!env.META_APP_SECRET || request.headers.get("x-diag") !== env.META_APP_SECRET) return new Response("No autorizado", { status: 403 });
       const leer = async (k) => { try { return JSON.parse((await env.LEO.get(k)) || "null"); } catch { return null; } };
       return json({
-        claves: { cerebro: !!env.LEO_ANTHROPIC_KEY, secreto_meta: !!env.META_APP_SECRET, secreto_ig: !!env.IG_APP_SECRET, llave_instagram: !!env.META_IG_TOKEN, llave_pagina: !!env.META_PAGE_TOKEN, whatsapp: !!env.WA_TOKEN },
+        claves: { cerebro: !!env.LEO_ANTHROPIC_KEY, secreto_meta: !!env.META_APP_SECRET, secreto_ig: !!env.IG_APP_SECRET, llave_instagram: !!env.META_IG_TOKEN, llave_pagina: !!env.META_PAGE_TOKEN, whatsapp: !!env.WA_TOKEN, avisos_app: !!env.AVISOS_HASH },
         ultimo_recibido: await leer("diag:recibido"),
         ultimo_envio: await leer("diag:envio"),
         firmas_rechazadas: await leer("diag:firma"),
