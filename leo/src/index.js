@@ -101,6 +101,7 @@ function sistema(env, canal) {
     "CÓMO ESCRIBIR (es un chat; a la gente le aburre mucha letra):",
     "- Cada respuesta va en 1 a 3 mensajitos cortos, de 1 a 3 líneas cada uno. Separá cada mensajito con una línea en blanco. Nunca párrafos largos.",
     "- Andá directo a la respuesta: no gastés un mensajito en relleno (como «te lo repito por acá» o «claro, con gusto»).",
+    "- Sin negritas, asteriscos ni títulos con #: el chat los muestra tal cual.",
     "- Usá de 2 a 4 emojis con estilo en toda la respuesta (por ejemplo 💈 ✂️ 🔥 ✨ 📅 📍 💳 🦁), no en cada línea.",
     "- Para listas (precios, servicios, horas) poné una cosa por línea con un emoji al inicio, por ejemplo «💈 Corte clásico — $8.00». Si piden el detalle de un servicio, explicalo en una o dos líneas.",
     "- Si ayuda, al final podés poner botones para que el cliente toque, en una línea aparte con este formato exacto: [[botones: 💈 Precios | 📅 Agendar | 📍 Ubicación]]. Máximo 4 botones, cada uno de pocas palabras. Usalos en el saludo y cuando des a escoger (horas libres, servicios, sí/no); no en todos los mensajes.",
@@ -125,7 +126,7 @@ function sistema(env, canal) {
     "",
     "DATOS PERSONALES: si alguien pide borrar sus datos (por ejemplo «BORRAR MIS DATOS»), usá avisar_a_jose con el motivo «Pide borrar sus datos» y decile que se borran en un máximo de 30 días y que le confirmamos por este mismo medio. Si preguntan qué hacemos con sus datos, explicalo corto y pasales la política: https://josemontes20201234-pixel.github.io/privacidad/",
     "",
-    "REGLAS: no cierres todos los mensajes ofreciendo una cita; ofrecela solo cuando la persona muestre interés en venir, pregunte por disponibilidad o ya te haya preguntado precios y servicios, y no la repitas si ya la ofreciste. Si el cliente dice que te escribe después o se despide, despedite en un solo mensajito corto y amable, sin presionar (no le digás que las horas se van a ocupar). No inventés precios, promociones ni horarios. No digás la hora actual a menos que te la pregunten. No des consejos médicos. Si hay un reclamo, algo que no sabés, o piden hablar con una persona, usá avisar_a_jose y decí que Jose les responde pronto. Si el mensaje no tiene que ver con la barbería, respondé amable y volvé al tema.",
+    "REGLAS: no cierres todos los mensajes ofreciendo una cita; ofrecela solo cuando la persona muestre interés en venir, pregunte por disponibilidad o ya te haya preguntado precios y servicios, y no la repitas si ya la ofreciste. Si el cliente dice que te escribe después o se despide, despedite en un solo mensajito corto y amable, sin presionar (no le digás que las horas se van a ocupar) y sin revisar la agenda. No inventés precios, promociones ni horarios. No digás la hora actual a menos que te la pregunten. No des consejos médicos. Si hay un reclamo, algo que no sabés, o piden hablar con una persona, usá avisar_a_jose y decí que Jose les responde pronto. Si el mensaje no tiene que ver con la barbería, respondé amable y volvé al tema.",
     "",
     "Hoy es " + DL[ahora.getUTCDay()] + " " + hoy + ", y son las " + (ahora.getUTCHours() % 12 || 12) + ":" + String(ahora.getUTCMinutes()).padStart(2, "0") + (ahora.getUTCHours() < 12 ? " a. m." : " p. m.") + " (hora de El Salvador).",
   ];
@@ -434,7 +435,7 @@ function prepararRespuesta(texto) {
   const t = String(texto || "").replace(/\[\[\s*botones?\s*:([^\]]*)\]\]/gi, (_, lista) => {
     botones = lista.split("|").map((b) => corto(b.trim(), 20)).filter(Boolean).slice(0, 4);
     return "";
-  });
+  }).replace(/\*\*(.+?)\*\*/g, "$1").replace(/__(.+?)__/g, "$1").replace(/^#{1,6}\s+/gm, ""); // Instagram no muestra negritas: se verían los asteriscos
   let burbujas = t.split(/\n\s*\n/).map((b) => b.trim()).filter(Boolean);
   if (burbujas.length > 3) burbujas = [...burbujas.slice(0, 2), burbujas.slice(2).join("\n\n")];
   if (!burbujas.length) burbujas = ["Dame un momento, por favor 🙏"];
@@ -538,13 +539,16 @@ async function revisarInstagram(env, motivo, memo = new Map()) {
     let respuesta;
     try { respuesta = await responder(env, "instagram", String(cliente.id), pendientes.map((m) => m.message).join("\n").slice(0, 1500)); }
     catch (e) { informe.push({ paso: "pensar", error: String(e.message || e).slice(0, 160) }); continue; }
-    try {
+    // Si pensó mucho rato, se revisa que nadie haya contestado mientras tanto (Jose a mano u otra revisión).
+    // Si fue rápido no hace falta, y así se ahorra 1 a 2 s de Meta.
+    if (Date.now() - tVisto > 6000) try {
       const tCliente = tiempo(pendientes[pendientes.length - 1].created_time);
       const recientes = ((await graphIG(env, c.id + "?fields=" + encodeURIComponent("messages.limit(5){id,created_time,from}"))).messages || {}).data || [];
       if (recientes.some((m) => esNegocio(m.from) && tiempo(m.created_time) > tCliente)) { informe.push({ paso: "ya estaba contestado" }); continue; }
     } catch {}
     await escribiendo;
     const tPensado = Date.now();
+    let tPrimero = 0;
     const { burbujas, botones } = prepararRespuesta(respuesta);
     const partes = burbujas.flatMap((b) => trozos(b));
     let ok = true;
@@ -555,12 +559,12 @@ async function revisarInstagram(env, motivo, memo = new Map()) {
         fue = await enviarMeta(env, "instagram", yo, String(cliente.id), partes[i]);
         if (fue) informe.push({ paso: "botones no funcionaron" });
       }
-      if (fue) dicho.push(partes[i]); else ok = false;
+      if (fue) { dicho.push(partes[i]); if (!tPrimero) tPrimero = Date.now(); } else ok = false;
     }
     nuevo.dicho = dicho.slice(-12);
     await guardar(nuevo);
     const seg = (x) => Math.round(x / 100) / 10;
-    informe.push({ paso: ok ? "contestado" : "no se pudo mandar (ver ultimo_envio)", motivo, segundos: { en_verlo: seg(tVisto - tMsg), pensando: seg(tPensado - tVisto), mandando: seg(Date.now() - tPensado), total: seg(Date.now() - tMsg) }, burbujas: partes.length, botones: botones.length });
+    informe.push({ paso: ok ? "contestado" : "no se pudo mandar (ver ultimo_envio)", motivo, segundos: { en_verlo: seg(tVisto - tMsg), pensando: seg(tPensado - tVisto), mandando: seg(Date.now() - tPensado), primer_mensajito: tPrimero ? seg(tPrimero - tMsg) : null, total: seg(Date.now() - tMsg) }, burbujas: partes.length, botones: botones.length });
   }
   if (informe.length) await diag(env, "revision", { motivo, informe });
 }
