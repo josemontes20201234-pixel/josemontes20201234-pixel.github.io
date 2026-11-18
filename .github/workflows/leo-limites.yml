@@ -1,0 +1,43 @@
+name: Leo — ¿qué llamada gasta qué límite de Meta?
+# Hace unas pocas llamadas de lectura y muestra solo los encabezados de uso de Meta (sin llaves ni mensajes).
+on:
+  workflow_dispatch:
+jobs:
+  medir:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Medir
+        env:
+          T: ${{ secrets.META_IG_TOKEN }}
+        run: |
+          python3 - <<'PY'
+          import json, os, time, urllib.request, urllib.error
+          IG, G, t = "17841479582218392", "https://graph.facebook.com/v23.0/", os.environ["T"]
+          def llamar(ruta):
+              req = urllib.request.Request(G + ruta, headers={"Authorization": "Bearer " + t})
+              try: r = urllib.request.urlopen(req, timeout=30); st, h, b = r.status, r.headers, json.load(r)
+              except urllib.error.HTTPError as e:
+                  st, h = e.code, e.headers
+                  try: b = json.load(e)
+                  except Exception: b = {}
+              app = h.get("x-app-usage")
+              buc = h.get("x-business-use-case-usage")
+              if buc:
+                  try: buc = {k: {x["type"]: [x.get("call_count"), x.get("total_cputime"), x.get("total_time")] for x in v} for k, v in json.loads(buc).items()}
+                  except Exception: pass
+              e = (b.get("error") or {})
+              return st, (str(e.get("code", "")) + " " + str(e.get("message", ""))[:80]).strip() or "ok", app, buc, b
+          print("Formato: estado | error | uso de la app (x-app-usage) | uso por negocio [llamadas %, cpu %, tiempo %]")
+          for i in range(5):
+              st, e, app, buc, b = llamar(IG + "/conversations?platform=instagram&fields=updated_time&limit=10")
+              print("lista de chats", i + 1, "|", st, "|", e, "| app:", app, "| negocio:", buc)
+              time.sleep(1)
+          convs = b.get("data") or []
+          if convs:
+              st, e, app, buc, _ = llamar(convs[0]["id"] + "?fields=" + urllib.request.quote("messages.limit(15){id,created_time,from,message}"))
+              print("leer un chat (15 mensajes) |", st, "|", e, "| app:", app, "| negocio:", buc)
+              st, e, app, buc, _ = llamar(convs[0]["id"] + "?fields=" + urllib.request.quote("messages.limit(5){id,created_time,from}"))
+              print("revisión corta (5 mensajes) |", st, "|", e, "| app:", app, "| negocio:", buc)
+          st, e, app, buc, _ = llamar(IG + "?fields=username")
+          print("datos de la cuenta |", st, "|", e, "| app:", app, "| negocio:", buc)
+          PY
