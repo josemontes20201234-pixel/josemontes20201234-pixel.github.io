@@ -45,3 +45,25 @@ jobs:
         env:
           LEO_ANTHROPIC_KEY: ${{ secrets.LEO_ANTHROPIC_KEY }}
           META_APP_SECRET: ${{ secrets.META_APP_SECRET }}
+      - name: Llave de Instagram para Leo (si ya está en GitHub)
+        env:
+          CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          T: ${{ secrets.META_IG_TOKEN }}
+        run: |
+          if [ -z "$T" ]; then echo "Todavía no hay META_IG_TOKEN en GitHub: se salta"; exit 0; fi
+          A=bcefe39d21eb6d4d1db006a3f7db17a9
+          python3 -c "import json,os; print(json.dumps({'name':'META_IG_TOKEN','text':os.environ['T'],'type':'secret_text'}))" > "$RUNNER_TEMP/s.json"
+          curl -s -X PUT -H "Authorization: Bearer $CF_TOKEN" -H "Content-Type: application/json" --data @"$RUNNER_TEMP/s.json" \
+            https://api.cloudflare.com/client/v4/accounts/$A/workers/scripts/meraki-leo/secrets \
+            | python3 -c "import sys,json; d=json.load(sys.stdin); print('Llave guardada en Leo' if d.get('success') else d.get('errors'))"
+          rm -f "$RUNNER_TEMP/s.json"
+      - name: Revisar a Leo (sin mostrar llaves)
+        env:
+          CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          S: ${{ secrets.META_APP_SECRET }}
+        run: |
+          A=bcefe39d21eb6d4d1db006a3f7db17a9
+          sub=$(curl -s -H "Authorization: Bearer $CF_TOKEN" https://api.cloudflare.com/client/v4/accounts/$A/workers/subdomain | python3 -c "import sys,json; print((json.load(sys.stdin).get('result') or {}).get('subdomain',''))")
+          echo "Dirección: https://meraki-leo.$sub.workers.dev"
+          sleep 10
+          curl -s -H "x-diag: $S" "https://meraki-leo.$sub.workers.dev/diag" | python3 -m json.tool || true

@@ -230,33 +230,99 @@ async function enviarWhatsApp(env, para, texto) {
   });
   return r.ok;
 }
-async function enviarMeta(env, id, texto) { // Instagram DM y Messenger
-  if (!env.META_PAGE_TOKEN) return false;
-  const r = await fetch("https://graph.facebook.com/v23.0/me/messages?access_token=" + env.META_PAGE_TOKEN, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ recipient: { id }, messaging_type: "RESPONSE", message: { text: texto } }),
-  });
-  return r.ok;
+/* Diagnóstico sin datos de clientes (sólo horas, rutas y errores): se lee en /diag */
+async function diag(env, clave, dato) {
+  try { await env.LEO.put("diag:" + clave, JSON.stringify({ cuando: new Date().toISOString(), ...dato }), { expirationTtl: 30 * 86400 }); } catch {}
 }
+
+async function enviarMeta(env, canal, cuenta, para, texto) { // Instagram DM y Messenger
+  const rutas = [];
+  if (canal === "instagram" && env.META_IG_TOKEN) {
+    const t = env.META_IG_TOKEN;
+    // La llave del «inicio de sesión unificado» de Meta: se prueba por dónde acepta mandar y se recuerda la que sirvió
+    rutas.push(
+      { n: "fb-cuenta", u: "https://graph.facebook.com/v23.0/" + cuenta + "/messages", t },
+      { n: "ig-cuenta", u: "https://graph.instagram.com/v23.0/" + cuenta + "/messages", t },
+      { n: "fb-me", u: "https://graph.facebook.com/v23.0/me/messages", t },
+      { n: "ig-me", u: "https://graph.instagram.com/v23.0/me/messages", t },
+    );
+  }
+  if (env.META_PAGE_TOKEN) rutas.push({ n: "pagina", u: "https://graph.facebook.com/v23.0/me/messages", t: env.META_PAGE_TOKEN, pagina: true });
+  if (!rutas.length) { await diag(env, "envio", { canal, ok: false, fallos: ["no hay llave para " + canal] }); return false; }
+  let buena = null;
+  try { buena = await env.LEO.get("ruta:" + canal); } catch {}
+  rutas.sort((x, y) => (y.n === buena) - (x.n === buena));
+  const fallos = [];
+  for (const r of rutas) {
+    const cuerpo = { recipient: { id: para }, message: { text: texto } };
+    if (r.pagina) cuerpo.messaging_type = "RESPONSE";
+    let res;
+    try {
+      res = await fetch(r.u, { method: "POST", headers: { "content-type": "application/json", authorization: "Bearer " + r.t }, body: JSON.stringify(cuerpo) });
+    } catch (e) { fallos.push(r.n + ": " + String(e).slice(0, 120)); continue; }
+    if (res.ok) {
+      if (r.n !== buena) { try { await env.LEO.put("ruta:" + canal, r.n); } catch {} }
+      await diag(env, "envio", { canal, ruta: r.n, ok: true });
+      return true;
+    }
+    let err = "";
+    try { const j = await res.json(); err = j.error ? (j.error.code || "") + " " + (j.error.message || "") : ""; } catch {}
+    fallos.push(r.n + ": " + res.status + " " + err.slice(0, 160));
+  }
+  await diag(env, "envio", { canal, ok: false, fallos });
+  return false;
+}
+
+/* Revisa la llave de Instagram sin mostrarla (para /diag) */
+async function revisarLlave(env) {
+  const t = env.META_IG_TOKEN;
+  if (!t) return { hay: false };
+  const pedir = async (u) => {
+    try {
+      const r = await fetch(u, { headers: { authorization: "Bearer " + t } });
+      const j = await r.json().catch(() => ({}));
+      return r.ok ? { ok: true, j } : { ok: false, error: j.error ? (j.error.code || "") + " " + (j.error.message || "") : String(r.status) };
+    } catch (e) { return { ok: false, error: String(e).slice(0, 120) }; }
+  };
+  const out = { hay: true, empieza: t.slice(0, 3) };
+  const d = await pedir("https://graph.facebook.com/v23.0/debug_token?input_token=" + encodeURIComponent(t));
+  if (d.ok && d.j.data) {
+    const x = d.j.data;
+    out.tipo = x.type; out.valida = x.is_valid; out.app = x.application;
+    out.vence = x.expires_at ? new Date(x.expires_at * 1000).toISOString() : "no vence";
+    out.permisos = x.scopes || [];
+  } else out.debug = d.error;
+  const cuenta = env.IG_ID || "me";
+  const fb = await pedir("https://graph.facebook.com/v23.0/" + cuenta + "?fields=id,username");
+  out.facebook = fb.ok ? "sirve (" + (fb.j.username || fb.j.id || "?") + ")" : fb.error;
+  const ig = await pedir("https://graph.instagram.com/v23.0/me?fields=user_id,username");
+  out.instagram = ig.ok ? "sirve (" + (ig.j.username || ig.j.user_id || "?") + ")" : ig.error;
+  return out;
+}
+
 async function avisarJose(env, texto) {
   const aviso = "[" + new Date().toISOString() + "] " + texto;
   try { await env.LEO.put("aviso:" + Date.now(), aviso, { expirationTtl: 30 * 86400 }); } catch {}
   if (env.JOSE_WA) { try { await enviarWhatsApp(env, env.JOSE_WA, texto); } catch {} }
 }
 
-async function firmaValida(env, request, cuerpo) {
-  if (!env.META_APP_SECRET) return false; // sin secreto no se acepta nada
-  const h = request.headers.get("x-hub-signature-256") || "";
-  const k = await crypto.subtle.importKey("raw", new TextEncoder().encode(env.META_APP_SECRET), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+async function firmaCon(secreto, cuerpo) {
+  const k = await crypto.subtle.importKey("raw", new TextEncoder().encode(secreto), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
   const f = await crypto.subtle.sign("HMAC", k, new TextEncoder().encode(cuerpo));
-  const hex = "sha256=" + [...new Uint8Array(f)].map((b) => b.toString(16).padStart(2, "0")).join("");
-  return h.length === hex.length && h === hex;
+  return "sha256=" + [...new Uint8Array(f)].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+async function firmaValida(env, request, cuerpo) {
+  const h = request.headers.get("x-hub-signature-256") || "";
+  for (const s of [env.META_APP_SECRET, env.IG_APP_SECRET]) { // sin secreto no se acepta nada
+    if (s && h.length === 71 && (await firmaCon(s, cuerpo)) === h) return true;
+  }
+  return false;
 }
 
 async function procesarMeta(env, cuerpo) {
   const dato = JSON.parse(cuerpo);
   const tareas = [];
+  await diag(env, "recibido", { tipo: dato.object, entradas: (dato.entry || []).length, mensajes: (dato.entry || []).reduce((n, e) => n + (e.messaging || []).length + (e.changes || []).length, 0) });
   for (const e of dato.entry || []) {
     // WhatsApp
     for (const c of e.changes || []) {
@@ -268,8 +334,10 @@ async function procesarMeta(env, cuerpo) {
     // Instagram y Messenger
     for (const ev of e.messaging || []) {
       if (!ev.message || ev.message.is_echo || !ev.message.text) continue;
+      if (ev.sender && ev.sender.id === e.id) continue; // lo que manda la misma cuenta del negocio
       const canal = dato.object === "instagram" ? "instagram" : "messenger";
-      tareas.push(responder(env, canal, ev.sender.id, ev.message.text).then((t) => enviarMeta(env, ev.sender.id, t)));
+      const cuenta = (ev.recipient && ev.recipient.id) || e.id;
+      tareas.push(responder(env, canal, ev.sender.id, ev.message.text).then((t) => enviarMeta(env, canal, cuenta, ev.sender.id, t)));
     }
   }
   await Promise.allSettled(tareas);
@@ -304,6 +372,20 @@ export default {
 
     if (url.pathname === "/salud") return json({ ok: true, quien: "Leo", negocio: "Meraki Barbershop", cerebro: !!env.LEO_ANTHROPIC_KEY, meta: !!env.META_APP_SECRET });
 
+    // Diagnóstico para revisar desde GitHub (sin llaves ni mensajes de clientes)
+    if (url.pathname === "/diag") {
+      if (!env.META_APP_SECRET || request.headers.get("x-diag") !== env.META_APP_SECRET) return new Response("No autorizado", { status: 403 });
+      const leer = async (k) => { try { return JSON.parse((await env.LEO.get(k)) || "null"); } catch { return null; } };
+      return json({
+        claves: { cerebro: !!env.LEO_ANTHROPIC_KEY, secreto_meta: !!env.META_APP_SECRET, secreto_ig: !!env.IG_APP_SECRET, llave_instagram: !!env.META_IG_TOKEN, llave_pagina: !!env.META_PAGE_TOKEN, whatsapp: !!env.WA_TOKEN },
+        ultimo_recibido: await leer("diag:recibido"),
+        ultimo_envio: await leer("diag:envio"),
+        firmas_rechazadas: await leer("diag:firma"),
+        ruta_instagram: await env.LEO.get("ruta:instagram"),
+        llave: await revisarLlave(env),
+      });
+    }
+
     // Página y endpoint de prueba (límite de 60 mensajes por día para cuidar el gasto)
     if (env.PROBAR === "1" && url.pathname === "/probar") return new Response(PAGINA_PRUEBA, { headers: { "content-type": "text/html; charset=utf-8" } });
     if (env.PROBAR === "1" && url.pathname === "/probar/chat" && request.method === "POST") {
@@ -328,7 +410,12 @@ export default {
       }
       if (request.method === "POST") {
         const cuerpo = await request.text();
-        if (!(await firmaValida(env, request, cuerpo))) return new Response("Firma inválida", { status: 403 });
+        if (!(await firmaValida(env, request, cuerpo))) {
+          let n = 0;
+          try { n = Number(JSON.parse((await env.LEO.get("diag:firma")) || "{}").veces || 0); } catch {}
+          await diag(env, "firma", { rechazada: true, veces: n + 1 });
+          return new Response("Firma inválida", { status: 403 });
+        }
         try { await procesarMeta(env, cuerpo); } catch (e) { console.log("webhook error", String(e)); }
         return new Response("ok");
       }
