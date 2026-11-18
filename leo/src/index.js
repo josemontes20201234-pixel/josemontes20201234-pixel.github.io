@@ -56,8 +56,23 @@ async function horasLibres(fecha) {
   return { fecha, dia: DL[diaSemana(fecha)], libres: libres.map((h) => ({ hora: h, texto: hTxt(h) })) };
 }
 
-async function apartarCita({ fecha, hora, nombre, tel, servicio, nota }) {
+// Citas que ya apartó cada cliente (KV). Así Leo siempre sabe que el cliente ya tiene cita, aunque la plática sea larga,
+// y no la aparta dos veces (pasó: al pedir «comprobante» Leo volvió a intentar apartarla, vio la hora ocupada y creyó que no estaba hecha).
+async function citasDelCliente(env, ctx) {
+  if (!ctx || !ctx.usuario) return [];
+  try {
+    const l = JSON.parse((await env.LEO.get("citas:" + ctx.canal + ":" + ctx.usuario)) || "[]");
+    const hoy = ymdSV(Date.now());
+    return (Array.isArray(l) ? l : []).filter((c) => c && c.fecha >= hoy);
+  } catch { return []; }
+}
+
+async function apartarCita({ fecha, hora, nombre, tel, servicio, nota, otra }, env, ctx) {
   hora = Number(hora);
+  const previas = await citasDelCliente(env, ctx);
+  const misma = previas.find((c) => c.fecha === fecha && Number(c.hora) === hora);
+  if (misma) return { ok: true, ya_estaba_apartada: true, resumen: misma.resumen, precio: misma.precio };
+  if (previas.length && !otra) return { error: "Este cliente ya tiene cita apartada: " + previas.map((c) => c.resumen).join("; ") + ". Preguntale si quiere OTRA cita además de esa (si dice que sí, usá otra=true). Si quiere cambiarla o cancelarla, usá avisar_a_jose." };
   nombre = String(nombre || "").trim();
   tel = String(tel || "").replace(/\D/g, "").replace(/^503/, "");
   nota = String(nota || "").slice(0, 180);
@@ -88,11 +103,17 @@ async function apartarCita({ fecha, hora, nombre, tel, servicio, nota }) {
     ] }),
   });
   if (!r.ok) return { error: r.status === 409 ? "Esa hora se acaba de ocupar." : "No se pudo guardar la cita (" + r.status + ")." };
-  return { ok: true, resumen: serv[0] + " · " + DL[diaSemana(fecha)] + " " + fecha + " a las " + hTxt(hora) + " · " + nombre + " · " + tel, precio: serv[1] };
+  const resumen = serv[0] + " · " + DL[diaSemana(fecha)] + " " + fecha + " a las " + hTxt(hora) + " · " + nombre + " · " + tel;
+  if (env && ctx && ctx.usuario) { // se anota para este cliente; se borra sola un día después de la última cita
+    const lista = [...previas, { fecha, hora, resumen, precio: serv[1] }];
+    const hasta = Math.max(...lista.map((c) => instante(c.fecha, Number(c.hora)).getTime())) + 86400e3;
+    try { await env.LEO.put("citas:" + ctx.canal + ":" + ctx.usuario, JSON.stringify(lista), { expirationTtl: Math.max(3600, Math.round((hasta - Date.now()) / 1000)) }); } catch {}
+  }
+  return { ok: true, resumen, precio: serv[1] };
 }
 
 /* ---------- cerebro de Leo ---------- */
-function sistema(env, canal) {
+function sistema(env, canal, extra = "") {
   const hoy = ymdSV(Date.now());
   const ahora = new Date(Date.now() - SV_MS);
   const lineas = [
@@ -121,9 +142,10 @@ function sistema(env, canal) {
     "",
     "CÓMO APARTAR UNA CITA:",
     "1) Preguntá qué servicio quiere y para qué día. Cada vez que vayás a mencionar horas libres, usá la herramienta horas_libres en ese momento, aunque ya la hayas usado antes en la conversación (la agenda cambia y la regla de una hora de aviso también). Nunca digás horas libres de memoria ni de mensajes anteriores.",
-    "2) Pedí nombre y número de WhatsApp de 8 dígitos si aún no los tenés" + (canal === "whatsapp" ? " (en WhatsApp ya conocés el número de quien escribe, pero confirmalo)." : "."),
+    "2) Pedí nombre y número de WhatsApp de 8 dígitos si aún no los tenés (si el cliente manda un número de 8 dígitos que empieza con 6 o 7, ese es su WhatsApp)" + (canal === "whatsapp" ? " (en WhatsApp ya conocés el número de quien escribe, pero confirmalo)." : "."),
     "3) Antes de guardar, repetí servicio, día, hora y nombre y esperá un «sí». Luego usá apartar_cita.",
     "4) Si no se puede, ofrecé otras horas. Para cancelar o cambiar una cita, usá avisar_a_jose (todavía no podés cancelar vos).",
+    "5) Comprobante: vos no podés mandar mensajes por WhatsApp, correos ni archivos; nunca lo prometás. Si piden comprobante, deciles que este chat es su confirmación (pueden tomarle captura) y repetiles servicio, día, hora, nombre y precio.",
     "",
     "DATOS PERSONALES: si alguien pide borrar sus datos (por ejemplo «BORRAR MIS DATOS»), usá avisar_a_jose con el motivo «Pide borrar sus datos» y decile que se borran en un máximo de 30 días y que le confirmamos por este mismo medio. Si preguntan qué hacemos con sus datos, explicalo corto y pasales la política: https://josemontes20201234-pixel.github.io/privacidad/",
     "",
@@ -131,7 +153,7 @@ function sistema(env, canal) {
     "",
     "Hoy es " + DL[ahora.getUTCDay()] + " " + hoy + ", y son las " + (ahora.getUTCHours() % 12 || 12) + ":" + String(ahora.getUTCMinutes()).padStart(2, "0") + (ahora.getUTCHours() < 12 ? " a. m." : " p. m.") + " (hora de El Salvador).",
   ];
-  const hora = lineas.pop();
+  const hora = lineas.pop() + (extra ? "\n" + extra : "");
   return [
     { type: "text", text: lineas.join("\n"), cache_control: { type: "ephemeral" } }, // fijo: se reutiliza entre mensajes
     { type: "text", text: hora },
@@ -156,6 +178,7 @@ const HERRAMIENTAS = [
         tel: { type: "string", description: "WhatsApp de 8 dígitos" },
         servicio: { type: "string", enum: SERVICIOS.map((s) => s[0]) },
         nota: { type: "string" },
+        otra: { type: "boolean", description: "true solo si el cliente ya tiene una cita y confirmó que quiere OTRA además de esa" },
       },
       required: ["fecha", "hora", "nombre", "tel", "servicio"],
     },
@@ -167,12 +190,12 @@ const HERRAMIENTAS = [
   },
 ];
 
-async function llamarClaude(env, mensajes, canal) {
+async function llamarClaude(env, mensajes, canal, extra = "") {
   const r = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: { "content-type": "application/json", "x-api-key": env.LEO_ANTHROPIC_KEY, "anthropic-version": "2023-06-01" },
     body: JSON.stringify({
-      model: env.LEO_MODELO || MODELO, max_tokens: 700, system: sistema(env, canal), tools: HERRAMIENTAS, messages: mensajes,
+      model: env.LEO_MODELO || MODELO, max_tokens: 700, system: sistema(env, canal, extra), tools: HERRAMIENTAS, messages: mensajes,
       ...(env.LEO_PENSAR ? { thinking: { type: env.LEO_PENSAR } } : {}),
       ...(env.LEO_ESFUERZO ? { output_config: { effort: env.LEO_ESFUERZO } } : {}),
     }),
@@ -184,7 +207,7 @@ async function llamarClaude(env, mensajes, canal) {
 async function ejecutar(env, nombre, input, ctx) {
   if (nombre === "horas_libres") return horasLibres(input.fecha);
   if (nombre === "apartar_cita") {
-    const r = await apartarCita(input);
+    const r = await apartarCita(input, env, ctx);
     if (r.ok) await avisarJose(env, "📅 Nueva cita por Leo (" + ctx.canal + "): " + r.resumen);
     return r;
   }
@@ -222,15 +245,17 @@ async function responder(env, canal, usuario, texto) {
     if (g && !Array.isArray(g) && g.dia === hoy) previo = soloTexto(g.hist); // la de otro día (o el formato viejo) no se usa
   } catch {}
   let hist = soloTexto([...previo, { role: "user", content: texto }]);
+  const citas = await citasDelCliente(env, { canal, usuario });
+  const extra = citas.length ? "Este cliente YA tiene cita apartada (es real, está en la agenda): " + citas.map((c) => c.resumen + " · $" + Number(c.precio).toFixed(2)).join("; ") + ". No la volvás a apartar; si pide comprobante, repetile estos datos." : "";
   let salida = "";
   for (let i = 0; i < 5; i++) {
     let res;
-    try { res = await llamarClaude(env, hist, canal); }
+    try { res = await llamarClaude(env, hist, canal, extra); }
     catch (e) {
       if (!/Claude 400/.test(String(e.message)) || hist.length <= 1) throw e;
       previo = []; // el historial guardado no sirve: se empieza limpio
       hist = [{ role: "user", content: texto }];
-      res = await llamarClaude(env, hist, canal);
+      res = await llamarClaude(env, hist, canal, extra);
     }
     hist.push({ role: "assistant", content: res.content });
     const usos = res.content.filter((b) => b.type === "tool_use");
