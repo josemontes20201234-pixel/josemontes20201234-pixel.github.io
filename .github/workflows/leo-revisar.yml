@@ -17,7 +17,7 @@ jobs:
           except Exception as e: print("no se pudo leer /diag:", e); sys.exit(0)
           llave = d.get('llave') if isinstance(d.get('llave'), dict) else {}
           llave.pop('permisos', None)
-          print(json.dumps({k: d.get(k) for k in ('claves','modo','uso_meta_ultimo','revisa_desde','ultimo_envio','ultimo_recibido','firmas_rechazadas','ruta_instagram')}, indent=2, ensure_ascii=False))
+          print(json.dumps({k: d.get(k) for k in ('modo','uso_meta_ultimo','revisa_desde','ultima_revision','ultimo_envio','ruta_instagram')}, indent=2, ensure_ascii=False))
           print('mensajes_directos:', llave.get('mensajes_directos', '(no se revisó, para no gastar llamadas de Meta)'))
           print("\n=== CRONÓMETRO (hora de El Salvador) ===")
           for r in d.get('ultimas_respuestas') or []:
