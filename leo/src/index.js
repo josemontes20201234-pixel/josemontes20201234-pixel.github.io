@@ -596,13 +596,18 @@ async function revisarInstagram(env, motivo, memo = new Map()) {
     informe.push({ paso: ok ? "contestado" : "no se pudo mandar (ver ultimo_envio)", motivo, segundos: { en_verlo: seg(tVisto - tMsg), pensando: seg(tPensado - tVisto), mandando: seg(Date.now() - tPensado), primer_mensajito: tPrimero ? seg(tPrimero - tMsg) : null, total: seg(Date.now() - tMsg) }, burbujas: partes.length, botones: botones.length });
   }
   if (informe.length) {
-    await diag(env, "revision", { motivo, informe });
     console.log("informe " + motivo + " " + JSON.stringify(informe)); // solo pasos y segundos, sin datos de clientes
-    // Cronómetro de las últimas 10 respuestas (no se guardan los «sin contestar» para ahorrar escrituras)
-    if (informe.some((x) => x.paso !== "sin contestar")) {
+    const importante = informe.some((x) => x.segundos || x.paso === "pensar" || String(x.paso).startsWith("reintento") || x.paso === "ya estaba contestado");
+    if (importante) {
+      await diag(env, "revision", { motivo, informe });
+      // Cronómetro de las últimas 10 respuestas
       let h = []; try { h = JSON.parse((await env.LEO.get("diag:revisiones")) || "[]"); } catch {}
       h.push({ cuando: new Date().toISOString(), motivo, informe });
       try { await env.LEO.put("diag:revisiones", JSON.stringify(h.slice(-10)), { expirationTtl: 30 * 86400 }); } catch {}
+    } else if (Date.now() - Number((await env.LEO.get("diag:aviso_t")) || 0) > 10 * 60e3) {
+      // «sin contestar», errores de lectura o Meta lleno: se anotan como mucho cada 10 minutos (KV gratis: 1000 escrituras al día)
+      try { await env.LEO.put("diag:aviso_t", String(Date.now()), { expirationTtl: 3600 }); } catch {}
+      await diag(env, "revision", { motivo, informe });
     }
   }
   return ultimaActividad;
