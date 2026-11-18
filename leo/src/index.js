@@ -95,7 +95,7 @@ async function apartarCita({ fecha, hora, nombre, tel, servicio, nota }) {
 function sistema(env, canal) {
   const hoy = ymdSV(Date.now());
   const ahora = new Date(Date.now() - SV_MS);
-  return [
+  const lineas = [
     "Sos Leo, el asistente de IA de Meraki Barbershop 🦁💈. Hablás en español salvadoreño con voseo (vos, tenés, vení), con estilo cálido, seguro y premium.",
     "",
     "CÓMO ESCRIBIR (es un chat; a la gente le aburre mucha letra):",
@@ -127,7 +127,12 @@ function sistema(env, canal) {
     "REGLAS: no cierres todos los mensajes ofreciendo una cita; ofrecela solo cuando la persona muestre interés en venir, pregunte por disponibilidad o ya te haya preguntado precios y servicios, y no la repitas si ya la ofreciste. No inventés precios, promociones ni horarios. No des consejos médicos. Si hay un reclamo, algo que no sabés, o piden hablar con una persona, usá avisar_a_jose y decí que Jose les responde pronto. Si el mensaje no tiene que ver con la barbería, respondé amable y volvé al tema.",
     "",
     "Hoy es " + DL[ahora.getUTCDay()] + " " + hoy + ", y son las " + String(ahora.getUTCHours()).padStart(2, "0") + ":" + String(ahora.getUTCMinutes()).padStart(2, "0") + " (hora de El Salvador).",
-  ].join("\n");
+  ];
+  const hora = lineas.pop();
+  return [
+    { type: "text", text: lineas.join("\n"), cache_control: { type: "ephemeral" } }, // fijo: se reutiliza entre mensajes
+    { type: "text", text: hora },
+  ];
 }
 
 const HERRAMIENTAS = [
@@ -163,7 +168,11 @@ async function llamarClaude(env, mensajes, canal) {
   const r = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: { "content-type": "application/json", "x-api-key": env.LEO_ANTHROPIC_KEY, "anthropic-version": "2023-06-01" },
-    body: JSON.stringify({ model: MODELO, max_tokens: 700, system: sistema(env, canal), tools: HERRAMIENTAS, messages: mensajes }),
+    body: JSON.stringify({
+      model: env.LEO_MODELO || MODELO, max_tokens: 700, system: sistema(env, canal), tools: HERRAMIENTAS, messages: mensajes,
+      ...(env.LEO_PENSAR ? { thinking: { type: env.LEO_PENSAR } } : {}),
+      ...(env.LEO_ESFUERZO ? { output_config: { effort: env.LEO_ESFUERZO } } : {}),
+    }),
   });
   if (!r.ok) throw new Error("Claude " + r.status + ": " + (await r.text()).slice(0, 200));
   return r.json();
@@ -456,15 +465,15 @@ async function graphIG(env, ruta) {
   return j;
 }
 
-// Cloudflare despierta a Leo cada minuto; adentro revisa 4 veces para contestar en segundos.
+// Cloudflare despierta a Leo cada minuto; adentro revisa 7 veces (cada 8 s) para contestar en segundos.
 // Esperar no gasta CPU, y termina antes del siguiente minuto.
 async function revisarSeguido(env) {
   const t0 = Date.now();
-  for (const seg of [0, 14, 28, 42]) {
+  for (const seg of [0, 8, 16, 24, 32, 40, 48]) {
     const falta = t0 + seg * 1000 - Date.now();
     if (falta > 0) await new Promise((r) => setTimeout(r, falta));
     if (seg > 0 && usoMeta >= 60) break;
-    await revisarInstagram(env, seg ? "cada 15 s" : "cada minuto");
+    await revisarInstagram(env, seg ? "cada 8 s" : "cada minuto");
   }
 }
 
@@ -515,7 +524,7 @@ async function revisarInstagram(env, motivo) {
     nuevo.ultimo = pendientes[pendientes.length - 1].id;
     await guardar(nuevo); // se marca antes de contestar para no contestar dos veces
     const tMsg = tiempo(pendientes[pendientes.length - 1].created_time), tVisto = Date.now(); // para medir cuánto tarda (sin datos del cliente)
-    await accionMeta(env, yo, String(cliente.id), "typing_on"); // el cliente ve «escribiendo…» mientras Leo piensa
+    const escribiendo = accionMeta(env, yo, String(cliente.id), "typing_on"); // el cliente ve «escribiendo…» mientras Leo piensa
     let respuesta;
     try { respuesta = await responder(env, "instagram", String(cliente.id), pendientes.map((m) => m.message).join("\n").slice(0, 1500)); }
     catch (e) { informe.push({ paso: "pensar", error: String(e.message || e).slice(0, 160) }); continue; }
@@ -524,13 +533,14 @@ async function revisarInstagram(env, motivo) {
       const recientes = ((await graphIG(env, c.id + "?fields=" + encodeURIComponent("messages.limit(5){id,created_time,from}"))).messages || {}).data || [];
       if (recientes.some((m) => esNegocio(m.from) && tiempo(m.created_time) > tCliente)) { informe.push({ paso: "ya estaba contestado" }); continue; }
     } catch {}
+    await escribiendo;
     const tPensado = Date.now();
     const { burbujas, botones } = prepararRespuesta(respuesta);
     const partes = burbujas.flatMap((b) => trozos(b));
     let ok = true;
     for (let i = 0; i < partes.length; i++) {
       const ultima = i === partes.length - 1;
-      if (i > 0) { await accionMeta(env, yo, String(cliente.id), "typing_on"); await new Promise((r) => setTimeout(r, 900)); }
+      if (i > 0) await new Promise((r) => setTimeout(r, 300));
       let fue = await enviarMeta(env, "instagram", yo, String(cliente.id), partes[i], ultima ? botones : null);
       if (!fue && ultima && botones.length) { // si Instagram no acepta los botones, se manda el texto solo
         fue = await enviarMeta(env, "instagram", yo, String(cliente.id), partes[i]);
