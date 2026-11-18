@@ -1,0 +1,73 @@
+name: Leo — probar el camino de la Página (límite de Meta)
+# Compara qué límite de Meta usa cada camino para leer los chats de Instagram.
+# Nunca imprime llaves ni mensajes: solo códigos, tipos de llave y porcentajes de uso.
+on:
+  workflow_dispatch:
+    inputs:
+      guardar:
+        description: Si el camino de la Página sirve, guardar su llave en Cloudflare (si/no)
+        default: "no"
+jobs:
+  probar:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Probar
+        env:
+          T: ${{ secrets.META_IG_TOKEN }}
+          S: ${{ secrets.META_APP_SECRET }}
+          CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          GUARDAR: ${{ inputs.guardar }}
+        run: |
+          python3 - <<'PY'
+          import json, os, urllib.request, urllib.error
+          IG, APP, G = "17841479582218392", "28956358694060671", "https://graph.facebook.com/v23.0/"
+          def llamar(url, token=None, metodo="GET", datos=None, extra=None):
+              h = {"Authorization": "Bearer " + token} if token else {}
+              h.update(extra or {})
+              req = urllib.request.Request(url, headers=h, method=metodo, data=datos)
+              try:
+                  r = urllib.request.urlopen(req, timeout=30); st, hh = r.status, r.headers; body = json.load(r)
+              except urllib.error.HTTPError as e:
+                  st, hh = e.code, e.headers
+                  try: body = json.load(e)
+                  except Exception: body = {}
+              lim = {k: hh.get(k) for k in ("x-app-usage", "x-business-use-case-usage") if hh.get(k)}
+              return st, body, lim
+          def err(b): e = b.get("error") or {}; return (str(e.get("code", "")) + " " + str(e.get("message", ""))[:110]).strip() or "ok"
+          def tipo(tok):
+              st, b, _ = llamar(G + "debug_token?input_token=" + tok + "&access_token=" + APP + "|" + os.environ["S"])
+              d = b.get("data") or {}
+              return {"tipo": d.get("type"), "vence": d.get("expires_at"), "valida": d.get("is_valid")} if st == 200 else err(b)
+
+          t = os.environ["T"]
+          print("Llave actual:", tipo(t))
+          st, b, lim = llamar(G + IG + "/conversations?platform=instagram&fields=updated_time&limit=1", t)
+          print("Camino actual (cuenta de Instagram):", st, err(b), "| límites:", lim or "(Meta no mandó encabezado de uso)")
+
+          st, b, lim = llamar(G + "me/accounts?fields=id,name,instagram_business_account,access_token&limit=50", t)
+          print("Páginas a las que llega la llave:", st, err(b))
+          pag = None
+          for p in b.get("data") or []:
+              ig = (p.get("instagram_business_account") or {}).get("id")
+              print("  -", p.get("name"), "| conectada a Instagram:", "sí, a Meraki" if ig == IG else (ig or "no"), "| trae llave:", bool(p.get("access_token")))
+              if ig == IG: pag = p
+          if not pag or not pag.get("access_token"):
+              print("RESULTADO: la llave no llega a la Página de Meraki (habría que darle acceso en Meta Business)."); raise SystemExit(0)
+
+          pt = pag["access_token"]
+          print("::add-mask::" + pt, flush=True)  # GitHub la tapa en los registros por si acaso (este renglón no se muestra)
+          print("Llave de la Página:", tipo(pt))
+          for i in range(3):
+              st, b, lim = llamar(G + pag["id"] + "/conversations?platform=instagram&fields=updated_time&limit=1", pt)
+              print("Camino de la Página, intento", i + 1, ":", st, err(b), "| límites:", lim or "(Meta no mandó encabezado de uso)")
+          if st != 200:
+              print("RESULTADO: el camino de la Página no sirve para leer los chats."); raise SystemExit(0)
+          print("RESULTADO: el camino de la Página sí lee los chats.")
+
+          if os.environ.get("GUARDAR") == "si":
+              A = "bcefe39d21eb6d4d1db006a3f7db17a9"
+              for nombre, valor in (("META_PAGE_TOKEN", pt), ("META_PAGE_ID", pag["id"])):
+                  st, b, _ = llamar("https://api.cloudflare.com/client/v4/accounts/" + A + "/workers/scripts/meraki-leo/secrets", os.environ["CF_TOKEN"], "PUT",
+                                    json.dumps({"name": nombre, "text": valor, "type": "secret_text"}).encode(), {"Content-Type": "application/json"})
+                  print("Guardada en Leo:", nombre, "✔" if b.get("success") else b.get("errors"))
+          PY
