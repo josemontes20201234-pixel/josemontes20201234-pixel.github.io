@@ -42,4 +42,13 @@ jobs:
           print("lista + participantes |", st, "|", e, "| app:", app, "| negocio:", buc, "| trae participantes:", bool(((b2.get("data") or [{}])[0].get("participants") or {}).get("data")))
           st, e, app, buc, b3 = llamar(IG + "/conversations?platform=instagram&fields=" + urllib.request.quote("updated_time,messages.limit(1){id,created_time,from}") + "&limit=10")
           print("lista + último mensaje |", st, "|", e, "| app:", app, "| negocio:", buc, "| trae último:", bool(((b3.get("data") or [{}])[0].get("messages") or {}).get("data")))
+          uid = None
+          for c in b3.get("data") or []:
+              m = ((c.get("messages") or {}).get("data") or [{}])[0]
+              if (m.get("from") or {}).get("id") and m["from"]["id"] != IG: uid = m["from"]["id"]; break
+          if uid:
+              st, e, app, buc, b4 = llamar(IG + "/conversations?platform=instagram&user_id=" + uid + "&fields=" + urllib.request.quote("updated_time,messages.limit(15){id,created_time,from,message}"))
+              print("un solo chat por cliente (15 mensajes) |", st, "|", e, "| app:", app, "| negocio:", buc, "| chats:", len(b4.get("data") or []), "| mensajes:", len((((b4.get("data") or [{}])[0].get("messages") or {}).get("data") or [])))
+          st, e, app, buc, b5 = llamar(IG + "/conversations?platform=instagram&fields=" + urllib.request.quote("updated_time,messages.limit(15){id,created_time,from,message}") + "&limit=10")
+          print("todos los chats con 15 mensajes |", st, "|", e, "| app:", app, "| negocio:", buc)
           PY
