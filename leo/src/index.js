@@ -495,6 +495,7 @@ async function graphIG(env, ruta) {
 // Cloudflare despierta a Leo cada minuto; adentro revisa varias veces. Cada revisión es UNA consulta a la lista
 // de chats (con el último mensaje adentro), que no gasta el límite por hora de la app. El ritmo se ajusta solo:
 // más rápido si hay una conversación activa, y más lento si el límite del negocio se llena.
+const MARCA_LEO = "\u2063"; // separador invisible al final de cada mensaje de Leo: así reconoce lo suyo aunque se pierdan los apuntes
 const ACTIVA_MS = 3 * 60e3; // una conversación con movimiento en los últimos 3 minutos se revisa más seguido
 function pausaRevision(uso, activa) { // segundos hasta la siguiente revisión (0 = ya no más en este minuto)
   if (uso >= 90) return 0;
@@ -506,16 +507,17 @@ async function revisarSeguido(env) {
   const t0 = Date.now();
   const memo = new Map(); // lo leído de KV en esta ronda (KV gratis: 100 000 lecturas al día)
   let ultimaActividad = 0, pausa = 0, primera = true;
-  for (let inicio = t0; ; ) {
-    const falta = inicio - Date.now();
+  for (let proxima = t0; ; ) {
+    const falta = proxima - Date.now();
     if (falta > 0) await new Promise((r) => setTimeout(r, falta));
+    const inicioRevision = Date.now();
     const act = await revisarInstagram(env, primera ? "cada minuto" : "seguido (cada " + pausa + " s)", memo);
     if (act) ultimaActividad = Math.max(ultimaActividad, act);
     primera = false;
     pausa = pausaRevision(usoNegocio, Date.now() - ultimaActividad < ACTIVA_MS);
-    console.log("revision a los " + Math.round((inicio - t0) / 1000) + " s · Meta negocio " + usoNegocio + "% app " + usoAppAhora() + "% · siguiente en " + (pausa || "-") + " s");
-    inicio += pausa * 1000;
-    if (!pausa || inicio - t0 > 50e3) break; // termina antes de que Cloudflare lo despierte otra vez
+    console.log("revision " + new Date(inicioRevision - SV_MS).toISOString().slice(11, 19) + " (a los " + Math.round((inicioRevision - t0) / 1000) + " s) · Meta negocio " + usoNegocio + "% app " + usoAppAhora() + "% · siguiente en " + (pausa || "-") + " s");
+    proxima = Math.max(inicioRevision + pausa * 1000, Date.now() + 500);
+    if (!pausa || proxima - t0 > 52e3) break; // con el reloj real: termina antes de que Cloudflare lo despierte otra vez
   }
 }
 
@@ -598,10 +600,14 @@ async function revisarInstagram(env, motivo, memo = new Map()) {
     }
     // Si Jose contestó a mano HOY en este chat (mensaje del negocio que no mandó Leo), Leo no se mete hasta mañana.
     // Lo de Leo se reconoce por el número de mensaje de Meta, o por el texto. Solo cuenta lo de después del arranque.
-    const plano = (t) => String(t || "").replace(/\s+/g, " ").trim();
-    const dichoPlano = dicho.map(plano);
-    const manual = msgs.some((m) => esNegocio(m.from) && tiempo(m.created_time) >= inicio && ymdSV(tiempo(m.created_time)) === ymdSV(ahora)
-      && !mios.includes(String(m.id)) && !dichoPlano.includes(plano(m.message)));
+    const plano = (t) => String(t || "").replace(/\u2063/g, "").replace(/\s+/g, " ").trim();
+    const deJoseHoy = (lista) => msgs.filter((m) => esNegocio(m.from) && tiempo(m.created_time) >= inicio && ymdSV(tiempo(m.created_time)) === ymdSV(ahora)
+      && !String(m.message || "").includes(MARCA_LEO) && !lista.mios.includes(String(m.id)) && !lista.dicho.map(plano).includes(plano(m.message)));
+    let manual = deJoseHoy({ mios, dicho }).length > 0;
+    if (manual) { // antes de callarse, se confirma con lo último guardado (otra revisión pudo haber mandado esos mensajes)
+      let fresco = {}; try { fresco = JSON.parse((await env.LEO.get(clave)) || "{}"); } catch {}
+      manual = deJoseHoy({ mios: [...mios, ...(fresco.mios || [])], dicho: [...dicho, ...(fresco.dicho || [])] }).length > 0;
+    }
     if (manual) { informe.push({ paso: "sin contestar", por: "Jose está atendiendo ese chat" }); await guardar(nuevo); continue; }
 
     const yaEscrita = idUltimo === estado.ultimo && estado.respuesta ? estado.respuesta : null;
@@ -631,9 +637,9 @@ async function revisarInstagram(env, motivo, memo = new Map()) {
     let ok = true, mandadas = 0;
     for (let i = 0; i < partes.length && ok; i++) {
       const ultima = i === partes.length - 1; // sin pausa: cada envío a Meta ya tarda 1 a 2 s
-      let fue = await enviarMeta(env, "instagram", yo, String(cliente.id), partes[i], ultima ? botones : null);
+      let fue = await enviarMeta(env, "instagram", yo, String(cliente.id), partes[i] + MARCA_LEO, ultima ? botones : null);
       if (!fue && ultima && botones.length) { // si Instagram no acepta los botones, se manda el texto solo
-        fue = await enviarMeta(env, "instagram", yo, String(cliente.id), partes[i]);
+        fue = await enviarMeta(env, "instagram", yo, String(cliente.id), partes[i] + MARCA_LEO);
         if (fue) informe.push({ paso: "botones no funcionaron" });
       }
       if (fue) { dicho.push(partes[i]); if (typeof fue === "string") mios.push(fue); mandadas++; if (!tPrimero) tPrimero = Date.now(); } else ok = false;
