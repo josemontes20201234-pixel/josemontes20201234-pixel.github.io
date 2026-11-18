@@ -306,14 +306,15 @@ async function revisarLlave(env) {
   const ig = await pedir("https://graph.instagram.com/v23.0/me?fields=user_id,username");
   out.instagram = ig.ok ? "sirve (" + (ig.j.username || ig.j.user_id || "?") + ")" : ig.error;
   // ¿Puede leer los mensajes directos? (sólo se cuenta, no se lee nada)
-  const conv = await pedir("https://graph.facebook.com/v23.0/" + cuenta + "/conversations?platform=instagram&limit=5");
-  out.mensajes_directos = conv.ok ? "sirve (" + ((conv.j.data || []).length) + " conversaciones vistas)" : conv.error;
+  const conv = await pedir("https://graph.facebook.com/v23.0/" + cuenta + "/conversations?platform=instagram&fields=updated_time&limit=3");
+  out.mensajes_directos = conv.ok ? "sirve" : conv.error;
+  if (conv.ok) out.ultimas_conversaciones = (conv.j.data || []).map((c) => c.updated_time); // sólo la hora, sin contenido
   // Avisos que Meta le manda a Leo (configurados en la app), leído como la app
   if (app.ok && env.META_APP_SECRET) {
     try {
       const r = await fetch("https://graph.facebook.com/v23.0/" + app.j.id + "/subscriptions?access_token=" + encodeURIComponent(app.j.id + "|" + env.META_APP_SECRET));
       const j = await r.json().catch(() => ({}));
-      out.avisos_app = r.ok ? (j.data || []).map((x) => ({ objeto: x.object, activo: x.active, campos: (x.fields || []).map((f) => f.name) })) : (j.error ? (j.error.code || "") + " " + (j.error.message || "") : String(r.status));
+      out.avisos_app = r.ok ? (j.data || []).map((x) => ({ objeto: x.object, activo: x.active, url: x.callback_url, campos: (x.fields || []).map((f) => f.name) })) : (j.error ? (j.error.code || "") + " " + (j.error.message || "") : String(r.status));
     } catch (e) { out.avisos_app = String(e).slice(0, 120); }
   }
   // ¿La cuenta de Instagram le manda sus avisos a la app?
