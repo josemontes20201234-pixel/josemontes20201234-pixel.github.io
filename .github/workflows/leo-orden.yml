@@ -1,0 +1,32 @@
+name: Leo — orden y frescura de los mensajes en la lista
+# Solo horas y quién escribió (negocio o cliente). Nada de texto, nombres ni llaves.
+on:
+  workflow_dispatch:
+jobs:
+  medir:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Medir
+        env:
+          T: ${{ secrets.META_IG_TOKEN }}
+        run: |
+          python3 - <<'PY'
+          import json, os, urllib.request, urllib.error
+          IG, G, t = "17841479582218392", "https://graph.facebook.com/v23.0/", os.environ["T"]
+          def get(ruta):
+              req = urllib.request.Request(G + ruta, headers={"Authorization": "Bearer " + t})
+              try: return json.load(urllib.request.urlopen(req, timeout=30))
+              except urllib.error.HTTPError as e:
+                  try: return json.load(e)
+                  except Exception: return {}
+          q = urllib.request.quote
+          liv = get(IG + "/conversations?platform=instagram&fields=updated_time&limit=3").get("data") or []
+          pes = get(IG + "/conversations?platform=instagram&fields=" + q("updated_time,messages.limit(15){id,created_time,from}") + "&limit=3").get("data") or []
+          quien = lambda m: "negocio" if (m.get("from") or {}).get("id") == IG else "cliente"
+          for i, c in enumerate(pes[:2]):
+              print("chat", i + 1, "| hora en la lista liviana:", (liv[i] if i < len(liv) else {}).get("updated_time"), "| en la pesada:", c.get("updated_time"))
+              ms = (c.get("messages") or {}).get("data") or []
+              print("   mensajes por la lista (en el orden que llegan):", len(ms), [m["created_time"][11:19] + " " + quien(m) for m in ms[:6]], "...")
+              ab = (get(c["id"] + "?fields=" + q("messages.limit(6){id,created_time,from}")).get("messages") or {}).get("data") or []
+              print("   abriendo el chat (6 más nuevos):", [m["created_time"][11:19] + " " + quien(m) for m in ab])
+          PY
