@@ -1,0 +1,27 @@
+name: Leo — activar a alguien en modo prueba
+# Busca el mensaje por un pedazo del texto y la hora; nunca muestra el usuario completo.
+on:
+  workflow_dispatch:
+    inputs:
+      texto:
+        description: Un pedazo del mensaje que mandó la persona
+        required: true
+      desde:
+        description: Desde qué hora (ISO, UTC)
+        required: true
+      hasta:
+        description: Hasta qué hora (ISO, UTC)
+        required: true
+jobs:
+  permitir:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Activar
+        env:
+          S: ${{ secrets.META_APP_SECRET }}
+          TEXTO: ${{ inputs.texto }}
+          DESDE: ${{ inputs.desde }}
+          HASTA: ${{ inputs.hasta }}
+        run: |
+          Q=$(python3 -c "import os,urllib.parse as u; print(u.urlencode({'texto':os.environ['TEXTO'],'desde':os.environ['DESDE'],'hasta':os.environ['HASTA']}))")
+          curl -s -X POST -H "x-diag: $S" "https://meraki-leo.merakibarbershop.workers.dev/permitir?$Q"; echo

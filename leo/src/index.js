@@ -583,6 +583,8 @@ async function revisarInstagram(env, motivo, memo = new Map()) {
   if (!inicio) { inicio = ahora - (ahora % 1000); await poner("ig:inicio", String(inicio)); } // lo de antes no se contesta (Meta da la hora en segundos)
   const yo = String(env.IG_ID), yoUsuario = String(env.IG_USUARIO || "").toLowerCase();
   const solo = String(env.LEO_SOLO || "").toLowerCase().split(",").map((x) => x.trim()).filter(Boolean);
+  // Modo prueba: además de LEO_SOLO, las cuentas que se activaron con /permitir (guardadas en KV, sin mostrarlas)
+  if (solo.length) { try { for (const u of JSON.parse((await leer("solo:extra")) || "[]")) solo.push(String(u).toLowerCase()); } catch {} }
   const esNegocio = (f) => !!f && (String(f.id) === yo || (!!yoUsuario && String(f.username || "").toLowerCase() === yoUsuario));
 
   const lista = (campos) => graphIG(env, yo + "/conversations?platform=instagram&fields=" + encodeURIComponent(campos) + "&limit=10").then((j) => j.data || []);
@@ -790,6 +792,29 @@ export default {
         cursor = l.list_complete ? null : l.cursor;
       } while (cursor);
       return json({ ok: true, revisa_desde: new Date(desde).toISOString(), apuntes_borrados: borrados });
+    }
+    if (url.pathname === "/permitir" && request.method === "POST") {
+      // Modo prueba: activa a la persona que mandó un mensaje (se busca por un pedazo del texto y la hora),
+      // sin mostrar su usuario, y hace que Leo vuelva a revisar ese chat.
+      if (!env.META_APP_SECRET || request.headers.get("x-diag") !== env.META_APP_SECRET) return new Response("No autorizado", { status: 403 });
+      const texto = String(url.searchParams.get("texto") || "").toLowerCase().trim();
+      const desde = Date.parse(url.searchParams.get("desde") || ""), hasta = Date.parse(url.searchParams.get("hasta") || "");
+      if (texto.length < 6 || isNaN(desde) || isNaN(hasta)) return json({ ok: false, error: "Faltan texto (6+ letras), desde y hasta" }, 400);
+      const yo = String(env.IG_ID);
+      const data = (await graphIG(env, yo + "/conversations?platform=instagram&fields=" + encodeURIComponent("updated_time,messages.limit(15){id,created_time,from,message}") + "&limit=10")).data || [];
+      const hallados = new Map(); // usuario -> id del chat
+      for (const c of data) for (const m of (c.messages || {}).data || []) {
+        const t = tiempo(m.created_time), de = m.from || {};
+        if (String(de.id) !== yo && de.username && t >= desde && t <= hasta && String(m.message || "").toLowerCase().includes(texto)) hallados.set(String(de.username).toLowerCase(), c.id);
+      }
+      const tapar = (u) => u.slice(0, 2) + "***" + u.slice(-1);
+      if (hallados.size !== 1) return json({ ok: false, encontrados: [...hallados.keys()].map(tapar) });
+      const [usuario, chat] = [...hallados.entries()][0];
+      let extra = []; try { extra = JSON.parse((await env.LEO.get("solo:extra")) || "[]"); } catch {}
+      if (!extra.includes(usuario)) extra.push(usuario);
+      await env.LEO.put("solo:extra", JSON.stringify(extra));
+      await env.LEO.delete("conv:" + chat); // así Leo vuelve a revisar ese chat y contesta lo pendiente
+      return json({ ok: true, permitido: tapar(usuario), cuentas_activadas: extra.length });
     }
     if (url.pathname === "/diag-chat") { // ¿Leo reconoce sus propios mensajes? Solo conteos (sin textos ni números completos)
       if (!env.META_APP_SECRET || request.headers.get("x-diag") !== env.META_APP_SECRET) return new Response("No autorizado", { status: 403 });
