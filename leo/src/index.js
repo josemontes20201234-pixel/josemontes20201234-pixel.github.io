@@ -282,6 +282,7 @@ async function revisarLlave(env) {
   const pedir = async (u) => {
     try {
       const r = await fetch(u, { headers: { authorization: "Bearer " + t } });
+      leerUso(r);
       const j = await r.json().catch(() => ({}));
       return r.ok ? { ok: true, j } : { ok: false, error: j.error ? (j.error.code || "") + " " + (j.error.message || "") : String(r.status) };
     } catch (e) { return { ok: false, error: String(e).slice(0, 120) }; }
@@ -391,11 +392,37 @@ function trozos(texto, max = 950) {
   return partes;
 }
 
+// Cuánto del límite de llamadas de Meta llevamos (0 a 100), según lo que Meta dice en cada respuesta
+let usoMeta = 0;
+function leerUso(r) {
+  try {
+    let max = 0;
+    const app = JSON.parse(r.headers.get("x-app-usage") || "{}");
+    max = Math.max(max, app.call_count || 0, app.total_time || 0, app.total_cputime || 0);
+    const buc = JSON.parse(r.headers.get("x-business-use-case-usage") || "{}");
+    for (const k in buc) for (const u of buc[k] || []) max = Math.max(max, u.call_count || 0, u.total_time || 0, u.total_cputime || 0);
+    usoMeta = max;
+  } catch {}
+}
+
 async function graphIG(env, ruta) {
   const r = await fetch("https://graph.facebook.com/v23.0/" + ruta, { headers: { authorization: "Bearer " + env.META_IG_TOKEN } });
+  leerUso(r);
   const j = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(j.error ? (j.error.code || "") + " " + (j.error.message || "") : String(r.status));
   return j;
+}
+
+// Cloudflare despierta a Leo cada minuto; adentro revisa 4 veces para contestar en segundos.
+// Esperar no gasta CPU, y termina antes del siguiente minuto.
+async function revisarSeguido(env) {
+  const t0 = Date.now();
+  for (const seg of [0, 14, 28, 42]) {
+    const falta = t0 + seg * 1000 - Date.now();
+    if (falta > 0) await new Promise((r) => setTimeout(r, falta));
+    if (seg > 0 && usoMeta >= 60) break;
+    await revisarInstagram(env, seg ? "cada 15 s" : "cada minuto");
+  }
 }
 
 async function revisarInstagram(env, motivo) {
@@ -447,6 +474,11 @@ async function revisarInstagram(env, motivo) {
     let respuesta;
     try { respuesta = await responder(env, "instagram", String(cliente.id), pendientes.map((m) => m.message).join("\n").slice(0, 1500)); }
     catch (e) { informe.push({ paso: "pensar", error: String(e.message || e).slice(0, 160) }); continue; }
+    try {
+      const tCliente = tiempo(pendientes[pendientes.length - 1].created_time);
+      const recientes = ((await graphIG(env, c.id + "?fields=" + encodeURIComponent("messages.limit(5){id,created_time,from}"))).messages || {}).data || [];
+      if (recientes.some((m) => esNegocio(m.from) && tiempo(m.created_time) > tCliente)) { informe.push({ paso: "ya estaba contestado" }); continue; }
+    } catch {}
     let ok = true;
     for (const t of trozos(respuesta)) {
       const fue = await enviarMeta(env, "instagram", yo, String(cliente.id), t);
@@ -483,7 +515,7 @@ add("Escribí como si fueras un cliente. Por ejemplo: «hola, cuánto cuesta un 
 
 export default {
   async scheduled(controller, env, ctx) {
-    ctx.waitUntil(revisarInstagram(env, "cada minuto").catch((e) => console.log("revision error", String(e))));
+    ctx.waitUntil(revisarSeguido(env).catch((e) => console.log("revision error", String(e))));
   },
 
   async fetch(request, env, ctx) {
@@ -503,6 +535,7 @@ export default {
         firmas_rechazadas: await leer("diag:firma"),
         ruta_instagram: await env.LEO.get("ruta:instagram"),
         modo: env.LEO_SOLO ? "solo contesta a: " + env.LEO_SOLO : "contesta a todos",
+        uso_meta_ultimo: usoMeta + "%",
         revisa_desde: (await env.LEO.get("ig:inicio")) ? new Date(Number(await env.LEO.get("ig:inicio"))).toISOString() : null,
         ultima_revision: await leer("diag:revision"),
         llave: await revisarLlave(env),
