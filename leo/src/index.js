@@ -488,7 +488,7 @@ function pausaRevision(uso, activa) { // segundos hasta la siguiente revisión (
   if (uso >= 90) return 0;
   if (uso >= 75) return activa ? 15 : 30;
   if (uso >= 50) return activa ? 8 : 12;
-  return activa ? 5 : 6; // ~10 revisiones por minuto: dentro del CPU que da Cloudflare gratis
+  return activa ? 5 : 7; // 8 a 11 revisiones por minuto: lo que aguanta el CPU que da Cloudflare gratis (10 ms)
 }
 async function revisarSeguido(env) {
   const t0 = Date.now();
@@ -520,7 +520,7 @@ async function revisarInstagram(env, motivo, memo = new Map()) {
 
   const lista = (campos) => graphIG(env, yo + "/conversations?platform=instagram&fields=" + encodeURIComponent(campos) + "&limit=10").then((j) => j.data || []);
   let convs;
-  try { convs = await lista("updated_time,messages.limit(1){id,created_time,from}"); }
+  try { convs = await lista("updated_time"); } // lo más liviano posible (cada revisión gasta CPU de Cloudflare)
   catch (e) { await diag(env, "revision", { motivo, error: String(e.message || e).slice(0, 200) }); return; }
   const ultimaActividad = Math.max(0, ...convs.map((c) => tiempo(c.updated_time)));
   // Los últimos 15 mensajes de cada chat, también por la lista (abrir el chat gasta ~3% del límite por hora de la app).
@@ -549,17 +549,17 @@ async function revisarInstagram(env, motivo, memo = new Map()) {
     const dicho = Array.isArray(estado.dicho) ? estado.dicho : [];
     const nuevo = { ...estado, visto: c.updated_time, listo: estado.ultimo }; // si no se contesta ahora, lo anterior queda cerrado
 
-    // Con el último mensaje (ya viene en la lista) casi siempre se sabe si hay algo que contestar, sin leer más
-    const ult = ((c.messages || {}).data || [])[0];
+    let msgs;
+    try { msgs = await leerChat(c.id); }
+    catch (e) { informe.push({ paso: "leer chat", error: String(e.message || e).slice(0, 160) }); continue; }
+    // Con el último mensaje casi siempre se sabe si hay algo que contestar
+    const ult = msgs[0];
     const tUlt = ult ? tiempo(ult.created_time) : 0;
     if (!ult || esNegocio(ult.from) || tUlt < inicio || ahora - tUlt > VENTANA_MS || (ult.id === estado.ultimo && !aMedias)) { await guardar(nuevo); continue; }
     if (solo.length && !solo.includes(String((ult.from || {}).username || "").toLowerCase())) {
       informe.push({ paso: "sin contestar", por: "modo prueba: no es la cuenta de prueba" }); // sin datos del cliente
       await guardar(nuevo); continue;
     }
-    let msgs;
-    try { msgs = await leerChat(c.id); }
-    catch (e) { informe.push({ paso: "leer chat", error: String(e.message || e).slice(0, 160) }); continue; }
     msgs = [...msgs].reverse().sort((x, y) => tiempo(x.created_time) - tiempo(y.created_time)); // Meta los da del más nuevo al más viejo: se ponen en orden
 
     // Lo que el cliente escribió después de la última respuesta del negocio
