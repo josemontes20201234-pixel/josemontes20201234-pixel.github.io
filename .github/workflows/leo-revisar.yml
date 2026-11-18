@@ -5,6 +5,9 @@ on:
       reiniciar:
         description: Que Leo empiece de cero (los mensajes de antes no cuentan) (si/no)
         default: "no"
+      desde:
+        description: Al reiniciar, desde qué hora cuentan los mensajes (ISO, vacío = ahora)
+        default: ""
 jobs:
   revisar:
     runs-on: ubuntu-latest
@@ -14,7 +17,8 @@ jobs:
           S: ${{ secrets.META_APP_SECRET }}
         run: |
           date -u
-          if [ "${{ inputs.reiniciar }}" = "si" ]; then curl -s -X POST -H "x-diag: $S" "https://meraki-leo.merakibarbershop.workers.dev/reiniciar"; echo; fi
+          echo "¿Leo reconoce sus mensajes? (solo conteos)"; curl -s -H "x-diag: $S" "https://meraki-leo.merakibarbershop.workers.dev/diag-chat"; echo
+          if [ "${{ inputs.reiniciar }}" = "si" ]; then curl -s -X POST -H "x-diag: $S" "https://meraki-leo.merakibarbershop.workers.dev/reiniciar?desde=${{ inputs.desde }}"; echo; fi
           curl -s -H "x-diag: $S" "https://meraki-leo.merakibarbershop.workers.dev/diag?ligero=1" > "$RUNNER_TEMP/d.json" || true
           python3 - "$RUNNER_TEMP/d.json" <<'PY'
           import sys, json, datetime as dt

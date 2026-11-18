@@ -728,9 +728,46 @@ export default {
     // Suscribir la cuenta de Instagram para que Meta le mande los mensajes a Leo (protegido)
     if (url.pathname === "/reiniciar" && request.method === "POST") {
       if (!env.META_APP_SECRET || request.headers.get("x-diag") !== env.META_APP_SECRET) return new Response("No autorizado", { status: 403 });
-      const ahora = Date.now() - (Date.now() % 1000);
-      await env.LEO.put("ig:inicio", String(ahora)); // los mensajes de antes de esta hora ya no se contestan ni cuentan
-      return json({ ok: true, revisa_desde: new Date(ahora).toISOString() });
+      // Desde qué hora cuenta (por defecto, ahora). Los mensajes de antes ya no se contestan ni cuentan, y se borran los apuntes de cada chat.
+      const pedido = Date.parse(url.searchParams.get("desde") || "");
+      const desde = (isNaN(pedido) ? Date.now() : pedido) - ((isNaN(pedido) ? Date.now() : pedido) % 1000);
+      await env.LEO.put("ig:inicio", String(desde));
+      let borrados = 0, cursor;
+      do {
+        const l = await env.LEO.list({ prefix: "conv:", cursor });
+        for (const k of l.keys) { await env.LEO.delete(k.name); borrados++; }
+        cursor = l.list_complete ? null : l.cursor;
+      } while (cursor);
+      return json({ ok: true, revisa_desde: new Date(desde).toISOString(), apuntes_borrados: borrados });
+    }
+    if (url.pathname === "/diag-chat") { // ¿Leo reconoce sus propios mensajes? Solo conteos (sin textos ni números completos)
+      if (!env.META_APP_SECRET || request.headers.get("x-diag") !== env.META_APP_SECRET) return new Response("No autorizado", { status: 403 });
+      const yo = String(env.IG_ID);
+      const plano = (t) => String(t || "").replace(/\u2063/g, "").replace(/\s+/g, " ").trim();
+      const data = (await graphIG(env, yo + "/conversations?platform=instagram&fields=" + encodeURIComponent("updated_time,messages.limit(15){id,created_time,from,message}") + "&limit=3")).data || [];
+      const out = [];
+      for (const c of data) {
+        let est = {}; try { est = JSON.parse((await env.LEO.get("conv:" + c.id)) || "{}"); } catch {}
+        const ms = ((c.messages || {}).data || []).filter((m) => String((m.from || {}).id) === yo);
+        const mios = (est.mios || []).map(String), dicho = (est.dicho || []).map(plano);
+        let dif = null;
+        if (ms[0] && dicho.length && !dicho.includes(plano(ms[0].message))) { // dónde difiere el texto (solo los códigos de 2 letras)
+          const a = plano(ms[0].message);
+          let mejor = "", n = -1;
+          for (const d of dicho) { let i = 0; while (i < a.length && i < d.length && a[i] === d[i]) i++; if (i > n) { n = i; mejor = d; } }
+          const cod = (x) => (x ? "U+" + x.codePointAt(0).toString(16).toUpperCase() : "fin");
+          dif = { igual_hasta: n, de_meta: cod(a[n]), guardado: cod(mejor[n]), largo_meta: a.length, largo_guardado: mejor.length };
+        }
+        out.push({ actualizado: c.updated_time, del_negocio: ms.length,
+          con_marca: ms.filter((m) => String(m.message || "").includes("\u2063")).length,
+          en_mios: ms.filter((m) => mios.includes(String(m.id))).length,
+          en_dicho: ms.filter((m) => dicho.includes(plano(m.message))).length,
+          mios_guardados: mios.length, dicho_guardado: dicho.length,
+          id_meta: ms[0] ? String(ms[0].id).slice(0, 12) + "… (" + String(ms[0].id).length + ")" : null,
+          id_guardado: mios.length ? mios[mios.length - 1].slice(0, 12) + "… (" + mios[mios.length - 1].length + ")" : null,
+          diferencia_texto: dif });
+      }
+      return json(out);
     }
     if (url.pathname === "/suscribir" && request.method === "POST") {
       if (!env.META_APP_SECRET || request.headers.get("x-diag") !== env.META_APP_SECRET) return new Response("No autorizado", { status: 403 });
