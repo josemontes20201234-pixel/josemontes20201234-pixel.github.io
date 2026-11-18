@@ -517,7 +517,9 @@ async function revisarSeguido(env) {
     pausa = pausaRevision(usoNegocio, Date.now() - ultimaActividad < ACTIVA_MS);
     console.log("revision " + new Date(inicioRevision - SV_MS).toISOString().slice(11, 19) + " (a los " + Math.round((inicioRevision - t0) / 1000) + " s) · Meta negocio " + usoNegocio + "% app " + usoAppAhora() + "% · siguiente en " + (pausa || "-") + " s");
     proxima = Math.max(inicioRevision + pausa * 1000, Date.now() + 500);
-    if (!pausa || proxima - t0 > 52e3) break; // con el reloj real: termina antes de que Cloudflare lo despierte otra vez
+    // Con el reloj real. Cloudflare arranca cada ronda ~60 s después de la anterior: revisando hasta los 56 s el hueco queda
+    // en ~4 s (antes 11 s). Si una respuesta se alarga y se cruza con la siguiente ronda, la marca y la revisión antes de mandar lo cuidan.
+    if (!pausa || proxima - t0 > 56e3) break;
   }
 }
 
