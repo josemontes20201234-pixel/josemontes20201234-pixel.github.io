@@ -21,16 +21,20 @@ jobs:
           python3 - "$RUNNER_TEMP/t.txt" <<'PY'
           import sys, json
           txt = open(sys.argv[1]).read()
-          dec = json.JSONDecoder(); i = 0; n = 0
-          while i < len(txt):
-              while i < len(txt) and txt[i] in " \n\r\t": i += 1
-              if i >= len(txt): break
-              try: ev, j = dec.raw_decode(txt, i)
-              except Exception: break
+          dec = json.JSONDecoder(); i = 0; n = 0; textos = []
+          while True:
+              k = txt.find("{", i)
+              pre = txt[i:(k if k >= 0 else len(txt))].strip()
+              if pre: textos.append(pre[:160])
+              if k < 0: break
+              try: ev, j = dec.raw_decode(txt, k)
+              except Exception:
+                  i = k + 1; continue
               i = j; n += 1
               e = ev.get("event") or {}
               tipo = "cada minuto" if "cron" in e else ("aviso/pagina" if "request" in e else "otro")
               print(tipo, "| resultado:", ev.get("outcome"), "| errores:", [str(x.get("message"))[:200] for x in ev.get("exceptions") or []], "| notas:", [str(x.get("message"))[:200] for x in ev.get("logs") or []])
           print("eventos escuchados:", n)
+          print("texto de wrangler:", textos[:4])
           PY
-          grep -iE "error|connected|listening" "$RUNNER_TEMP/e.txt" | tail -5 || true
+          echo "--- avisos de wrangler ---"; grep -vE "^\s*$" "$RUNNER_TEMP/e.txt" | cut -c1-200 | tail -8 || true
