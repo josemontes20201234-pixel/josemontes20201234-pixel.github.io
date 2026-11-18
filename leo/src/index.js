@@ -514,6 +514,7 @@ async function revisarInstagram(env, motivo) {
 
     nuevo.ultimo = pendientes[pendientes.length - 1].id;
     await guardar(nuevo); // se marca antes de contestar para no contestar dos veces
+    const tMsg = tiempo(pendientes[pendientes.length - 1].created_time), tVisto = Date.now(); // para medir cuánto tarda (sin datos del cliente)
     await accionMeta(env, yo, String(cliente.id), "typing_on"); // el cliente ve «escribiendo…» mientras Leo piensa
     let respuesta;
     try { respuesta = await responder(env, "instagram", String(cliente.id), pendientes.map((m) => m.message).join("\n").slice(0, 1500)); }
@@ -523,6 +524,7 @@ async function revisarInstagram(env, motivo) {
       const recientes = ((await graphIG(env, c.id + "?fields=" + encodeURIComponent("messages.limit(5){id,created_time,from}"))).messages || {}).data || [];
       if (recientes.some((m) => esNegocio(m.from) && tiempo(m.created_time) > tCliente)) { informe.push({ paso: "ya estaba contestado" }); continue; }
     } catch {}
+    const tPensado = Date.now();
     const { burbujas, botones } = prepararRespuesta(respuesta);
     const partes = burbujas.flatMap((b) => trozos(b));
     let ok = true;
@@ -538,7 +540,8 @@ async function revisarInstagram(env, motivo) {
     }
     nuevo.dicho = dicho.slice(-12);
     await guardar(nuevo);
-    informe.push({ paso: ok ? "contestado" : "no se pudo mandar (ver ultimo_envio)" });
+    const seg = (x) => Math.round(x / 100) / 10;
+    informe.push({ paso: ok ? "contestado" : "no se pudo mandar (ver ultimo_envio)", motivo, segundos: { en_verlo: seg(tVisto - tMsg), pensando: seg(tPensado - tVisto), mandando: seg(Date.now() - tPensado), total: seg(Date.now() - tMsg) }, burbujas: partes.length, botones: botones.length });
   }
   if (informe.length) await diag(env, "revision", { motivo, informe });
 }

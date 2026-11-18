@@ -11,4 +11,4 @@ jobs:
         run: |
           date -u
           curl -s -H "x-diag: $S" "https://meraki-leo.merakibarbershop.workers.dev/diag" \
-            | python3 -c "import sys,json; d=json.load(sys.stdin); d.get('llave',{}).pop('permisos',None); print(json.dumps({k:d.get(k) for k in ('claves','modo','revisa_desde','ultima_revision','ultimo_envio','ultimo_recibido','firmas_rechazadas','ruta_instagram')}, indent=2, ensure_ascii=False)); print('mensajes_directos:', d.get('llave',{}).get('mensajes_directos'))" || true
+            | python3 -c "import sys,json; d=json.load(sys.stdin); d.get('llave',{}).pop('permisos',None); print(json.dumps({k:d.get(k) for k in ('claves','modo','uso_meta_ultimo','revisa_desde','ultima_revision','ultimo_envio','ultimo_recibido','firmas_rechazadas','ruta_instagram')}, indent=2, ensure_ascii=False)); print('mensajes_directos:', d.get('llave',{}).get('mensajes_directos'))" || true
