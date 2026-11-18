@@ -10,14 +10,15 @@ jobs:
           S: ${{ secrets.META_APP_SECRET }}
         run: |
           date -u
-          curl -s -H "x-diag: $S" "https://meraki-leo.merakibarbershop.workers.dev/diag" > "$RUNNER_TEMP/d.json" || true
+          curl -s -H "x-diag: $S" "https://meraki-leo.merakibarbershop.workers.dev/diag?ligero=1" > "$RUNNER_TEMP/d.json" || true
           python3 - "$RUNNER_TEMP/d.json" <<'PY'
           import sys, json, datetime as dt
           try: d = json.load(open(sys.argv[1]))
           except Exception as e: print("no se pudo leer /diag:", e); sys.exit(0)
-          d.get('llave', {}).pop('permisos', None)
+          llave = d.get('llave') if isinstance(d.get('llave'), dict) else {}
+          llave.pop('permisos', None)
           print(json.dumps({k: d.get(k) for k in ('claves','modo','uso_meta_ultimo','revisa_desde','ultimo_envio','ultimo_recibido','firmas_rechazadas','ruta_instagram')}, indent=2, ensure_ascii=False))
-          print('mensajes_directos:', d.get('llave', {}).get('mensajes_directos'))
+          print('mensajes_directos:', llave.get('mensajes_directos', '(no se revisó, para no gastar llamadas de Meta)'))
           print("\n=== CRONÓMETRO (hora de El Salvador) ===")
           for r in d.get('ultimas_respuestas') or []:
               h = (dt.datetime.fromisoformat(r['cuando'].replace('Z', '+00:00')) - dt.timedelta(hours=6)).strftime('%H:%M:%S')
