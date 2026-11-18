@@ -291,7 +291,8 @@ async function enviarMeta(env, canal, cuenta, para, texto, botones) { // Instagr
     if (res.ok) {
       // Solo se anota cuando cambia la ruta (KV gratis: 1000 escrituras al día; los fallos sí se anotan siempre)
       if (r.n !== buena) { try { await env.LEO.put("ruta:" + canal, r.n); } catch {} await diag(env, "envio", { canal, ruta: r.n, ok: true }); }
-      return true;
+      let mid = ""; try { mid = String((await res.json()).message_id || ""); } catch {}
+      return mid || true; // el número del mensaje en Meta: así Leo reconoce después lo que él mandó
     }
     let err = "";
     try { const j = await res.json(); err = j.error ? (j.error.code || "") + " " + (j.error.message || "") : ""; } catch {}
@@ -444,6 +445,13 @@ function prepararRespuesta(texto) {
     return "";
   }).replace(/\*\*(.+?)\*\*/g, "$1").replace(/__(.+?)__/g, "$1").replace(/^#{1,6}\s+/gm, ""); // Instagram no muestra negritas: se verían los asteriscos
   let burbujas = t.split(/\n\s*\n/).map((b) => b.trim()).filter(Boolean);
+  // Una frase corta que presenta una lista («Los cortes cuestan:») va en el mismo mensajito que la lista
+  const esLista = (b) => /^[^\p{L}\p{N}¿¡"'(]/u.test(b);
+  for (let i = 0; i < burbujas.length - 1; i++) {
+    if (!burbujas[i].includes("\n") && burbujas[i].length <= 80 && (burbujas[i].endsWith(":") || esLista(burbujas[i + 1]))) {
+      burbujas.splice(i, 2, burbujas[i] + "\n" + burbujas[i + 1]); i--;
+    }
+  }
   if (burbujas.length > 2) burbujas = [burbujas[0], burbujas.slice(1).join("\n\n")]; // cada mensajito es una llamada a Meta
   if (!burbujas.length) burbujas = ["Dame un momento, por favor 🙏"];
   return { burbujas, botones };
@@ -545,8 +553,18 @@ async function revisarInstagram(env, motivo, memo = new Map()) {
     const aMedias = !!estado.ultimo && estado.listo !== estado.ultimo && estado.reintento !== estado.ultimo
       && ahora - (estado.intento || 0) > REINTENTO_MS && ahora - (estado.intento || 0) < 15 * 60e3 && usoAppAhora() < 90;
     if (estado.visto === c.updated_time && !aMedias) continue; // nada nuevo en este chat
-    const guardar = (o) => { memo.set(clave, o); return env.LEO.put(clave, JSON.stringify(o), { expirationTtl: 7 * 86400 }); };
+    // Cloudflare a veces corre dos revisiones a la vez: al guardar se junta con lo último guardado, para no borrar
+    // lo que la otra anotó (si se borraba, Leo creía que sus propios mensajes los había mandado Jose y se callaba).
+    const guardar = async (o) => {
+      let fresco = {}; try { fresco = JSON.parse((await env.LEO.get(clave)) || "{}"); } catch {}
+      const junta = (a, b, n) => [...new Set([...(Array.isArray(a) ? a : []), ...(Array.isArray(b) ? b : [])])].slice(-n);
+      o.dicho = junta(fresco.dicho, o.dicho, 12); o.mios = junta(fresco.mios, o.mios, 30);
+      if (fresco.ultimo && fresco.ultimo === o.ultimo && fresco.listo === fresco.ultimo) o.listo = fresco.listo;
+      memo.set(clave, o);
+      return env.LEO.put(clave, JSON.stringify(o), { expirationTtl: 7 * 86400 });
+    };
     const dicho = Array.isArray(estado.dicho) ? estado.dicho : [];
+    const mios = Array.isArray(estado.mios) ? estado.mios : [];
     const nuevo = { ...estado, visto: c.updated_time, listo: estado.ultimo }; // si no se contesta ahora, lo anterior queda cerrado
 
     let msgs;
@@ -574,8 +592,12 @@ async function revisarInstagram(env, motivo, memo = new Map()) {
       informe.push({ paso: "sin contestar", por: "modo prueba: no es la cuenta de prueba" }); // sin datos del cliente
       await guardar(nuevo); continue;
     }
-    // Si Jose contestó a mano hace poco (mensaje del negocio que no mandó Leo), Leo no se mete
-    const manual = msgs.some((m) => esNegocio(m.from) && ahora - tiempo(m.created_time) <= PAUSA_HUMANO_MS && !dicho.includes(String(m.message || "").trim()));
+    // Si Jose contestó a mano hace poco (mensaje del negocio que no mandó Leo), Leo no se mete.
+    // Lo de Leo se reconoce por el número de mensaje de Meta, o por el texto. Solo cuenta lo de después del arranque.
+    const plano = (t) => String(t || "").replace(/\s+/g, " ").trim();
+    const dichoPlano = dicho.map(plano);
+    const manual = msgs.some((m) => esNegocio(m.from) && tiempo(m.created_time) >= inicio && ahora - tiempo(m.created_time) <= PAUSA_HUMANO_MS
+      && !mios.includes(String(m.id)) && !dichoPlano.includes(plano(m.message)));
     if (manual) { informe.push({ paso: "sin contestar", por: "Jose está atendiendo ese chat" }); await guardar(nuevo); continue; }
 
     const yaEscrita = idUltimo === estado.ultimo && estado.respuesta ? estado.respuesta : null;
@@ -595,7 +617,7 @@ async function revisarInstagram(env, motivo, memo = new Map()) {
     if (!motivo.startsWith("seguido") || Date.now() - tVisto > 6000) try {
       const tCliente = tiempo(pendientes[pendientes.length - 1].created_time);
       const recientes = ((((await lista("updated_time,messages.limit(3){id,created_time,from}")).find((x) => x.id === c.id)) || {}).messages || {}).data || [];
-      if (recientes.some((m) => esNegocio(m.from) && tiempo(m.created_time) > tCliente)) { informe.push({ paso: "ya estaba contestado" }); continue; }
+      if (recientes.some((m) => esNegocio(m.from) && tiempo(m.created_time) > tCliente)) { memo.delete(clave); informe.push({ paso: "ya estaba contestado" }); continue; }
     } catch {}
     await escribiendo;
     const tPensado = Date.now();
@@ -610,9 +632,10 @@ async function revisarInstagram(env, motivo, memo = new Map()) {
         fue = await enviarMeta(env, "instagram", yo, String(cliente.id), partes[i]);
         if (fue) informe.push({ paso: "botones no funcionaron" });
       }
-      if (fue) { dicho.push(partes[i]); mandadas++; if (!tPrimero) tPrimero = Date.now(); } else ok = false;
+      if (fue) { dicho.push(partes[i]); if (typeof fue === "string") mios.push(fue); mandadas++; if (!tPrimero) tPrimero = Date.now(); } else ok = false;
     }
     nuevo.dicho = dicho.slice(-12);
+    nuevo.mios = mios.slice(-30);
     if (ok) nuevo.listo = idUltimo;
     else if (!mandadas) nuevo.respuesta = String(respuesta).slice(0, 2000); // para el reintento, sin volver a pensar
     await guardar(nuevo);
@@ -691,6 +714,12 @@ export default {
     }
 
     // Suscribir la cuenta de Instagram para que Meta le mande los mensajes a Leo (protegido)
+    if (url.pathname === "/reiniciar" && request.method === "POST") {
+      if (!env.META_APP_SECRET || request.headers.get("x-diag") !== env.META_APP_SECRET) return new Response("No autorizado", { status: 403 });
+      const ahora = Date.now() - (Date.now() % 1000);
+      await env.LEO.put("ig:inicio", String(ahora)); // los mensajes de antes de esta hora ya no se contestan ni cuentan
+      return json({ ok: true, revisa_desde: new Date(ahora).toISOString() });
+    }
     if (url.pathname === "/suscribir" && request.method === "POST") {
       if (!env.META_APP_SECRET || request.headers.get("x-diag") !== env.META_APP_SECRET) return new Response("No autorizado", { status: 403 });
       if (!env.META_IG_TOKEN) return json({ ok: false, error: "todavía no hay llave de Instagram" });
