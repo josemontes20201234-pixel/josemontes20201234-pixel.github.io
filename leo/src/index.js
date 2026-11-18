@@ -285,18 +285,29 @@ async function revisarLlave(env) {
     } catch (e) { return { ok: false, error: String(e).slice(0, 120) }; }
   };
   const out = { hay: true, empieza: t.slice(0, 3) };
-  const d = await pedir("https://graph.facebook.com/v23.0/debug_token?input_token=" + encodeURIComponent(t));
-  if (d.ok && d.j.data) {
-    const x = d.j.data;
-    out.tipo = x.type; out.valida = x.is_valid; out.app = x.application;
-    out.vence = x.expires_at ? new Date(x.expires_at * 1000).toISOString() : "no vence";
-    out.permisos = x.scopes || [];
-  } else out.debug = d.error;
+  // Para saber qué tipo de llave es y cuándo vence se pregunta como la app (id|secreto), sin mostrar nada
+  const app = await pedir("https://graph.facebook.com/v23.0/app?fields=id,name");
+  if (app.ok && env.META_APP_SECRET) {
+    out.app = app.j.name;
+    try {
+      const r = await fetch("https://graph.facebook.com/v23.0/debug_token?input_token=" + encodeURIComponent(t) + "&access_token=" + encodeURIComponent(app.j.id + "|" + env.META_APP_SECRET));
+      const j = await r.json().catch(() => ({}));
+      if (r.ok && j.data) {
+        const x = j.data;
+        out.tipo = x.type; out.valida = x.is_valid;
+        out.vence = x.expires_at ? new Date(x.expires_at * 1000).toISOString() : "no vence";
+        out.permisos = x.scopes || [];
+      } else out.debug = j.error ? (j.error.code || "") + " " + (j.error.message || "") : String(r.status);
+    } catch (e) { out.debug = String(e).slice(0, 120); }
+  } else out.debug = app.ok ? "falta el secreto de la app" : app.error;
   const cuenta = env.IG_ID || "me";
   const fb = await pedir("https://graph.facebook.com/v23.0/" + cuenta + "?fields=id,username");
   out.facebook = fb.ok ? "sirve (" + (fb.j.username || fb.j.id || "?") + ")" : fb.error;
   const ig = await pedir("https://graph.instagram.com/v23.0/me?fields=user_id,username");
   out.instagram = ig.ok ? "sirve (" + (ig.j.username || ig.j.user_id || "?") + ")" : ig.error;
+  // ¿Puede leer los mensajes directos? (sólo se cuenta, no se lee nada)
+  const conv = await pedir("https://graph.facebook.com/v23.0/" + cuenta + "/conversations?platform=instagram&limit=5");
+  out.mensajes_directos = conv.ok ? "sirve (" + ((conv.j.data || []).length) + " conversaciones vistas)" : conv.error;
   return out;
 }
 
