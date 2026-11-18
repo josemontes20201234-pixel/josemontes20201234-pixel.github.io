@@ -530,6 +530,7 @@ async function revisarInstagram(env, motivo, memo = new Map()) {
       && ahora - (estado.intento || 0) > REINTENTO_MS && ahora - (estado.intento || 0) < 15 * 60e3 && usoMeta < 90;
     if (estado.visto === c.updated_time && !aMedias) continue; // nada nuevo en este chat
     const guardar = (o) => { memo.set(clave, o); return env.LEO.put(clave, JSON.stringify(o), { expirationTtl: 7 * 86400 }); };
+    if (usoMeta >= 100) { informe.push({ paso: "esperando a Meta", por: "límite de llamadas lleno (" + usoMeta + "%)" }); break; } // no se gasta más: así Meta se recupera antes
     let msgs;
     try { msgs = ((await graphIG(env, c.id + "?fields=" + encodeURIComponent("messages.limit(15){id,created_time,from,message}"))).messages || {}).data || []; }
     catch (e) { informe.push({ paso: "leer chat", error: String(e.message || e).slice(0, 160) }); continue; }
