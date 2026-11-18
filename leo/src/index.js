@@ -286,6 +286,7 @@ async function enviarMeta(env, canal, cuenta, para, texto, botones) { // Instagr
     let res;
     try {
       res = await fetch(r.u, { method: "POST", headers: { "content-type": "application/json", authorization: "Bearer " + r.t }, body: JSON.stringify(cuerpo) });
+      leerUso(res);
     } catch (e) { fallos.push(r.n + ": " + String(e).slice(0, 120)); continue; }
     if (res.ok) {
       // Solo se anota cuando cambia la ruta (KV gratis: 1000 escrituras al día; los fallos sí se anotan siempre)
@@ -418,16 +419,20 @@ function trozos(texto, max = 950) {
   return partes;
 }
 
-// Cuánto del límite de llamadas de Meta llevamos (0 a 100), según lo que Meta dice en cada respuesta
-let usoMeta = 0;
+// Meta tiene dos límites (medido el 18 nov 2026):
+// - el de la app, por hora: lo gasta ABRIR un chat (~3% cada vez). Por eso Meta bloqueó a Leo.
+// - el del negocio: la LISTA de chats (aunque traiga los mensajes adentro). Es muy amplio.
+// Se lleva la cuenta de los dos (0 a 100) según lo que Meta dice en cada respuesta.
+let usoAppDato = 0, usoAppT = 0, usoNegocio = 0, usoMeta = 0;
+// El de la app solo se sabe al mandar mensajes: si el dato tiene más de 5 minutos ya no vale (el límite es por hora y baja solo)
+const usoAppAhora = () => (Date.now() - usoAppT < 5 * 60e3 ? usoAppDato : 0);
 function leerUso(r) {
   try {
-    let max = 0;
-    const app = JSON.parse(r.headers.get("x-app-usage") || "{}");
-    max = Math.max(max, app.call_count || 0, app.total_time || 0, app.total_cputime || 0);
-    const buc = JSON.parse(r.headers.get("x-business-use-case-usage") || "{}");
-    for (const k in buc) for (const u of buc[k] || []) max = Math.max(max, u.call_count || 0, u.total_time || 0, u.total_cputime || 0);
-    usoMeta = max;
+    const app = r.headers.get("x-app-usage");
+    if (app) { const a = JSON.parse(app); usoAppDato = Math.max(a.call_count || 0, a.total_time || 0, a.total_cputime || 0); usoAppT = Date.now(); }
+    const buc = r.headers.get("x-business-use-case-usage");
+    if (buc) { let m = 0; const b = JSON.parse(buc); for (const k in b) for (const u of b[k] || []) m = Math.max(m, u.call_count || 0, u.total_time || 0, u.total_cputime || 0); usoNegocio = m; }
+    usoMeta = Math.max(usoAppAhora(), usoNegocio);
   } catch {}
 }
 
@@ -462,6 +467,7 @@ async function accionMeta(env, cuenta, para, accion) {
       : ruta === "ig-me" ? "https://graph.instagram.com/v23.0/me/messages"
       : "https://graph.facebook.com/v23.0/" + cuenta + "/messages";
     const r = await fetch(u, { method: "POST", headers: { "content-type": "application/json", authorization: "Bearer " + env.META_IG_TOKEN }, body: JSON.stringify({ recipient: { id: para }, sender_action: accion }) });
+    leerUso(r);
     if (!r.ok) { const j = await r.json().catch(() => ({})); await diag(env, "accion", { accion, ok: false, error: j.error ? (j.error.code || "") + " " + (j.error.message || "") : String(r.status) }); }
   } catch {}
 }
@@ -474,16 +480,15 @@ async function graphIG(env, ruta) {
   return j;
 }
 
-// Cloudflare despierta a Leo cada minuto; adentro revisa varias veces. Meta deja pocas llamadas por hora
-// (revisando cada 8 s todo el rato se llenó el límite y Meta bloqueó a Leo), así que el ritmo se ajusta solo:
-// rápido cuando hay una conversación activa y Meta va holgado; más lento cuando Meta va cargado.
+// Cloudflare despierta a Leo cada minuto; adentro revisa varias veces. Cada revisión es UNA consulta a la lista
+// de chats (con el último mensaje adentro), que no gasta el límite por hora de la app. El ritmo se ajusta solo:
+// más rápido si hay una conversación activa, y más lento si el límite del negocio se llena.
 const ACTIVA_MS = 3 * 60e3; // una conversación con movimiento en los últimos 3 minutos se revisa más seguido
 function pausaRevision(uso, activa) { // segundos hasta la siguiente revisión (0 = ya no más en este minuto)
-  if (uso >= 95) return 0;
-  if (uso >= 80) return 30;
-  if (uso >= 60) return activa ? 15 : 30;
-  if (uso >= 40) return activa ? 10 : 20;
-  return activa ? 8 : 15;
+  if (uso >= 90) return 0;
+  if (uso >= 75) return activa ? 15 : 30;
+  if (uso >= 50) return activa ? 8 : 12;
+  return activa ? 5 : 6; // ~10 revisiones por minuto: dentro del CPU que da Cloudflare gratis
 }
 async function revisarSeguido(env) {
   const t0 = Date.now();
@@ -495,8 +500,8 @@ async function revisarSeguido(env) {
     const act = await revisarInstagram(env, primera ? "cada minuto" : "seguido (cada " + pausa + " s)", memo);
     if (act) ultimaActividad = Math.max(ultimaActividad, act);
     primera = false;
-    pausa = pausaRevision(usoMeta, Date.now() - ultimaActividad < ACTIVA_MS);
-    console.log("revision a los " + Math.round((inicio - t0) / 1000) + " s · Meta " + usoMeta + "% · siguiente en " + (pausa || "-") + " s");
+    pausa = pausaRevision(usoNegocio, Date.now() - ultimaActividad < ACTIVA_MS);
+    console.log("revision a los " + Math.round((inicio - t0) / 1000) + " s · Meta negocio " + usoNegocio + "% app " + usoAppAhora() + "% · siguiente en " + (pausa || "-") + " s");
     inicio += pausa * 1000;
     if (!pausa || inicio - t0 > 50e3) break; // termina antes de que Cloudflare lo despierte otra vez
   }
@@ -513,10 +518,21 @@ async function revisarInstagram(env, motivo, memo = new Map()) {
   const solo = String(env.LEO_SOLO || "").toLowerCase().split(",").map((x) => x.trim()).filter(Boolean);
   const esNegocio = (f) => !!f && (String(f.id) === yo || (!!yoUsuario && String(f.username || "").toLowerCase() === yoUsuario));
 
+  const lista = (campos) => graphIG(env, yo + "/conversations?platform=instagram&fields=" + encodeURIComponent(campos) + "&limit=10").then((j) => j.data || []);
   let convs;
-  try { convs = (await graphIG(env, yo + "/conversations?platform=instagram&fields=updated_time&limit=10")).data || []; }
+  try { convs = await lista("updated_time,messages.limit(1){id,created_time,from}"); }
   catch (e) { await diag(env, "revision", { motivo, error: String(e.message || e).slice(0, 200) }); return; }
   const ultimaActividad = Math.max(0, ...convs.map((c) => tiempo(c.updated_time)));
+  // Los últimos 15 mensajes de cada chat, también por la lista (abrir el chat gasta ~3% del límite por hora de la app).
+  // Se pide una sola vez por revisión y solo si hace falta.
+  let completos = null;
+  const leerChat = async (id) => {
+    if (!completos) completos = new Map((await lista("updated_time,messages.limit(15){id,created_time,from,message}")).map((x) => [x.id, x]));
+    const x = completos.get(id);
+    if (x) return (x.messages || {}).data || [];
+    if (usoAppAhora() >= 80) throw new Error("no apareció en la lista y el límite de la app va en " + usoAppAhora() + "%");
+    return ((await graphIG(env, id + "?fields=" + encodeURIComponent("messages.limit(15){id,created_time,from,message}"))).messages || {}).data || [];
+  };
 
   const informe = [];
   for (const c of convs) {
@@ -527,16 +543,24 @@ async function revisarInstagram(env, motivo, memo = new Map()) {
     const estado = memo.get(clave);
     // ¿Quedó a medias un intento de contestar (Cloudflare lo cortó o falló Claude/Meta antes de mandar)?
     const aMedias = !!estado.ultimo && estado.listo !== estado.ultimo && estado.reintento !== estado.ultimo
-      && ahora - (estado.intento || 0) > REINTENTO_MS && ahora - (estado.intento || 0) < 15 * 60e3 && usoMeta < 90;
+      && ahora - (estado.intento || 0) > REINTENTO_MS && ahora - (estado.intento || 0) < 15 * 60e3 && usoAppAhora() < 90;
     if (estado.visto === c.updated_time && !aMedias) continue; // nada nuevo en este chat
     const guardar = (o) => { memo.set(clave, o); return env.LEO.put(clave, JSON.stringify(o), { expirationTtl: 7 * 86400 }); };
-    if (usoMeta >= 100) { informe.push({ paso: "esperando a Meta", por: "límite de llamadas lleno (" + usoMeta + "%)" }); break; } // no se gasta más: así Meta se recupera antes
-    let msgs;
-    try { msgs = ((await graphIG(env, c.id + "?fields=" + encodeURIComponent("messages.limit(15){id,created_time,from,message}"))).messages || {}).data || []; }
-    catch (e) { informe.push({ paso: "leer chat", error: String(e.message || e).slice(0, 160) }); continue; }
-    msgs.reverse().sort((x, y) => tiempo(x.created_time) - tiempo(y.created_time)); // Meta los da del más nuevo al más viejo: se ponen en orden
     const dicho = Array.isArray(estado.dicho) ? estado.dicho : [];
     const nuevo = { ...estado, visto: c.updated_time, listo: estado.ultimo }; // si no se contesta ahora, lo anterior queda cerrado
+
+    // Con el último mensaje (ya viene en la lista) casi siempre se sabe si hay algo que contestar, sin leer más
+    const ult = ((c.messages || {}).data || [])[0];
+    const tUlt = ult ? tiempo(ult.created_time) : 0;
+    if (!ult || esNegocio(ult.from) || tUlt < inicio || ahora - tUlt > VENTANA_MS || (ult.id === estado.ultimo && !aMedias)) { await guardar(nuevo); continue; }
+    if (solo.length && !solo.includes(String((ult.from || {}).username || "").toLowerCase())) {
+      informe.push({ paso: "sin contestar", por: "modo prueba: no es la cuenta de prueba" }); // sin datos del cliente
+      await guardar(nuevo); continue;
+    }
+    let msgs;
+    try { msgs = await leerChat(c.id); }
+    catch (e) { informe.push({ paso: "leer chat", error: String(e.message || e).slice(0, 160) }); continue; }
+    msgs = [...msgs].reverse().sort((x, y) => tiempo(x.created_time) - tiempo(y.created_time)); // Meta los da del más nuevo al más viejo: se ponen en orden
 
     // Lo que el cliente escribió después de la última respuesta del negocio
     let iNeg = -1;
@@ -560,7 +584,7 @@ async function revisarInstagram(env, motivo, memo = new Map()) {
     await guardar(nuevo); // se marca antes de contestar para no contestar dos veces
     const tMsg = tiempo(pendientes[pendientes.length - 1].created_time), tVisto = Date.now(); // para medir cuánto tarda (sin datos del cliente)
     // «escribiendo…» mientras Leo piensa (si Meta va cargado se omite: cada llamada cuenta)
-    const escribiendo = usoMeta < 60 && !yaEscrita ? accionMeta(env, yo, String(cliente.id), "typing_on") : Promise.resolve();
+    const escribiendo = usoAppAhora() < 60 && !yaEscrita ? accionMeta(env, yo, String(cliente.id), "typing_on") : Promise.resolve();
     let respuesta = yaEscrita;
     if (!respuesta) {
       try { respuesta = await responder(env, "instagram", String(cliente.id), pendientes.map((m) => m.message).join("\n").slice(0, 1500)); }
@@ -570,7 +594,7 @@ async function revisarInstagram(env, motivo, memo = new Map()) {
     // En las revisiones de cada 8 s, si pensó rápido, no hace falta: así se ahorra 1 a 2 s de Meta.
     if (!motivo.startsWith("seguido") || Date.now() - tVisto > 6000) try {
       const tCliente = tiempo(pendientes[pendientes.length - 1].created_time);
-      const recientes = ((await graphIG(env, c.id + "?fields=" + encodeURIComponent("messages.limit(5){id,created_time,from}"))).messages || {}).data || [];
+      const recientes = ((((await lista("updated_time,messages.limit(3){id,created_time,from}")).find((x) => x.id === c.id)) || {}).messages || {}).data || [];
       if (recientes.some((m) => esNegocio(m.from) && tiempo(m.created_time) > tCliente)) { informe.push({ paso: "ya estaba contestado" }); continue; }
     } catch {}
     await escribiendo;
