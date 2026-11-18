@@ -572,7 +572,16 @@ async function revisarInstagram(env, motivo, memo = new Map()) {
     const seg = (x) => Math.round(x / 100) / 10;
     informe.push({ paso: ok ? "contestado" : "no se pudo mandar (ver ultimo_envio)", motivo, segundos: { en_verlo: seg(tVisto - tMsg), pensando: seg(tPensado - tVisto), mandando: seg(Date.now() - tPensado), primer_mensajito: tPrimero ? seg(tPrimero - tMsg) : null, total: seg(Date.now() - tMsg) }, burbujas: partes.length, botones: botones.length });
   }
-  if (informe.length) await diag(env, "revision", { motivo, informe });
+  if (informe.length) {
+    await diag(env, "revision", { motivo, informe });
+    console.log("informe " + motivo + " " + JSON.stringify(informe)); // solo pasos y segundos, sin datos de clientes
+    // Cronómetro de las últimas 10 respuestas (no se guardan los «sin contestar» para ahorrar escrituras)
+    if (informe.some((x) => x.paso !== "sin contestar")) {
+      let h = []; try { h = JSON.parse((await env.LEO.get("diag:revisiones")) || "[]"); } catch {}
+      h.push({ cuando: new Date().toISOString(), motivo, informe });
+      try { await env.LEO.put("diag:revisiones", JSON.stringify(h.slice(-10)), { expirationTtl: 30 * 86400 }); } catch {}
+    }
+  }
 }
 
 /* ---------- página de prueba (solo mientras PROBAR=1) ---------- */
@@ -623,6 +632,7 @@ export default {
         uso_meta_ultimo: usoMeta + "%",
         revisa_desde: (await env.LEO.get("ig:inicio")) ? new Date(Number(await env.LEO.get("ig:inicio"))).toISOString() : null,
         ultima_revision: await leer("diag:revision"),
+        ultimas_respuestas: await leer("diag:revisiones"),
         llave: await revisarLlave(env),
       });
     }

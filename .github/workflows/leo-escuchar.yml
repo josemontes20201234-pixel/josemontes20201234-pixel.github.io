@@ -1,6 +1,13 @@
 name: Leo (escuchar)
 on:
   workflow_dispatch:
+    inputs:
+      segundos:
+        description: Cuántos segundos escuchar
+        default: "150"
+      probar:
+        description: Hacer una pregunta de prueba para medir CPU (si/no)
+        default: "si"
 jobs:
   escuchar:
     runs-on: ubuntu-latest
@@ -18,9 +25,9 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: bcefe39d21eb6d4d1db006a3f7db17a9
         run: |
           # A los 40 s se le hace una pregunta de prueba (página de prueba, sin Instagram) para medir cuánto CPU gasta una respuesta con agenda
-          ( sleep 40; curl -s -o /dev/null -w "prueba de respuesta: http %{http_code} en %{time_total} s\n" -X POST -H "content-type: application/json" \
-              -d '{"id":"medir-cpu","texto":"¿Tenés espacio hoy?"}' https://meraki-leo.merakibarbershop.workers.dev/probar/chat ) &
-          timeout 150 npx --yes wrangler@4 tail meraki-leo --format json > "$RUNNER_TEMP/t.txt" 2>"$RUNNER_TEMP/e.txt" || true
+          if [ "${{ inputs.probar }}" != "no" ]; then ( sleep 40; curl -s -o /dev/null -w "prueba de respuesta: http %{http_code} en %{time_total} s\n" -X POST -H "content-type: application/json" \
+              -d '{"id":"medir-cpu","texto":"¿Tenés espacio hoy?"}' https://meraki-leo.merakibarbershop.workers.dev/probar/chat ) & fi
+          timeout "${{ inputs.segundos || 150 }}" npx --yes wrangler@4 tail meraki-leo --format json > "$RUNNER_TEMP/t.txt" 2>"$RUNNER_TEMP/e.txt" || true
           wait
           python3 - "$RUNNER_TEMP/t.txt" <<'PY'
           import sys, json
