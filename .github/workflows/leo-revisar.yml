@@ -1,0 +1,14 @@
+name: Leo (revisar)
+on:
+  workflow_dispatch:
+jobs:
+  revisar:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Revisar a Leo (sin mostrar llaves ni mensajes)
+        env:
+          S: ${{ secrets.META_APP_SECRET }}
+        run: |
+          date -u
+          curl -s -H "x-diag: $S" "https://meraki-leo.merakibarbershop.workers.dev/diag" \
+            | python3 -c "import sys,json; d=json.load(sys.stdin); d.get('llave',{}).pop('permisos',None); print(json.dumps({k:d.get(k) for k in ('ultimo_recibido','ultimo_envio','firmas_rechazadas','ruta_instagram')}, indent=2, ensure_ascii=False)); print('mensajes_directos:', d.get('llave',{}).get('mensajes_directos'))" || true
