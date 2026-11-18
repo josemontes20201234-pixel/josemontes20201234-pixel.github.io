@@ -308,6 +308,17 @@ async function revisarLlave(env) {
   // ¿Puede leer los mensajes directos? (sólo se cuenta, no se lee nada)
   const conv = await pedir("https://graph.facebook.com/v23.0/" + cuenta + "/conversations?platform=instagram&limit=5");
   out.mensajes_directos = conv.ok ? "sirve (" + ((conv.j.data || []).length) + " conversaciones vistas)" : conv.error;
+  // Avisos que Meta le manda a Leo (configurados en la app), leído como la app
+  if (app.ok && env.META_APP_SECRET) {
+    try {
+      const r = await fetch("https://graph.facebook.com/v23.0/" + app.j.id + "/subscriptions?access_token=" + encodeURIComponent(app.j.id + "|" + env.META_APP_SECRET));
+      const j = await r.json().catch(() => ({}));
+      out.avisos_app = r.ok ? (j.data || []).map((x) => ({ objeto: x.object, activo: x.active, campos: (x.fields || []).map((f) => f.name) })) : (j.error ? (j.error.code || "") + " " + (j.error.message || "") : String(r.status));
+    } catch (e) { out.avisos_app = String(e).slice(0, 120); }
+  }
+  // ¿La cuenta de Instagram le manda sus avisos a la app?
+  const sa = await pedir("https://graph.facebook.com/v23.0/" + cuenta + "/subscribed_apps");
+  out.cuenta_suscrita = sa.ok ? (sa.j.data || []).map((x) => ({ app: x.name || x.id, campos: x.subscribed_fields || [] })) : sa.error;
   return out;
 }
 
@@ -395,6 +406,23 @@ export default {
         ruta_instagram: await env.LEO.get("ruta:instagram"),
         llave: await revisarLlave(env),
       });
+    }
+
+    // Suscribir la cuenta de Instagram para que Meta le mande los mensajes a Leo (protegido)
+    if (url.pathname === "/suscribir" && request.method === "POST") {
+      if (!env.META_APP_SECRET || request.headers.get("x-diag") !== env.META_APP_SECRET) return new Response("No autorizado", { status: 403 });
+      if (!env.META_IG_TOKEN) return json({ ok: false, error: "todavía no hay llave de Instagram" });
+      const cuenta = env.IG_ID || "me";
+      const intentos = [];
+      for (const campos of ["messages,comments", "messages"]) {
+        try {
+          const r = await fetch("https://graph.facebook.com/v23.0/" + cuenta + "/subscribed_apps?subscribed_fields=" + campos, { method: "POST", headers: { authorization: "Bearer " + env.META_IG_TOKEN } });
+          const j = await r.json().catch(() => ({}));
+          intentos.push({ campos, ok: r.ok, respuesta: r.ok ? j : (j.error ? (j.error.code || "") + " " + (j.error.message || "") : String(r.status)) });
+          if (r.ok) break;
+        } catch (e) { intentos.push({ campos, ok: false, respuesta: String(e).slice(0, 120) }); }
+      }
+      return json({ intentos });
     }
 
     // Página y endpoint de prueba (límite de 60 mensajes por día para cuidar el gasto)

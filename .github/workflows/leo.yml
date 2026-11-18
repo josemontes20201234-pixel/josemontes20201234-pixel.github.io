@@ -66,4 +66,7 @@ jobs:
           sub=$(curl -s -H "Authorization: Bearer $CF_TOKEN" https://api.cloudflare.com/client/v4/accounts/$A/workers/subdomain | python3 -c "import sys,json; print((json.load(sys.stdin).get('result') or {}).get('subdomain',''))")
           echo "Dirección: https://meraki-leo.$sub.workers.dev"
           sleep 10
+          echo "Suscribir la cuenta de Instagram:"
+          curl -s -X POST -H "x-diag: $S" "https://meraki-leo.$sub.workers.dev/suscribir" | python3 -m json.tool || true
+          echo "Estado:"
           curl -s -H "x-diag: $S" "https://meraki-leo.$sub.workers.dev/diag" | python3 -m json.tool || true
