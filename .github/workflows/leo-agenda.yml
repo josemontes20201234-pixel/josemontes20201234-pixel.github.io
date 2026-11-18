@@ -1,0 +1,14 @@
+name: Leo — horas ocupadas en la agenda (solo fechas y horas)
+on:
+  workflow_dispatch:
+jobs:
+  ver:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ver
+        run: |
+          B="https://firestore.googleapis.com/v1/projects/meraki-barbershop/databases/(default)/documents"
+          K="AIzaSyCysp_Pr9o-LYM5td9wOGLNNvsSKaEx2MQ"
+          curl -s "$B/ocupado?pageSize=100&key=$K" | python3 -c "import sys,json; d=json.load(sys.stdin); print('Horas ocupadas:', sorted(x['name'].split('/')[-1] for x in d.get('documents',[])) or d.get('error',{}).get('status','ninguna'))"
+          echo "¿Existe la cita del jueves 19 a las 10? (solo el código, sin datos):"
+          curl -s -o /dev/null -w "%{http_code}\n" "$B/citas/2026-11-19_10?key=$K"
