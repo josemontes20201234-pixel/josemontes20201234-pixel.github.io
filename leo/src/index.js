@@ -96,7 +96,13 @@ function sistema(env, canal) {
   const hoy = ymdSV(Date.now());
   const ahora = new Date(Date.now() - SV_MS);
   return [
-    "Sos Leo, el asistente de IA de Meraki Barbershop 🦁💈. Hablás en español salvadoreño con voseo (vos, tenés, vení), con estilo cálido, seguro y premium, sin exagerar con emojis (máximo 2 por mensaje). Mensajes cortos, como en WhatsApp.",
+    "Sos Leo, el asistente de IA de Meraki Barbershop 🦁💈. Hablás en español salvadoreño con voseo (vos, tenés, vení), con estilo cálido, seguro y premium.",
+    "",
+    "CÓMO ESCRIBIR (es un chat; a la gente le aburre mucha letra):",
+    "- Cada respuesta va en 1 a 3 mensajitos cortos, de 1 a 3 líneas cada uno. Separá cada mensajito con una línea en blanco. Nunca párrafos largos.",
+    "- Usá de 2 a 4 emojis con estilo en toda la respuesta (por ejemplo 💈 ✂️ 🔥 ✨ 📅 📍 💳 🦁), no en cada línea.",
+    "- Para listas (precios, servicios, horas) poné una cosa por línea con un emoji al inicio, por ejemplo «💈 Corte clásico — $8.00». Si piden el detalle de un servicio, explicalo en una o dos líneas.",
+    "- Si ayuda, al final podés poner botones para que el cliente toque, en una línea aparte con este formato exacto: [[botones: 💈 Precios | 📅 Agendar | 📍 Ubicación]]. Máximo 4 botones, cada uno de pocas palabras. Usalos en el saludo y cuando des a escoger (horas libres, servicios, sí/no); no en todos los mensajes.",
     "En el primer mensaje de una conversación te presentás así: «Hola, soy Leo, el asistente de IA de Meraki Barbershop 🦁💈». Nunca fingís ser una persona. Si te preguntan, decís que sos una IA y que Jose, el barbero y dueño, atiende en persona.",
     "",
     "DATOS DEL NEGOCIO (no inventés nada fuera de esto):",
@@ -237,7 +243,7 @@ async function diag(env, clave, dato) {
   try { await env.LEO.put("diag:" + clave, JSON.stringify({ cuando: new Date().toISOString(), ...dato }), { expirationTtl: 30 * 86400 }); } catch {}
 }
 
-async function enviarMeta(env, canal, cuenta, para, texto) { // Instagram DM y Messenger
+async function enviarMeta(env, canal, cuenta, para, texto, botones) { // Instagram DM y Messenger
   const rutas = [];
   if (canal === "instagram" && env.META_IG_TOKEN) {
     const t = env.META_IG_TOKEN;
@@ -256,7 +262,9 @@ async function enviarMeta(env, canal, cuenta, para, texto) { // Instagram DM y M
   rutas.sort((x, y) => (y.n === buena) - (x.n === buena));
   const fallos = [];
   for (const r of rutas) {
-    const cuerpo = { recipient: { id: para }, message: { text: texto } };
+    const mensaje = { text: texto };
+    if (botones && botones.length) mensaje.quick_replies = botones.map((b, i) => ({ content_type: "text", title: b, payload: "BOTON_" + (i + 1) }));
+    const cuerpo = { recipient: { id: para }, message: mensaje };
     if (r.pagina) cuerpo.messaging_type = "RESPONSE";
     let res;
     try {
@@ -355,7 +363,7 @@ async function procesarMeta(env, cuerpo) {
     for (const c of e.changes || []) {
       for (const m of (c.value && c.value.messages) || []) {
         if (m.type !== "text") { tareas.push(enviarWhatsApp(env, m.from, "Por ahora solo leo mensajes de texto 🙏 Escribime tu consulta y con gusto te ayudo.")); continue; }
-        tareas.push(responder(env, "whatsapp", m.from, m.text.body).then((t) => enviarWhatsApp(env, m.from, t)));
+        tareas.push(responder(env, "whatsapp", m.from, m.text.body).then((t) => enviarWhatsApp(env, m.from, sinBotones(t))));
       }
     }
     // Instagram: se revisa la bandeja (mismas reglas que cada minuto). Messenger: se contesta directo.
@@ -364,7 +372,7 @@ async function procesarMeta(env, cuerpo) {
       if (dato.object === "instagram") { revisarIG = true; continue; }
       if (ev.sender && ev.sender.id === e.id) continue; // lo que manda la misma cuenta del negocio
       const cuenta = (ev.recipient && ev.recipient.id) || e.id;
-      tareas.push(responder(env, "messenger", ev.sender.id, ev.message.text).then((t) => enviarMeta(env, "messenger", cuenta, ev.sender.id, t)));
+      tareas.push(responder(env, "messenger", ev.sender.id, ev.message.text).then((t) => enviarMeta(env, "messenger", cuenta, ev.sender.id, sinBotones(t))));
     }
   }
   if (revisarIG) tareas.push(revisarInstagram(env, "aviso de Meta"));
@@ -402,6 +410,41 @@ function leerUso(r) {
     const buc = JSON.parse(r.headers.get("x-business-use-case-usage") || "{}");
     for (const k in buc) for (const u of buc[k] || []) max = Math.max(max, u.call_count || 0, u.total_time || 0, u.total_cputime || 0);
     usoMeta = max;
+  } catch {}
+}
+
+// Separa lo que escribió Leo en mensajitos (línea en blanco) y saca los botones [[botones: a | b]]
+function prepararRespuesta(texto) {
+  let botones = [];
+  const t = String(texto || "").replace(/\[\[\s*botones?\s*:([^\]]*)\]\]/gi, (_, lista) => {
+    botones = lista.split("|").map((b) => corto(b.trim(), 20)).filter(Boolean).slice(0, 4);
+    return "";
+  });
+  let burbujas = t.split(/\n\s*\n/).map((b) => b.trim()).filter(Boolean);
+  if (burbujas.length > 3) burbujas = [...burbujas.slice(0, 2), burbujas.slice(2).join("\n\n")];
+  if (!burbujas.length) burbujas = ["Dame un momento, por favor 🙏"];
+  return { burbujas, botones };
+}
+// Corta sin partir un emoji a la mitad (Instagram: botones de máximo 20 caracteres)
+function corto(t, max) {
+  let out = "";
+  for (const ch of Array.from(t)) { if ((out + ch).length > max) break; out += ch; }
+  return out.trim();
+}
+// Para canales sin botones (WhatsApp, Messenger, página de prueba)
+const sinBotones = (t) => prepararRespuesta(t).burbujas.join("\n\n");
+
+// "Escribiendo…" y otras acciones del chat (si falla, no pasa nada)
+async function accionMeta(env, cuenta, para, accion) {
+  if (!env.META_IG_TOKEN) return;
+  try {
+    const ruta = await env.LEO.get("ruta:instagram");
+    const u = ruta === "ig-cuenta" ? "https://graph.instagram.com/v23.0/" + cuenta + "/messages"
+      : ruta === "fb-me" ? "https://graph.facebook.com/v23.0/me/messages"
+      : ruta === "ig-me" ? "https://graph.instagram.com/v23.0/me/messages"
+      : "https://graph.facebook.com/v23.0/" + cuenta + "/messages";
+    const r = await fetch(u, { method: "POST", headers: { "content-type": "application/json", authorization: "Bearer " + env.META_IG_TOKEN }, body: JSON.stringify({ recipient: { id: para }, sender_action: accion }) });
+    if (!r.ok) { const j = await r.json().catch(() => ({})); await diag(env, "accion", { accion, ok: false, error: j.error ? (j.error.code || "") + " " + (j.error.message || "") : String(r.status) }); }
   } catch {}
 }
 
@@ -471,6 +514,7 @@ async function revisarInstagram(env, motivo) {
 
     nuevo.ultimo = pendientes[pendientes.length - 1].id;
     await guardar(nuevo); // se marca antes de contestar para no contestar dos veces
+    await accionMeta(env, yo, String(cliente.id), "typing_on"); // el cliente ve «escribiendo…» mientras Leo piensa
     let respuesta;
     try { respuesta = await responder(env, "instagram", String(cliente.id), pendientes.map((m) => m.message).join("\n").slice(0, 1500)); }
     catch (e) { informe.push({ paso: "pensar", error: String(e.message || e).slice(0, 160) }); continue; }
@@ -479,10 +523,18 @@ async function revisarInstagram(env, motivo) {
       const recientes = ((await graphIG(env, c.id + "?fields=" + encodeURIComponent("messages.limit(5){id,created_time,from}"))).messages || {}).data || [];
       if (recientes.some((m) => esNegocio(m.from) && tiempo(m.created_time) > tCliente)) { informe.push({ paso: "ya estaba contestado" }); continue; }
     } catch {}
+    const { burbujas, botones } = prepararRespuesta(respuesta);
+    const partes = burbujas.flatMap((b) => trozos(b));
     let ok = true;
-    for (const t of trozos(respuesta)) {
-      const fue = await enviarMeta(env, "instagram", yo, String(cliente.id), t);
-      if (fue) dicho.push(t); else ok = false;
+    for (let i = 0; i < partes.length; i++) {
+      const ultima = i === partes.length - 1;
+      if (i > 0) { await accionMeta(env, yo, String(cliente.id), "typing_on"); await new Promise((r) => setTimeout(r, 900)); }
+      let fue = await enviarMeta(env, "instagram", yo, String(cliente.id), partes[i], ultima ? botones : null);
+      if (!fue && ultima && botones.length) { // si Instagram no acepta los botones, se manda el texto solo
+        fue = await enviarMeta(env, "instagram", yo, String(cliente.id), partes[i]);
+        if (fue) informe.push({ paso: "botones no funcionaron" });
+      }
+      if (fue) dicho.push(partes[i]); else ok = false;
     }
     nuevo.dicho = dicho.slice(-12);
     await guardar(nuevo);
@@ -571,7 +623,8 @@ export default {
         const { id, texto } = await request.json();
         const t = String(texto || "").slice(0, 800);
         if (!t) return json({ error: "Mensaje vacío" }, 400);
-        return json({ respuesta: await responder(env, "prueba", String(id || "x").slice(0, 40), t) });
+        const { burbujas, botones } = prepararRespuesta(await responder(env, "prueba", String(id || "x").slice(0, 40), t));
+        return json({ respuesta: burbujas.join("\n\n") + (botones.length ? "\n\n" + botones.map((b) => "[ " + b + " ]").join("  ") : "") });
       } catch (e) { return json({ error: String(e.message || e).slice(0, 300) }, 500); }
     }
 
