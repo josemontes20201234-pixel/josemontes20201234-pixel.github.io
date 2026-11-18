@@ -17,7 +17,7 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: bcefe39d21eb6d4d1db006a3f7db17a9
         run: |
-          timeout 120 npx --yes wrangler@4 tail meraki-leo --format json > "$RUNNER_TEMP/t.txt" 2>"$RUNNER_TEMP/e.txt" || true
+          timeout 150 npx --yes wrangler@4 tail meraki-leo --format json > "$RUNNER_TEMP/t.txt" 2>"$RUNNER_TEMP/e.txt" || true
           python3 - "$RUNNER_TEMP/t.txt" <<'PY'
           import sys, json
           txt = open(sys.argv[1]).read()
@@ -33,7 +33,7 @@ jobs:
               i = j; n += 1
               e = ev.get("event") or {}
               tipo = "cada minuto" if "cron" in e else ("aviso/pagina" if "request" in e else "otro")
-              print(tipo, "| resultado:", ev.get("outcome"), "| errores:", [str(x.get("message"))[:200] for x in ev.get("exceptions") or []], "| notas:", [str(x.get("message"))[:200] for x in ev.get("logs") or []])
+              print(tipo, "| resultado:", ev.get("outcome"), "| cpu ms:", ev.get("cpuTime"), "| duró ms:", ev.get("wallTime"), "| errores:", [str(x.get("message"))[:200] for x in ev.get("exceptions") or []], "| notas:", [str(x.get("message"))[:200] for x in ev.get("logs") or []])
           print("eventos escuchados:", n)
           print("texto de wrangler:", textos[:4])
           PY

@@ -100,6 +100,7 @@ function sistema(env, canal) {
     "",
     "CÓMO ESCRIBIR (es un chat; a la gente le aburre mucha letra):",
     "- Cada respuesta va en 1 a 3 mensajitos cortos, de 1 a 3 líneas cada uno. Separá cada mensajito con una línea en blanco. Nunca párrafos largos.",
+    "- Andá directo a la respuesta: no gastés un mensajito en relleno (como «te lo repito por acá» o «claro, con gusto»).",
     "- Usá de 2 a 4 emojis con estilo en toda la respuesta (por ejemplo 💈 ✂️ 🔥 ✨ 📅 📍 💳 🦁), no en cada línea.",
     "- Para listas (precios, servicios, horas) poné una cosa por línea con un emoji al inicio, por ejemplo «💈 Corte clásico — $8.00». Si piden el detalle de un servicio, explicalo en una o dos líneas.",
     "- Si ayuda, al final podés poner botones para que el cliente toque, en una línea aparte con este formato exacto: [[botones: 💈 Precios | 📅 Agendar | 📍 Ubicación]]. Máximo 4 botones, cada uno de pocas palabras. Usalos en el saludo y cuando des a escoger (horas libres, servicios, sí/no); no en todos los mensajes.",
@@ -117,16 +118,16 @@ function sistema(env, canal) {
     env.UBICACION ? "- Ubicación: " + env.UBICACION : "- Ubicación exacta: todavía no la tenés; decí que está en Apopa y que Jose les manda la ubicación por WhatsApp (6061-8603).",
     "",
     "CÓMO APARTAR UNA CITA:",
-    "1) Preguntá qué servicio quiere, para qué día, y mostrá solo horas libres usando la herramienta horas_libres (nunca adivinés disponibilidad).",
+    "1) Preguntá qué servicio quiere y para qué día. Cada vez que vayás a mencionar horas libres, usá la herramienta horas_libres en ese momento, aunque ya la hayas usado antes en la conversación (la agenda cambia y la regla de una hora de aviso también). Nunca digás horas libres de memoria ni de mensajes anteriores.",
     "2) Pedí nombre y número de WhatsApp de 8 dígitos si aún no los tenés" + (canal === "whatsapp" ? " (en WhatsApp ya conocés el número de quien escribe, pero confirmalo)." : "."),
     "3) Antes de guardar, repetí servicio, día, hora y nombre y esperá un «sí». Luego usá apartar_cita.",
     "4) Si no se puede, ofrecé otras horas. Para cancelar o cambiar una cita, usá avisar_a_jose (todavía no podés cancelar vos).",
     "",
     "DATOS PERSONALES: si alguien pide borrar sus datos (por ejemplo «BORRAR MIS DATOS»), usá avisar_a_jose con el motivo «Pide borrar sus datos» y decile que se borran en un máximo de 30 días y que le confirmamos por este mismo medio. Si preguntan qué hacemos con sus datos, explicalo corto y pasales la política: https://josemontes20201234-pixel.github.io/privacidad/",
     "",
-    "REGLAS: no cierres todos los mensajes ofreciendo una cita; ofrecela solo cuando la persona muestre interés en venir, pregunte por disponibilidad o ya te haya preguntado precios y servicios, y no la repitas si ya la ofreciste. No inventés precios, promociones ni horarios. No des consejos médicos. Si hay un reclamo, algo que no sabés, o piden hablar con una persona, usá avisar_a_jose y decí que Jose les responde pronto. Si el mensaje no tiene que ver con la barbería, respondé amable y volvé al tema.",
+    "REGLAS: no cierres todos los mensajes ofreciendo una cita; ofrecela solo cuando la persona muestre interés en venir, pregunte por disponibilidad o ya te haya preguntado precios y servicios, y no la repitas si ya la ofreciste. Si el cliente dice que te escribe después o se despide, despedite en un solo mensajito corto y amable, sin presionar (no le digás que las horas se van a ocupar). No inventés precios, promociones ni horarios. No digás la hora actual a menos que te la pregunten. No des consejos médicos. Si hay un reclamo, algo que no sabés, o piden hablar con una persona, usá avisar_a_jose y decí que Jose les responde pronto. Si el mensaje no tiene que ver con la barbería, respondé amable y volvé al tema.",
     "",
-    "Hoy es " + DL[ahora.getUTCDay()] + " " + hoy + ", y son las " + String(ahora.getUTCHours()).padStart(2, "0") + ":" + String(ahora.getUTCMinutes()).padStart(2, "0") + " (hora de El Salvador).",
+    "Hoy es " + DL[ahora.getUTCDay()] + " " + hoy + ", y son las " + (ahora.getUTCHours() % 12 || 12) + ":" + String(ahora.getUTCMinutes()).padStart(2, "0") + (ahora.getUTCHours() < 12 ? " a. m." : " p. m.") + " (hora de El Salvador).",
   ];
   const hora = lineas.pop();
   return [
@@ -192,30 +193,36 @@ async function ejecutar(env, nombre, input, ctx) {
   return { error: "Herramienta desconocida." };
 }
 
-// Quita los bloques de "pensamiento" (están atados a una conversación y no deben guardarse).
-function limpiar(hist) {
+// El historial se guarda solo con el texto de cada turno. Los resultados de herramientas (horas libres, etc.)
+// se vuelven viejos rápido y Leo los reusaba en vez de revisar de nuevo; además pesan y lo hacen más lento.
+function soloTexto(hist) {
   const out = [];
-  for (const m of hist) {
-    if (typeof m.content === "string") { out.push(m); continue; }
-    const c = (m.content || []).filter((b) => b.type !== "thinking" && b.type !== "redacted_thinking");
-    if (c.length) out.push({ role: m.role, content: c });
+  for (const m of hist || []) {
+    const t = String(typeof m.content === "string" ? m.content
+      : (m.content || []).filter((b) => b.type === "text").map((b) => b.text).join("\n")).trim();
+    if (!t || (m.role !== "user" && m.role !== "assistant")) continue;
+    const prev = out[out.length - 1];
+    if (prev && prev.role === m.role) prev.content += "\n\n" + t;
+    else out.push({ role: m.role, content: t });
   }
+  while (out.length && out[0].role !== "user") out.shift();
   return out;
 }
 
 // Corre la conversación: historial en KV + ciclo de herramientas.
 async function responder(env, canal, usuario, texto) {
   const clave = "h:" + canal + ":" + usuario;
-  let hist = [];
-  try { hist = limpiar(JSON.parse((await env.LEO.get(clave)) || "[]")); } catch {}
-  hist.push({ role: "user", content: texto });
+  let previo = [];
+  try { previo = soloTexto(JSON.parse((await env.LEO.get(clave)) || "[]")); } catch {}
+  let hist = soloTexto([...previo, { role: "user", content: texto }]);
   let salida = "";
   for (let i = 0; i < 5; i++) {
     let res;
     try { res = await llamarClaude(env, hist, canal); }
     catch (e) {
       if (!/Claude 400/.test(String(e.message)) || hist.length <= 1) throw e;
-      hist = [{ role: "user", content: texto }]; // el historial guardado no sirve: se empieza limpio
+      previo = []; // el historial guardado no sirve: se empieza limpio
+      hist = [{ role: "user", content: texto }];
       res = await llamarClaude(env, hist, canal);
     }
     hist.push({ role: "assistant", content: res.content });
@@ -230,9 +237,8 @@ async function responder(env, canal, usuario, texto) {
     }
     hist.push({ role: "user", content: resultados });
   }
-  // Se guardan solo los últimos mensajes y se empieza siempre en un turno de texto del usuario.
-  let corte = limpiar(hist).slice(-24);
-  while (corte.length && !(corte[0].role === "user" && typeof corte[0].content === "string")) corte.shift();
+  // Se guarda lo que dijo el cliente y lo que Leo le mandó (últimos 20 turnos, empezando en el cliente).
+  const corte = soloTexto(soloTexto([...previo, { role: "user", content: texto }, { role: "assistant", content: salida }]).slice(-20));
   await env.LEO.put(clave, JSON.stringify(corte), { expirationTtl: 7 * 86400 });
   return salida || "Dame un momento, por favor 🙏";
 }
@@ -469,19 +475,23 @@ async function graphIG(env, ruta) {
 // Esperar no gasta CPU, y termina antes del siguiente minuto.
 async function revisarSeguido(env) {
   const t0 = Date.now();
+  const memo = new Map(); // lo leído de KV en esta ronda (KV gratis: 100 000 lecturas al día)
   for (const seg of [0, 8, 16, 24, 32, 40, 48]) {
     const falta = t0 + seg * 1000 - Date.now();
     if (falta > 0) await new Promise((r) => setTimeout(r, falta));
-    if (seg > 0 && usoMeta >= 60) break;
-    await revisarInstagram(env, seg ? "cada 8 s" : "cada minuto");
+    if (seg > 0 && usoMeta >= 60) { console.log("revision frenada: Meta va en " + usoMeta + "%"); break; }
+    console.log("revision " + seg + " s (a los " + Math.round((Date.now() - t0) / 1000) + " s)");
+    await revisarInstagram(env, seg ? "cada 8 s" : "cada minuto", memo);
   }
 }
 
-async function revisarInstagram(env, motivo) {
+async function revisarInstagram(env, motivo, memo = new Map()) {
   if (!env.META_IG_TOKEN || !env.IG_ID) return;
+  const leer = async (k) => { if (!memo.has(k)) memo.set(k, await env.LEO.get(k)); return memo.get(k); };
+  const poner = (k, v, o) => { memo.set(k, v); return env.LEO.put(k, v, o); };
   const ahora = Date.now();
-  let inicio = Number(await env.LEO.get("ig:inicio"));
-  if (!inicio) { inicio = ahora - (ahora % 1000); await env.LEO.put("ig:inicio", String(inicio)); } // lo de antes no se contesta (Meta da la hora en segundos)
+  let inicio = Number(await leer("ig:inicio"));
+  if (!inicio) { inicio = ahora - (ahora % 1000); await poner("ig:inicio", String(inicio)); } // lo de antes no se contesta (Meta da la hora en segundos)
   const yo = String(env.IG_ID), yoUsuario = String(env.IG_USUARIO || "").toLowerCase();
   const solo = String(env.LEO_SOLO || "").toLowerCase().split(",").map((x) => x.trim()).filter(Boolean);
   const esNegocio = (f) => !!f && (String(f.id) === yo || (!!yoUsuario && String(f.username || "").toLowerCase() === yoUsuario));
@@ -496,9 +506,9 @@ async function revisarInstagram(env, motivo) {
     if (act < inicio || ahora - act > VENTANA_MS) continue;
     const clave = "conv:" + c.id;
     let estado = {};
-    try { estado = JSON.parse((await env.LEO.get(clave)) || "{}"); } catch {}
+    try { estado = JSON.parse((await leer(clave)) || "{}"); } catch {}
     if (estado.visto === c.updated_time) continue; // nada nuevo en este chat
-    const guardar = (o) => env.LEO.put(clave, JSON.stringify(o), { expirationTtl: 7 * 86400 });
+    const guardar = (o) => poner(clave, JSON.stringify(o), { expirationTtl: 7 * 86400 });
     let msgs;
     try { msgs = ((await graphIG(env, c.id + "?fields=" + encodeURIComponent("messages.limit(15){id,created_time,from,message}"))).messages || {}).data || []; }
     catch (e) { informe.push({ paso: "leer chat", error: String(e.message || e).slice(0, 160) }); continue; }
@@ -539,8 +549,7 @@ async function revisarInstagram(env, motivo) {
     const partes = burbujas.flatMap((b) => trozos(b));
     let ok = true;
     for (let i = 0; i < partes.length; i++) {
-      const ultima = i === partes.length - 1;
-      if (i > 0) await new Promise((r) => setTimeout(r, 300));
+      const ultima = i === partes.length - 1; // sin pausa: cada envío a Meta ya tarda 1 a 2 s
       let fue = await enviarMeta(env, "instagram", yo, String(cliente.id), partes[i], ultima ? botones : null);
       if (!fue && ultima && botones.length) { // si Instagram no acepta los botones, se manda el texto solo
         fue = await enviarMeta(env, "instagram", yo, String(cliente.id), partes[i]);
@@ -579,8 +588,9 @@ add("Escribí como si fueras un cliente. Por ejemplo: «hola, cuánto cuesta un 
 </script></html>`;
 
 export default {
+  // Se espera aquí mismo (no con waitUntil): waitUntil se corta a los 30 s y las revisiones de 32, 40 y 48 s no corrían.
   async scheduled(controller, env, ctx) {
-    ctx.waitUntil(revisarSeguido(env).catch((e) => console.log("revision error", String(e))));
+    await revisarSeguido(env).catch((e) => console.log("revision error", String(e)));
   },
 
   async fetch(request, env, ctx) {
