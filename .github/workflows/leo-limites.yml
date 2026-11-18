@@ -38,6 +38,8 @@ jobs:
               print("leer un chat (15 mensajes) |", st, "|", e, "| app:", app, "| negocio:", buc)
               st, e, app, buc, _ = llamar(convs[0]["id"] + "?fields=" + urllib.request.quote("messages.limit(5){id,created_time,from}"))
               print("revisión corta (5 mensajes) |", st, "|", e, "| app:", app, "| negocio:", buc)
-          st, e, app, buc, _ = llamar(IG + "?fields=username")
-          print("datos de la cuenta |", st, "|", e, "| app:", app, "| negocio:", buc)
+          st, e, app, buc, b2 = llamar(IG + "/conversations?platform=instagram&fields=updated_time,participants&limit=10")
+          print("lista + participantes |", st, "|", e, "| app:", app, "| negocio:", buc, "| trae participantes:", bool(((b2.get("data") or [{}])[0].get("participants") or {}).get("data")))
+          st, e, app, buc, b3 = llamar(IG + "/conversations?platform=instagram&fields=" + urllib.request.quote("updated_time,messages.limit(1){id,created_time,from}") + "&limit=10")
+          print("lista + último mensaje |", st, "|", e, "| app:", app, "| negocio:", buc, "| trae último:", bool(((b3.get("data") or [{}])[0].get("messages") or {}).get("data")))
           PY
