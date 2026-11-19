@@ -18,6 +18,8 @@ const SERVICIOS = [
 // Antes va la «Semana Aniversario Meraki» (8 al 13 de diciembre): precios de siempre + boleto para rifar un full detalle.
 const CAMBIO_PRECIOS = "2026-12-15";
 const ANIVERSARIO = { desde: "2026-12-08", hasta: "2026-12-13" };
+// Jose (19 nov 2026): a los clientes con Tarjeta Meraki se les respeta el precio anterior hasta el 31 de enero
+const TARJETA_RESPETA_HASTA = "2027-01-31";
 const SERVICIOS_NUEVOS = [
   ["Corte clásico", 4, "corte a tijera o máquina, acabado limpio y perfilado de patillas"],
   ["Corte moderno", 5, "degradados, cortes a cero, técnicas de tendencia y acabado con producto"],
@@ -144,7 +146,7 @@ function sistema(env, canal, extra = "") {
     "- Andá directo a la respuesta: no gastés un mensajito en relleno (como «te lo repito por acá» o «claro, con gusto»).",
     "- Sin negritas, asteriscos ni títulos con #: el chat los muestra tal cual.",
     "- Usá de 2 a 4 emojis con estilo en toda la respuesta (por ejemplo 💈 ✂️ 🔥 ✨ 📅 📍 💳 🦁), no en cada línea.",
-    "- Para listas (precios, servicios, horas) poné una cosa por línea con un emoji al inicio, por ejemplo «💈 Corte clásico — $8.00». Si piden el detalle de un servicio, explicalo en una o dos líneas.",
+    "- Para listas (precios, servicios, horas) poné una cosa por línea con un emoji al inicio, por ejemplo «💈 Nombre del servicio — $precio» (con los precios reales de abajo). Si piden el detalle de un servicio, explicalo en una o dos líneas.",
     "- Si ayuda, al final podés poner botones para que el cliente toque, en una línea aparte con este formato exacto: [[botones: 💈 Precios | 📅 Agendar | 📍 Ubicación]]. Máximo 4 botones, cada uno de pocas palabras. Usalos en el saludo y cuando des a escoger (horas libres, servicios, sí/no); no en todos los mensajes.",
     "En el primer mensaje de una conversación te presentás así: «Hola, soy Leo, el asistente de IA de Meraki Barbershop 🦁💈». Nunca fingís ser una persona. Si te preguntan, decís que sos una IA y que Jose, el barbero y dueño, atiende en persona.",
     "",
@@ -185,6 +187,11 @@ function sistema(env, canal, extra = "") {
     if (hoy >= ANIVERSARIO.desde && hoy <= ANIVERSARIO.hasta) avisos.push(
       "SEMANA ANIVERSARIO MERAKI (del martes 8 al domingo 13 de diciembre): Meraki cumple un año en su local. Esta semana se cobran los precios de siempre y cada cliente que venga recibe un boleto para la rifa de un Servicio full detalle gratis el domingo 13. Desde el martes 15 de diciembre entran los precios nuevos (abajo). Contalo con alegría cuando hablen de precios o aparten cita esta semana, sin repetirlo en cada mensaje.");
     avisos.push("Precios para citas del martes 15 de diciembre en adelante (" + (hoy >= ANIVERSARIO.desde ? "ya se pueden anunciar" : "todavía no los anunciés; usalos solo si alguien aparta para esas fechas") + "):", ...listaPrecios(SERVICIOS_NUEVOS));
+    avisos.push("TARJETA MERAKI: a los clientes con Tarjeta Meraki se les respeta el precio de ahora hasta el 31 de enero de 2027, aunque la cita sea del 15 de diciembre en adelante (Jose lo verifica en persona con la tarjeta). Mencionalo siempre que hablés de los precios nuevos.");
+  }
+  // Del 15 de diciembre al 31 de enero: precios nuevos, pero con Tarjeta Meraki se respeta el precio anterior
+  if (hoy >= CAMBIO_PRECIOS && hoy <= TARJETA_RESPETA_HASTA) {
+    avisos.push("TARJETA MERAKI: hasta el 31 de enero de 2027, los clientes con Tarjeta Meraki todavía pagan los precios anteriores (Jose lo verifica en persona con la tarjeta). Mencionalo cuando pregunten precios, se quejen del aumento o digan que tienen la tarjeta, sin repetirlo en cada mensaje. Precios anteriores:", ...listaPrecios(SERVICIOS));
   }
   const hora = lineas.pop() + (avisos.length ? "\n" + avisos.join("\n") : "") + (extra ? "\n" + extra : "");
   return [
