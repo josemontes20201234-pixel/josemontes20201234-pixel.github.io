@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Preparar
-        run: pip install -q faster-whisper==1.1.1
+        run: pip install -q faster-whisper==1.1.1 "av>=11,<14"
       - name: Transcribir con tiempos
         env:
           A: ${{ inputs.audio_b64 }}
