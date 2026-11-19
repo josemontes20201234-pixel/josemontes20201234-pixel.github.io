@@ -5,18 +5,20 @@ on:
       urls:
         description: Enlaces separados por espacio (se guardan como 1, 2, 3... con su extensión)
         required: true
+permissions:
+  contents: write
 jobs:
   bajar:
     runs-on: ubuntu-latest
     steps:
-      - name: Bajar
+      - name: Bajar y dejar en la rama "descargas" (temporal, se reemplaza cada vez)
         env:
           U: ${{ inputs.urls }}
+          GH_TOKEN: ${{ github.token }}
         run: |
-          mkdir -p out; i=0
-          for u in $U; do i=$((i+1)); ext="${u##*.}"; ext="${ext%%\?*}"; curl -sSL --max-time 60 -o "out/$i.$ext" "$u"; echo "$i.$ext $(stat -c %s out/$i.$ext) bytes"; done
-      - uses: actions/upload-artifact@v4
-        with:
-          name: descargas
-          path: out/
-          retention-days: 1
+          mkdir out && cd out
+          i=0
+          for u in $U; do i=$((i+1)); ext="${u##*.}"; ext="${ext%%\?*}"; curl -sSL --max-time 60 -o "$i.$ext" "$u"; echo "$i.$ext $(stat -c %s $i.$ext) bytes"; done
+          git init -q -b descargas && git config user.name "meraki-bot" && git config user.email "bot@users.noreply.github.com"
+          git add . && git commit -q -m "descargas"
+          git push -q -f "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" descargas
