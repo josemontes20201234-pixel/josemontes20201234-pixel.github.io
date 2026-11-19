@@ -13,18 +13,20 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Preparar
-        run: pip install -q faster-whisper==1.1.1 "av>=11,<14"
+        run: pip install -q faster-whisper==1.1.1 numpy
       - name: Transcribir con tiempos
         env:
           A: ${{ inputs.audio_b64 }}
           L: ${{ inputs.idioma }}
         run: |
           echo "$A" | base64 -d > audio.ogg
+          ffmpeg -v error -y -i audio.ogg -ac 1 -ar 16000 -f f32le audio.f32
           python3 - <<'PY'
-          import os
+          import os, numpy as np
           from faster_whisper import WhisperModel
+          audio = np.fromfile("audio.f32", dtype=np.float32)  # sin PyAV: ffmpeg ya lo decodificó
           m = WhisperModel("small", device="cpu", compute_type="int8")
-          segs, info = m.transcribe("audio.ogg", language=os.environ.get("L") or None, word_timestamps=True, vad_filter=False)
+          segs, info = m.transcribe(audio, language=os.environ.get("L") or None, word_timestamps=True, vad_filter=False)
           print("idioma:", info.language, round(info.language_probability, 2), "| duración:", round(info.duration, 2))
           for s in segs:
               print(f"[{s.start:5.2f} - {s.end:5.2f}] {s.text.strip()}")
