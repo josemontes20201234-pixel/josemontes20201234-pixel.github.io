@@ -44,6 +44,11 @@ jobs:
               i = j; n += 1
               e = ev.get("event") or {}
               tipo = "cada minuto" if "cron" in e else ("aviso/pagina" if "request" in e else "otro")
+              if "request" in e:  # solo la ruta y el resultado (nada de encabezados ni datos)
+                  from urllib.parse import urlparse
+                  import datetime
+                  hora = datetime.datetime.utcfromtimestamp((ev.get("eventTimestamp") or 0) / 1000) - datetime.timedelta(hours=6)
+                  tipo = "pedido " + urlparse(e["request"].get("url", "")).path + " -> " + str((e.get("response") or {}).get("status")) + " a las " + hora.strftime("%H:%M:%S") + " (hora SV)"
               print(tipo, "| resultado:", ev.get("outcome"), "| cpu ms:", ev.get("cpuTime"), "| duró ms:", ev.get("wallTime"), "| errores:", [str(x.get("message"))[:200] for x in ev.get("exceptions") or []], "| notas:", [str(x.get("message"))[:200] for x in ev.get("logs") or []])
           print("eventos escuchados:", n)
           print("texto de wrangler:", textos[:4])
