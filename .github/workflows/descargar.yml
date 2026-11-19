@@ -1,0 +1,22 @@
+name: Descargar archivos (para editar videos de Meraki)
+on:
+  workflow_dispatch:
+    inputs:
+      urls:
+        description: Enlaces separados por espacio (se guardan como 1, 2, 3... con su extensión)
+        required: true
+jobs:
+  bajar:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Bajar
+        env:
+          U: ${{ inputs.urls }}
+        run: |
+          mkdir -p out; i=0
+          for u in $U; do i=$((i+1)); ext="${u##*.}"; ext="${ext%%\?*}"; curl -sSL --max-time 60 -o "out/$i.$ext" "$u"; echo "$i.$ext $(stat -c %s out/$i.$ext) bytes"; done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: descargas
+          path: out/
+          retention-days: 1
