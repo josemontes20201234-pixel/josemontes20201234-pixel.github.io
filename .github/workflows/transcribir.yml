@@ -1,0 +1,32 @@
+name: Transcribir audio (Whisper)
+on:
+  workflow_dispatch:
+    inputs:
+      audio_b64:
+        description: Audio corto en base64 (ogg/opus, máx. ~45 KB)
+        required: true
+      idioma:
+        description: Idioma
+        default: "es"
+jobs:
+  transcribir:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Preparar
+        run: pip install -q faster-whisper==1.1.1
+      - name: Transcribir con tiempos
+        env:
+          A: ${{ inputs.audio_b64 }}
+          L: ${{ inputs.idioma }}
+        run: |
+          echo "$A" | base64 -d > audio.ogg
+          python3 - <<'PY'
+          import os
+          from faster_whisper import WhisperModel
+          m = WhisperModel("small", device="cpu", compute_type="int8")
+          segs, info = m.transcribe("audio.ogg", language=os.environ.get("L") or None, word_timestamps=True, vad_filter=False)
+          print("idioma:", info.language, round(info.language_probability, 2), "| duración:", round(info.duration, 2))
+          for s in segs:
+              print(f"[{s.start:5.2f} - {s.end:5.2f}] {s.text.strip()}")
+              print("   palabras:", " ".join(f"{w.word.strip()}@{w.start:.2f}" for w in (s.words or [])))
+          PY
