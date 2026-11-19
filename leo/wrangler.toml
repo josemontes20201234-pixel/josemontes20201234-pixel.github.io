@@ -14,5 +14,9 @@ LEO_PENSAR = "between_tools"
 # Huella (SHA-256) de la clave de avisos de la app Meraki CRM. La clave no está aquí: solo la huella.
 AVISOS_HASH = "88e2bd3f8917830be07dd5350fd18646feed54f65b755cf9b58a839e08adae94"
 
+# Oído de Leo: pasa los audios a texto (Whisper en Cloudflare, plan gratis)
+[ai]
+binding = "AI"
+
 [triggers]
 crons = ["* * * * *"]

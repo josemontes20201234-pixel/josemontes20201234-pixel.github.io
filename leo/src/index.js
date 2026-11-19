@@ -166,6 +166,12 @@ function sistema(env, canal, extra = "") {
     "4) Si no se puede, ofrecé otras horas. Para cancelar o cambiar una cita, usá avisar_a_jose (todavía no podés cancelar vos).",
     "5) Comprobante: vos no podés mandar mensajes por WhatsApp, correos ni archivos; nunca lo prometás. Si piden comprobante, deciles que este chat es su confirmación (pueden tomarle captura) y repetiles servicio, día, hora, nombre y precio.",
     "",
+    "AUDIOS, FOTOS Y STICKERS:",
+    "- Si una parte del mensaje empieza con «🎤 Audio:», es un audio del cliente pasado a texto automáticamente (puede traer alguna palabra mal). Contestá normal, como si lo hubieras escuchado, sin decir que lo transcribiste. Si no queda claro algo importante (día, hora, nombre o número), preguntá solo eso.",
+    "- «[Audio que no se pudo escuchar]»: disculpate corto y pedile que te lo escriba o que lo mande otra vez.",
+    "- «[Foto]», «[Video]» o «[Publicación compartida]»: vos no podés verlas, pero Jose sí (ya se le avisó; no usés avisar_a_jose para eso). Decilo en pocas palabras y seguí con lo que el cliente necesita; si parece que quiere ese corte o estilo, preguntá para qué día lo quiere.",
+    "- «[Sticker]» solo: contestá con un mensajito muy corto y amable, sin preguntas. «[Te mencionó en su historia]»: agradecé con cariño en un mensajito corto.",
+    "",
     "DATOS PERSONALES: si alguien pide borrar sus datos (por ejemplo «BORRAR MIS DATOS»), usá avisar_a_jose con el motivo «Pide borrar sus datos» y decile que se borran en un máximo de 30 días y que le confirmamos por este mismo medio. Si preguntan qué hacemos con sus datos, explicalo corto y pasales la política: https://josemontes20201234-pixel.github.io/privacidad/",
     "",
     "REGLAS: no cierres todos los mensajes ofreciendo una cita; ofrecela solo cuando la persona muestre interés en venir, pregunte por disponibilidad o ya te haya preguntado precios y servicios, y no la repitas si ya la ofreciste. Si el cliente dice que te escribe después o se despide, despedite en un solo mensajito corto y amable, sin presionar (no le digás que las horas se van a ocupar) y sin revisar la agenda. No inventés precios, promociones ni horarios. No digás la hora actual a menos que te la pregunten. No des consejos médicos. Si hay un reclamo, algo que no sabés, o piden hablar con una persona, usá avisar_a_jose y decí que Jose les responde pronto. Si el mensaje no tiene que ver con la barbería, respondé amable y volvé al tema.",
@@ -540,6 +546,90 @@ async function accionMeta(env, cuenta, para, accion) {
   } catch {}
 }
 
+// ---------- Audios, fotos y stickers ----------
+// Campos de cada mensaje en la lista de chats (con adjuntos). Probado con Meta: estos nombres sí existen.
+const CAMPOS_MSG = "id,created_time,from,message,attachments{mime_type,name,size,file_url,image_data,video_data},shares{name,link},story";
+const EXT_AUDIO = /\.(m4a|aac|mp3|mpga|ogg|oga|opus|wav|amr|weba)$/;
+function adjuntosDe(m) {
+  const out = [];
+  for (const a of ((m.attachments || {}).data) || []) {
+    const mime = String(a.mime_type || "").toLowerCase(), nombre = String(a.name || "").toLowerCase();
+    const img = a.image_data || null, vid = a.video_data || null;
+    const url = a.file_url || (vid && vid.url) || (img && img.url) || "";
+    let ruta = ""; try { ruta = new URL(url).pathname.toLowerCase(); } catch {}
+    const ext = (ruta.match(/\.([a-z0-9]{2,4})$/) || [])[1] || "";
+    let tipo = "archivo";
+    if (mime.startsWith("audio/") || /audioclip|voice|audio/.test(nombre) || EXT_AUDIO.test(ruta)) tipo = "audio";
+    else if (img) tipo = img.render_as_sticker || /sticker/.test(nombre + " " + String(img.image_type || "")) ? "sticker" : "foto";
+    else if (vid || mime.startsWith("video/")) tipo = "video";
+    else if (mime.startsWith("image/")) tipo = "foto";
+    out.push({ tipo, url, mime: mime.slice(0, 30), ext, kb: a.size ? Math.round(a.size / 1024) : null });
+  }
+  if (((m.shares || {}).data || []).length) out.push({ tipo: "compartido" });
+  if ((m.story || {}).mention) out.push({ tipo: "mencion" });
+  return out;
+}
+const tieneContenido = (m) => !!m.message || adjuntosDe(m).length > 0;
+
+// Leo «escucha» los audios: se pasan a texto con Whisper en Cloudflare (Workers AI, sin llaves nuevas).
+async function escucharAudio(env, url) {
+  if (!env.AI) throw new Error("Workers AI no está conectado");
+  if (!url) throw new Error("el audio no trae enlace");
+  const r = await fetch(url);
+  if (!r.ok) throw new Error("no se pudo bajar el audio (" + r.status + ")");
+  const buf = new Uint8Array(await r.arrayBuffer());
+  if (buf.length > 2e6) throw new Error("audio muy largo (" + Math.round(buf.length / 1024) + " KB)");
+  let bin = "";
+  for (let i = 0; i < buf.length; i += 0x8000) bin += String.fromCharCode.apply(null, buf.subarray(i, i + 0x8000));
+  const audio = btoa(bin);
+  let res;
+  try { res = await env.AI.run("@cf/openai/whisper-large-v3-turbo", { audio, language: "es", vad_filter: true }); }
+  catch { res = await env.AI.run("@cf/openai/whisper-large-v3-turbo", { audio, language: "es" }); }
+  let texto = String((res && res.text) || "").replace(/\s+/g, " ").trim();
+  // En el silencio Whisper a veces «oye» frases de YouTube: eso no cuenta como audio entendido
+  if (/^[\s.,¡!¿?]*((subt[ií]tulos|subtitulado)[^.]*|gracias por (ver|su atenci[oó]n)[^.]*|suscr[ií]bete[^.]*)?[\s.,¡!¿?]*$/i.test(texto)) texto = "";
+  return { texto: texto.slice(0, 1200), kb: Math.round(buf.length / 1024) };
+}
+
+// Lo que el cliente mandó (textos, audios pasados a texto, fotos…) en un solo mensaje para Leo,
+// y lo que hay que avisarle a Jose (fotos, videos, audios que no se entendieron, menciones).
+async function mensajeDelCliente(env, pendientes, informe) {
+  const partes = [], paraJose = [];
+  const cuenta = { foto: 0, video: 0, compartido: 0 };
+  for (const m of pendientes) {
+    if (m.message) partes.push(((m.story || {}).reply_to ? "(respondiendo a una historia de Meraki) " : "") + m.message);
+    for (const a of adjuntosDe(m)) {
+      if (a.tipo === "audio") {
+        const t0 = Date.now();
+        try {
+          const { texto, kb } = await escucharAudio(env, a.url);
+          informe.push({ paso: "audio", kb, ext: a.ext, mime: a.mime, seg_audio: Math.round((Date.now() - t0) / 100) / 10, entendido: !!texto });
+          if (texto) { partes.push("🎤 Audio: " + texto); continue; }
+        } catch (e) {
+          informe.push({ paso: "audio", ext: a.ext, mime: a.mime, kb: a.kb, error: String(e.message || e).slice(0, 160) });
+        }
+        partes.push("[Audio que no se pudo escuchar]");
+        paraJose.push("te mandó un audio que Leo no pudo escuchar");
+      } else if (a.tipo === "sticker") partes.push("[Sticker]");
+      else if (a.tipo === "mencion") { partes.push("[Te mencionó en su historia]"); paraJose.push("te mencionó en su historia 🙌"); }
+      else if (a.tipo === "archivo") { partes.push("[Archivo]"); paraJose.push("te mandó un archivo"); informe.push({ paso: "adjunto", tipo: a.tipo, mime: a.mime, ext: a.ext }); }
+      else { partes.push(a.tipo === "foto" ? "[Foto]" : a.tipo === "video" ? "[Video]" : "[Publicación compartida]"); cuenta[a.tipo]++; }
+    }
+  }
+  const n = (k, uno, varios) => (cuenta[k] === 1 ? uno : cuenta[k] > 1 ? cuenta[k] + " " + varios : "");
+  const media = [n("foto", "una foto", "fotos"), n("video", "un video", "videos"), n("compartido", "una publicación", "publicaciones")].filter(Boolean);
+  if (media.length) paraJose.unshift("te mandó " + media.join(" y "));
+  return { texto: partes.join("\n"), paraJose };
+}
+
+function motivoFalla(e) {
+  const t = String((e && e.message) || e || "");
+  if (/credit|balance|billing|payment/i.test(t)) return "se acabó el saldo de la cuenta de Claude";
+  if (/Claude (429|5\d\d)|overloaded/i.test(t)) return "Claude estaba saturado";
+  if (/Claude 40[13]/.test(t)) return "la llave de Claude no está funcionando";
+  return "falló algo al pensar la respuesta";
+}
+
 async function graphIG(env, ruta) {
   const r = await fetch("https://graph.facebook.com/v23.0/" + ruta, { headers: { authorization: "Bearer " + env.META_IG_TOKEN } });
   leerUso(r);
@@ -601,11 +691,11 @@ async function revisarInstagram(env, motivo, memo = new Map()) {
   // Se pide una sola vez por revisión y solo si hace falta.
   let completos = null;
   const leerChat = async (id) => {
-    if (!completos) completos = new Map((await lista("updated_time,messages.limit(15){id,created_time,from,message}")).map((x) => [x.id, x]));
+    if (!completos) completos = new Map((await lista("updated_time,messages.limit(15){" + CAMPOS_MSG + "}")).map((x) => [x.id, x]));
     const x = completos.get(id);
     if (x) return (x.messages || {}).data || [];
     if (usoAppAhora() >= 80) throw new Error("no apareció en la lista y el límite de la app va en " + usoAppAhora() + "%");
-    return ((await graphIG(env, id + "?fields=" + encodeURIComponent("messages.limit(15){id,created_time,from,message}"))).messages || {}).data || [];
+    return ((await graphIG(env, id + "?fields=" + encodeURIComponent("messages.limit(15){" + CAMPOS_MSG + "}"))).messages || {}).data || [];
   };
 
   const informe = [];
@@ -649,7 +739,7 @@ async function revisarInstagram(env, motivo, memo = new Map()) {
     // Lo que el cliente escribió después de la última respuesta del negocio
     let iNeg = -1;
     for (let i = msgs.length - 1; i >= 0; i--) if (esNegocio(msgs[i].from)) { iNeg = i; break; }
-    const pendientes = msgs.slice(iNeg + 1).filter((m) => !esNegocio(m.from) && m.message && tiempo(m.created_time) >= inicio && ahora - tiempo(m.created_time) <= VENTANA_MS);
+    const pendientes = msgs.slice(iNeg + 1).filter((m) => !esNegocio(m.from) && tieneContenido(m) && tiempo(m.created_time) >= inicio && ahora - tiempo(m.created_time) <= VENTANA_MS);
     const idUltimo = pendientes.length ? pendientes[pendientes.length - 1].id : null;
     if (!idUltimo || (idUltimo === estado.ultimo && !aMedias)) { await guardar(nuevo); continue; }
 
@@ -670,7 +760,9 @@ async function revisarInstagram(env, motivo, memo = new Map()) {
     }
     if (manual) { informe.push({ paso: "sin contestar", por: "Jose está atendiendo ese chat" }); await guardar(nuevo); continue; }
 
-    const yaEscrita = idUltimo === estado.ultimo && estado.respuesta ? estado.respuesta : null;
+    const esReintento = idUltimo === estado.ultimo;
+    const alias = cliente.username ? "@" + cliente.username : "un cliente";
+    const yaEscrita = esReintento && estado.respuesta ? estado.respuesta : null;
     if (idUltimo === estado.ultimo) { nuevo.reintento = idUltimo; informe.push({ paso: "reintento (el intento anterior se cayó)" }); }
     nuevo.ultimo = idUltimo; nuevo.intento = Date.now(); delete nuevo.listo; delete nuevo.respuesta;
     await guardar(nuevo); // se marca antes de contestar para no contestar dos veces
@@ -679,8 +771,17 @@ async function revisarInstagram(env, motivo, memo = new Map()) {
     const escribiendo = usoAppAhora() < 60 && !yaEscrita ? accionMeta(env, yo, String(cliente.id), "typing_on") : Promise.resolve();
     let respuesta = yaEscrita;
     if (!respuesta) {
-      try { respuesta = await responder(env, "instagram", String(cliente.id), pendientes.map((m) => m.message).join("\n").slice(0, 1500), cliente.username ? "@" + cliente.username : ""); }
-      catch (e) { informe.push({ paso: "pensar", error: String(e.message || e).slice(0, 160) }); continue; }
+      let texto = "", paraJose = [];
+      try { ({ texto, paraJose } = await mensajeDelCliente(env, pendientes, informe)); }
+      catch (e) { informe.push({ paso: "adjuntos", error: String(e.message || e).slice(0, 160) }); texto = pendientes.map((m) => m.message || "[Mensaje sin texto]").join("\n"); }
+      if (paraJose.length && !esReintento) await avisarJose(env, "🦁 Leo te avisa (instagram): " + alias + " " + paraJose.join(" y ") + ". Revisalo en el chat de Instagram.");
+      try { respuesta = await responder(env, "instagram", String(cliente.id), texto.slice(0, 1500), cliente.username ? "@" + cliente.username : ""); }
+      catch (e) {
+        informe.push({ paso: "pensar", error: String(e.message || e).slice(0, 160) });
+        // Al segundo intento ya no se reintenta: se le avisa a Jose para que nadie se quede esperando
+        if (esReintento) await avisarJose(env, "⚠️ Leo no pudo contestar (instagram): " + alias + " te escribió y Leo no le pudo contestar (" + motivoFalla(e) + "). Contestale vos en Instagram.");
+        continue;
+      }
     }
     // Se revisa que nadie haya contestado mientras Leo pensaba (Jose a mano, o la revisión del minuto anterior).
     // En las revisiones de cada 8 s, si pensó rápido, no hace falta: así se ahorra 1 a 2 s de Meta.
@@ -708,13 +809,14 @@ async function revisarInstagram(env, motivo, memo = new Map()) {
     nuevo.mios = mios.slice(-30);
     if (ok) nuevo.listo = idUltimo;
     else if (!mandadas) nuevo.respuesta = String(respuesta).slice(0, 2000); // para el reintento, sin volver a pensar
+    if (!ok && esReintento) await avisarJose(env, "⚠️ Leo no pudo contestar (instagram): " + alias + " te escribió y Instagram no dejó pasar la respuesta de Leo. Contestale vos en Instagram.");
     await guardar(nuevo);
     const seg = (x) => Math.round(x / 100) / 10;
     informe.push({ paso: ok ? "contestado" : "no se pudo mandar (ver ultimo_envio)", motivo, segundos: { en_verlo: seg(tVisto - tMsg), pensando: seg(tPensado - tVisto), mandando: seg(Date.now() - tPensado), primer_mensajito: tPrimero ? seg(tPrimero - tMsg) : null, total: seg(Date.now() - tMsg) }, burbujas: partes.length, botones: botones.length });
   }
   if (informe.length) {
     console.log("informe " + motivo + " " + JSON.stringify(informe)); // solo pasos y segundos, sin datos de clientes
-    const importante = informe.some((x) => x.segundos || x.paso === "pensar" || String(x.paso).startsWith("reintento") || x.paso === "ya estaba contestado");
+    const importante = informe.some((x) => x.segundos || x.paso === "pensar" || x.paso === "audio" || x.paso === "adjunto" || String(x.paso).startsWith("reintento") || x.paso === "ya estaba contestado");
     if (importante) {
       await diag(env, "revision", { motivo, informe });
       // Cronómetro de las últimas 10 respuestas
@@ -796,7 +898,7 @@ export default {
       if (!env.META_APP_SECRET || request.headers.get("x-diag") !== env.META_APP_SECRET) return new Response("No autorizado", { status: 403 });
       const leer = async (k) => { try { return JSON.parse((await env.LEO.get(k)) || "null"); } catch { return null; } };
       return json({
-        claves: { cerebro: !!env.LEO_ANTHROPIC_KEY, secreto_meta: !!env.META_APP_SECRET, secreto_ig: !!env.IG_APP_SECRET, llave_instagram: !!env.META_IG_TOKEN, llave_pagina: !!env.META_PAGE_TOKEN, whatsapp: !!env.WA_TOKEN, avisos_app: !!env.AVISOS_HASH },
+        claves: { cerebro: !!env.LEO_ANTHROPIC_KEY, secreto_meta: !!env.META_APP_SECRET, secreto_ig: !!env.IG_APP_SECRET, llave_instagram: !!env.META_IG_TOKEN, llave_pagina: !!env.META_PAGE_TOKEN, whatsapp: !!env.WA_TOKEN, avisos_app: !!env.AVISOS_HASH, oido_audios: !!env.AI },
         ultimo_recibido: await leer("diag:recibido"),
         ultimo_envio: await leer("diag:envio"),
         firmas_rechazadas: await leer("diag:firma"),
