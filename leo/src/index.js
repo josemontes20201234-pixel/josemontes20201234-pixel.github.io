@@ -169,6 +169,7 @@ function sistema(env, canal, extra = "") {
     "AUDIOS, FOTOS Y STICKERS:",
     "- Si una parte del mensaje empieza con «🎤 Audio:», es un audio del cliente pasado a texto automáticamente (puede traer alguna palabra mal). Contestá normal, como si lo hubieras escuchado, sin decir que lo transcribiste. Si no queda claro algo importante (día, hora, nombre o número), preguntá solo eso.",
     "- «[Audio que no se pudo escuchar]»: disculpate corto y pedile que te lo escriba o que lo mande otra vez.",
+    "- «[No se puede ver: audio o reel]»: Instagram no te deja escuchar audios ni ver algunos reels. Decí en pocas palabras que por aquí no te llegan los audios, pedile amablemente que te lo escriba, y que si era algo para Jose, él ya lo va a ver (ya se le avisó; no usés avisar_a_jose para eso).",
     "- «[Foto]», «[Video]» o «[Publicación compartida]»: vos no podés verlas, pero Jose sí (ya se le avisó; no usés avisar_a_jose para eso). Decilo en pocas palabras y seguí con lo que el cliente necesita; si parece que quiere ese corte o estilo, preguntá para qué día lo quiere.",
     "- «[Sticker]» solo: contestá con un mensajito muy corto y amable, sin preguntas. «[Te mencionó en su historia]»: agradecé con cariño en un mensajito corto.",
     "",
@@ -548,7 +549,9 @@ async function accionMeta(env, cuenta, para, accion) {
 
 // ---------- Audios, fotos y stickers ----------
 // Campos de cada mensaje en la lista de chats (con adjuntos). Probado con Meta: estos nombres sí existen.
-const CAMPOS_MSG = "id,created_time,from,message,attachments{mime_type,name,size,file_url,image_data,video_data},shares{name,link},story";
+// Ojo: por esta vía Instagram NO entrega los audios: los marca is_unsupported (igual que algunos reels e historias compartidas).
+// Los avisos de Meta (webhooks, cuando se verifique el negocio) sí traen el audio; el oído ya está listo para eso.
+const CAMPOS_MSG = "id,created_time,from,message,attachments{mime_type,name,size,file_url,image_data,video_data},shares{name,link},story,is_unsupported";
 const EXT_AUDIO = /\.(m4a|aac|mp3|mpga|ogg|oga|opus|wav|amr|weba)$/;
 function adjuntosDe(m) {
   const out = [];
@@ -567,6 +570,7 @@ function adjuntosDe(m) {
   }
   if (((m.shares || {}).data || []).length) out.push({ tipo: "compartido" });
   if ((m.story || {}).mention) out.push({ tipo: "mencion" });
+  if (m.is_unsupported && !out.length) out.push({ tipo: "no_soportado" });
   return out;
 }
 const tieneContenido = (m) => !!m.message || adjuntosDe(m).length > 0;
@@ -611,6 +615,7 @@ async function mensajeDelCliente(env, pendientes, informe) {
         partes.push("[Audio que no se pudo escuchar]");
         paraJose.push("te mandó un audio que Leo no pudo escuchar");
       } else if (a.tipo === "sticker") partes.push("[Sticker]");
+      else if (a.tipo === "no_soportado") { partes.push("[No se puede ver: audio o reel]"); paraJose.push("te mandó un audio o un reel que Leo no puede ver"); informe.push({ paso: "adjunto", tipo: a.tipo }); }
       else if (a.tipo === "mencion") { partes.push("[Te mencionó en su historia]"); paraJose.push("te mencionó en su historia 🙌"); }
       else if (a.tipo === "archivo") { partes.push("[Archivo]"); paraJose.push("te mandó un archivo"); informe.push({ paso: "adjunto", tipo: a.tipo, mime: a.mime, ext: a.ext }); }
       else { partes.push(a.tipo === "foto" ? "[Foto]" : a.tipo === "video" ? "[Video]" : "[Publicación compartida]"); cuenta[a.tipo]++; }
