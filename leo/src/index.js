@@ -18,7 +18,8 @@ const SERVICIOS = [
 // Antes va la «Semana Aniversario Meraki» (8 al 13 de diciembre): precios de siempre + boleto para rifar un full detalle.
 const CAMBIO_PRECIOS = "2026-12-15";
 const ANIVERSARIO = { desde: "2026-12-08", hasta: "2026-12-13" };
-// Jose (19 nov 2026): a los clientes con Tarjeta Meraki se les respeta el precio anterior hasta el 31 de enero
+// Jose (19 nov 2026): a los clientes que ya tenían Tarjeta Meraki antes del 15 de diciembre se les respeta el precio
+// anterior hasta el 31 de enero (Jose lo ve en su app: «Cliente desde»)
 const TARJETA_RESPETA_HASTA = "2027-01-31";
 const SERVICIOS_NUEVOS = [
   ["Corte clásico", 4, "corte a tijera o máquina, acabado limpio y perfilado de patillas"],
@@ -187,11 +188,11 @@ function sistema(env, canal, extra = "") {
     if (hoy >= ANIVERSARIO.desde && hoy <= ANIVERSARIO.hasta) avisos.push(
       "SEMANA ANIVERSARIO MERAKI (del martes 8 al domingo 13 de diciembre): Meraki cumple un año en su local. Esta semana se cobran los precios de siempre y cada cliente que venga recibe un boleto para la rifa de un Servicio full detalle gratis el domingo 13. Desde el martes 15 de diciembre entran los precios nuevos (abajo). Contalo con alegría cuando hablen de precios o aparten cita esta semana, sin repetirlo en cada mensaje.");
     avisos.push("Precios para citas del martes 15 de diciembre en adelante (" + (hoy >= ANIVERSARIO.desde ? "ya se pueden anunciar" : "todavía no los anunciés; usalos solo si alguien aparta para esas fechas") + "):", ...listaPrecios(SERVICIOS_NUEVOS));
-    avisos.push("TARJETA MERAKI: a los clientes con Tarjeta Meraki se les respeta el precio de ahora hasta el 31 de enero de 2027, aunque la cita sea del 15 de diciembre en adelante (Jose lo verifica en persona con la tarjeta). Mencionalo siempre que hablés de los precios nuevos.");
+    avisos.push("TARJETA MERAKI: a los clientes que ya tienen su Tarjeta Meraki (sacada antes del 15 de diciembre) se les respeta el precio de ahora hasta el 31 de enero de 2027, aunque la cita sea del 15 de diciembre en adelante (Jose lo verifica en persona con la tarjeta). Mencionalo siempre que hablés de los precios nuevos.");
   }
   // Del 15 de diciembre al 31 de enero: precios nuevos, pero con Tarjeta Meraki se respeta el precio anterior
   if (hoy >= CAMBIO_PRECIOS && hoy <= TARJETA_RESPETA_HASTA) {
-    avisos.push("TARJETA MERAKI: hasta el 31 de enero de 2027, los clientes con Tarjeta Meraki todavía pagan los precios anteriores (Jose lo verifica en persona con la tarjeta). Mencionalo cuando pregunten precios, se quejen del aumento o digan que tienen la tarjeta, sin repetirlo en cada mensaje. Precios anteriores:", ...listaPrecios(SERVICIOS));
+    avisos.push("TARJETA MERAKI: hasta el 31 de enero de 2027, los clientes que ya tenían su Tarjeta Meraki antes del 15 de diciembre todavía pagan los precios anteriores (Jose lo verifica en persona con la tarjeta; las tarjetas nuevas pagan los precios de ahora). Mencionalo cuando pregunten precios, se quejen del aumento o digan que tienen la tarjeta, sin repetirlo en cada mensaje. Precios anteriores:", ...listaPrecios(SERVICIOS));
   }
   const hora = lineas.pop() + (avisos.length ? "\n" + avisos.join("\n") : "") + (extra ? "\n" + extra : "");
   return [
