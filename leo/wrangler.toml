@@ -8,7 +8,7 @@ PROBAR = "1"
 META_VERIFY_TOKEN = "meraki-leo-7df854ae7b4dd4f6"
 IG_ID = "17841479582218392"
 IG_USUARIO = "meraki20256"
-LEO_SOLO = "merakievaluador"
+# Lanzado para todos los clientes el 19 de noviembre de 2026 (antes: LEO_SOLO = "merakievaluador", modo prueba)
 # Sonnet sin pensar antes de contestar (piensa solo entre herramientas): igual de bueno y sin pausas largas
 LEO_PENSAR = "between_tools"
 # Huella (SHA-256) de la clave de avisos de la app Meraki CRM. La clave no está aquí: solo la huella.
