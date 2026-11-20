@@ -309,7 +309,13 @@ public class MainActivity extends Activity {
 
         /** Avisos para Leo (GET o POST a /ajustes). La clave la pone Java: nunca pasa al JavaScript. Respuesta en window.__http. */
         @JavascriptInterface
-        public void leo(final String id, final String metodo, final String cuerpo) {
+        public void leo(final String id, final String metodo, final String cuerpo) { leoPedir(id, metodo, cuerpo, Leo.URL_AJUSTES); }
+
+        /** Leo en WhatsApp: encender/apagar, clave de YCloud y números que Leo no contesta. */
+        @JavascriptInterface
+        public void leoWa(final String id, final String metodo, final String cuerpo) { leoPedir(id, metodo, cuerpo, Leo.URL_WA); }
+
+        private void leoPedir(String id, String metodo, String cuerpo, String url) {
             String clave = Leo.prefs(MainActivity.this).getString("clave", "");
             if (clave.isEmpty()) {
                 js("window.__http&&window.__http(" + JSONObject.quote(id) + ",0," + JSONObject.quote("{\"error\":{\"message\":\"Falta activar los avisos de Leo en este teléfono\"}}") + ")");
@@ -317,7 +323,7 @@ public class MainActivity extends Activity {
             }
             String encabezados;
             try { encabezados = new JSONObject().put("x-avisos", clave).toString(); } catch (Exception e) { encabezados = "{}"; }
-            http(id, "POST".equals(metodo) ? "POST" : "GET", Leo.URL_AJUSTES, encabezados, "POST".equals(metodo) ? cuerpo : "", "json");
+            http(id, "POST".equals(metodo) ? "POST" : "GET", url, encabezados, "POST".equals(metodo) ? cuerpo : "", "json");
         }
 
         @JavascriptInterface

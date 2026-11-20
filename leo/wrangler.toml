@@ -12,6 +12,8 @@ IG_USUARIO = "meraki20256"
 # Sonnet sin pensar antes de contestar (piensa solo entre herramientas): igual de bueno y sin pausas largas
 LEO_PENSAR = "between_tools"
 # Huella (SHA-256) de la clave de avisos de la app Meraki CRM. La clave no está aquí: solo la huella.
+# WhatsApp (YCloud): huella del token que va en la dirección del webhook; el token solo lo tiene Jose
+WA_HOOK_HASH = "a9c1983c4e86639414cdd4f1725086df92f3f7fc4494c0310bf1c1105e73cbec"
 AVISOS_HASH = "88e2bd3f8917830be07dd5350fd18646feed54f65b755cf9b58a839e08adae94"
 
 # Oído de Leo: pasa los audios a texto (Whisper en Cloudflare, plan gratis)
@@ -20,3 +22,12 @@ binding = "AI"
 
 [triggers]
 crons = ["* * * * *"]
+
+# Un chat por cliente de WhatsApp (junta mensajes seguidos y contesta de uno en uno). Gratis en el plan Free (SQLite).
+[[durable_objects.bindings]]
+name = "CHAT_WA"
+class_name = "ChatWA"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["ChatWA"]

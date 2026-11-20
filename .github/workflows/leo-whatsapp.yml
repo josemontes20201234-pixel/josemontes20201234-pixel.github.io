@@ -1,0 +1,23 @@
+name: Leo — probar WhatsApp
+on:
+  workflow_dispatch:
+jobs:
+  probar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Conversaciones por WhatsApp (herramientas simuladas, no toca nada guardado)
+        env:
+          K: ${{ secrets.LEO_ANTHROPIC_KEY }}
+        run: node .github/scripts/leo-whatsapp.mjs
+      - name: Servidor (sin mostrar claves ni números)
+        env:
+          S: ${{ secrets.META_APP_SECRET }}
+        run: |
+          U=https://meraki-leo.merakibarbershop.workers.dev
+          echo "Webhook con token malo (debe ser 403): $(curl -s -o /dev/null -w '%{http_code}' -X POST -d '{}' $U/whatsapp/token-malo)"
+          echo "Ajustes sin clave (debe ser 403): $(curl -s -o /dev/null -w '%{http_code}' $U/whatsapp-ajustes)"
+          curl -s -H "x-diag: $S" $U/whatsapp-ajustes | python3 -c 'import sys,json; d=json.load(sys.stdin); print("Ajustes:", {"activo": d.get("activo"), "clave": d.get("clave"), "numeros_ignorados": len(d.get("ignorar") or []), "listo": d.get("listo")})'

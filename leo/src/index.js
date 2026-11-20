@@ -318,7 +318,7 @@ function soloTexto(hist) {
 
 // Corre la conversación: historial en KV + ciclo de herramientas.
 // Una plática dura el día (hora de El Salvador): al día siguiente Leo saluda y empieza de cero, como un CRM.
-async function responder(env, canal, usuario, texto, alias = "") {
+async function responder(env, canal, usuario, texto, alias = "", nota = "") {
   const clave = "h:" + canal + ":" + usuario;
   const hoy = ymdSV(Date.now());
   let previo = [];
@@ -328,7 +328,7 @@ async function responder(env, canal, usuario, texto, alias = "") {
   } catch {}
   let hist = soloTexto([...previo, { role: "user", content: texto }]);
   const citas = await citasDelCliente(env, { canal, usuario });
-  const extra = citas.length ? "Este cliente YA tiene cita apartada (es real, está en la agenda): " + citas.map((c) => c.resumen + " · $" + Number(c.precio).toFixed(2)).join("; ") + ". No la volvás a apartar; si pide comprobante, repetile estos datos." : "";
+  const extra = [nota, citas.length ? "Este cliente YA tiene cita apartada (es real, está en la agenda): " + citas.map((c) => c.resumen + " · $" + Number(c.precio).toFixed(2)).join("; ") + ". No la volvás a apartar; si pide comprobante, repetile estos datos." : ""].filter(Boolean).join("\n");
   let salida = "";
   for (let i = 0; i < 5; i++) {
     let res;
@@ -625,10 +625,10 @@ function adjuntosDe(m) {
 const tieneContenido = (m) => !!m.message || adjuntosDe(m).length > 0;
 
 // Leo «escucha» los audios: se pasan a texto con Whisper en Cloudflare (Workers AI, sin llaves nuevas).
-async function escucharAudio(env, url) {
+async function escucharAudio(env, url, encabezados = {}) {
   if (!env.AI) throw new Error("Workers AI no está conectado");
   if (!url) throw new Error("el audio no trae enlace");
-  const r = await fetch(url);
+  const r = await fetch(url, { headers: encabezados });
   if (!r.ok) throw new Error("no se pudo bajar el audio (" + r.status + ")");
   const buf = new Uint8Array(await r.arrayBuffer());
   if (buf.length > 2e6) throw new Error("audio muy largo (" + Math.round(buf.length / 1024) + " KB)");
@@ -674,6 +674,137 @@ async function mensajeDelCliente(env, pendientes, informe) {
   const media = [n("foto", "una foto", "fotos"), n("video", "un video", "videos"), n("compartido", "una publicación", "publicaciones")].filter(Boolean);
   if (media.length) paraJose.unshift("te mandó " + media.join(" y "));
   return { texto: partes.join("\n"), paraJose };
+}
+
+/* ---------- WhatsApp por YCloud (coexistencia: Jose sigue usando WhatsApp Business y Leo contesta a la par) ---------- */
+// YCloud manda cada mensaje a /whatsapp/<token> (solo la huella del token está en el código público).
+// Cada cliente tiene su «ChatWA» (Durable Object): junta los mensajes seguidos y los atiende de uno en uno.
+// Leo NO contesta: a los números de la lista de Jose (familia), ni el resto del día en un chat donde Jose escribió a mano.
+const ESPERA_WA_MS = 4000;
+const digitos = (s) => String(s || "").replace(/\D/g, "");
+const numeroWA = (s) => { const d = digitos(s); return d.length === 8 ? "503" + d : d; };
+const localWA = (d) => (/^503[67]\d{7}$/.test(d) ? d.slice(3, 7) + "-" + d.slice(7) : "+" + d);
+async function sha256hex(texto) {
+  const d = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(String(texto || "")));
+  return [...new Uint8Array(d)].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+async function configWA(env) {
+  let cfg = {};
+  try { cfg = JSON.parse((await env.LEO.get("wa:cfg")) || "{}"); } catch {}
+  return { activo: !!cfg.activo, ignorar: Array.isArray(cfg.ignorar) ? cfg.ignorar : [], clave: (await env.LEO.get("wa:clave")) || "" };
+}
+const ignoradoWA = (cfg, num) => cfg.ignorar.some((x) => x.numero === num);
+function limpiarIgnorar(lista) {
+  if (!Array.isArray(lista)) return null;
+  const out = [];
+  for (const x of lista) {
+    const numero = numeroWA(x && x.numero);
+    if (numero.length < 10 || numero.length > 15 || out.some((y) => y.numero === numero)) continue;
+    out.push({ numero, nombre: String((x && x.nombre) || "").replace(/\s+/g, " ").trim().slice(0, 40) });
+    if (out.length >= 150) break;
+  }
+  return out;
+}
+const chatHoyWA = async (env, cliente) => (await env.LEO.get("wa:mano:" + cliente)) === ymdSV(Date.now());
+
+// Lo que llega de YCloud: mensajes de clientes y copias de lo que Jose manda desde la app
+async function recibirWhatsApp(env, ev) {
+  const cfg = await configWA(env);
+  if (ev.type === "whatsapp.smb.message.echoes") { // Jose escribió a mano: Leo se hace a un lado en ese chat el resto del día
+    const cliente = digitos((ev.whatsappMessage || {}).to);
+    if (!cliente || ignoradoWA(cfg, cliente) || (await chatHoyWA(env, cliente))) return;
+    await env.LEO.put("wa:mano:" + cliente, ymdSV(Date.now()), { expirationTtl: 2 * 86400 });
+    return;
+  }
+  if (ev.type !== "whatsapp.inbound_message.received") return;
+  const m = ev.whatsappInboundMessage || {};
+  const cliente = digitos(m.from);
+  if (!cliente || !cfg.activo || !cfg.clave || !env.CHAT_WA || ignoradoWA(cfg, cliente)) return;
+  if (await chatHoyWA(env, cliente)) return;
+  const tipo = String(m.type || "");
+  const cuerpo = m[tipo] || {};
+  const texto = tipo === "text" ? (cuerpo.body || "")
+    : tipo === "interactive" ? ((cuerpo.button_reply || cuerpo.list_reply || {}).title || "")
+    : tipo === "button" ? (cuerpo.text || "")
+    : cuerpo.caption || "";
+  const datos = { id: String(m.wamid || m.id || ev.id || Date.now()), de: digitos(m.to), cliente, nombre: String((m.customerProfile || {}).name || "").slice(0, 60),
+    tipo, texto: String(texto).slice(0, 2000), link: tipo === "audio" ? String(cuerpo.link || "") : "" };
+  const chat = env.CHAT_WA.get(env.CHAT_WA.idFromName(cliente));
+  await chat.fetch("https://chat/encolar", { method: "POST", body: JSON.stringify(datos) });
+}
+
+async function enviarYCloud(clave, de, para, mensaje) {
+  const r = await fetch("https://api.ycloud.com/v2/whatsapp/messages/sendDirectly", {
+    method: "POST",
+    headers: { "content-type": "application/json", "X-API-Key": clave },
+    body: JSON.stringify({ from: "+" + de, to: "+" + para, ...mensaje }),
+  });
+  if (!r.ok) throw new Error("YCloud " + r.status + " " + (await r.text()).slice(0, 160));
+  return r.json().catch(() => ({}));
+}
+
+// Lo que Leo necesita saber cuando el chat es por WhatsApp
+const notaWhatsApp = (cliente) => "El cliente te escribe por WhatsApp desde el " + localWA(cliente) + (/^503[67]/.test(cliente) ? " (ese es su WhatsApp para la cita: no se lo pidás)" : "") +
+  ". Ya estás en el WhatsApp de Meraki (6061-8603): no le pidás que escriba a otro WhatsApp; si algo es para Jose, él lo ve en este mismo chat. En WhatsApp se ven máximo 3 botones.";
+
+// Atiende lo que el cliente mandó (ya juntado): igual que en Instagram, con el mismo cerebro
+async function atenderWhatsApp(env, cola) {
+  const t0 = Date.now();
+  const cfg = await configWA(env);
+  const ult = cola[cola.length - 1], cliente = ult.cliente, de = ult.de;
+  if (!cfg.activo || !cfg.clave || ignoradoWA(cfg, cliente) || (await chatHoyWA(env, cliente))) return;
+  const quien = (ult.nombre ? ult.nombre + " · " : "") + localWA(cliente);
+  const partes = [], paraJose = [];
+  const cuenta = { image: 0, video: 0 };
+  let audios = 0, oidos = 0;
+  for (const m of cola) {
+    if (m.tipo === "audio") {
+      audios++;
+      try {
+        const { texto } = await escucharAudio(env, m.link, { "X-API-Key": cfg.clave });
+        if (texto) { partes.push("🎤 Audio: " + texto); oidos++; continue; }
+      } catch {}
+      partes.push("[Audio que no se pudo escuchar]");
+      paraJose.push("te mandó un audio que Leo no pudo escuchar");
+    } else if (m.tipo === "text" || m.tipo === "interactive" || m.tipo === "button") { if (m.texto) partes.push(m.texto); }
+    else if (m.tipo === "image" || m.tipo === "video") { partes.push((m.tipo === "image" ? "[Foto]" : "[Video]") + (m.texto ? " " + m.texto : "")); cuenta[m.tipo]++; }
+    else if (m.tipo === "sticker") partes.push("[Sticker]");
+    else if (m.tipo === "reaction") continue;
+    else if (m.tipo === "document") { partes.push("[Archivo]" + (m.texto ? " " + m.texto : "")); paraJose.push("te mandó un archivo"); }
+    else if (m.tipo === "location") partes.push("[Mandó una ubicación]");
+    else { partes.push("[Mensaje que Leo no puede ver]"); paraJose.push("te mandó algo que Leo no puede ver"); }
+  }
+  const media = [cuenta.image === 1 ? "una foto" : cuenta.image > 1 ? cuenta.image + " fotos" : "", cuenta.video === 1 ? "un video" : cuenta.video > 1 ? cuenta.video + " videos" : ""].filter(Boolean);
+  if (media.length) paraJose.unshift("te mandó " + media.join(" y "));
+  const texto = partes.join("\n").trim();
+  if (!texto) return;
+
+  const nota = notaWhatsApp(cliente);
+  let salida;
+  try { salida = await responder(env, "whatsapp", cliente, texto, ult.nombre || localWA(cliente), nota); }
+  catch (e) {
+    await avisarJose(env, "⚠️ Leo no pudo contestar (whatsapp): " + quien + " te escribió y Leo no le pudo contestar (" + motivoFalla(e) + "). Contestale vos en WhatsApp.");
+    await diag(env, "wa", { ok: false, paso: "pensar", error: String((e && e.message) || e).slice(0, 160) });
+    return;
+  }
+  if (await chatHoyWA(env, cliente)) return; // Jose contestó mientras Leo pensaba
+  const { burbujas, botones } = prepararRespuesta(salida);
+  const titulos = [...new Set(botones)].slice(0, 3);
+  try {
+    for (let i = 0; i < burbujas.length; i++) {
+      if (i === burbujas.length - 1 && titulos.length && burbujas[i].length <= 1000) {
+        const conBotones = { type: "interactive", interactive: { type: "button", body: { text: burbujas[i] }, action: { buttons: titulos.map((b, j) => ({ type: "reply", reply: { id: "b" + (j + 1), title: b } })) } } };
+        if (await enviarYCloud(cfg.clave, de, cliente, conBotones).then(() => true, () => false)) continue;
+      }
+      await enviarYCloud(cfg.clave, de, cliente, { type: "text", text: { body: burbujas[i] } });
+    }
+  } catch (e) {
+    await avisarJose(env, "⚠️ Leo no pudo mandar la respuesta (whatsapp) a " + quien + ". Contestale vos en WhatsApp.");
+    await diag(env, "wa", { ok: false, paso: "enviar", error: String((e && e.message) || e).slice(0, 160) });
+    return;
+  }
+  if (paraJose.length) await avisarJose(env, "📎 " + quien + " " + paraJose.join(" y ") + " (WhatsApp)");
+  await diag(env, "wa", { ok: true, seg: Math.round((Date.now() - t0) / 100) / 10, mensajes: cola.length, audios, oidos, botones: titulos.length });
 }
 
 function motivoFalla(e) {
@@ -939,6 +1070,42 @@ export default {
       return new Response(JSON.stringify({ avisos, ahora: Date.now() }), { headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" } });
     }
 
+    // WhatsApp: YCloud avisa aquí cada mensaje (la dirección lleva un token; en el código solo está su huella)
+    if (url.pathname.startsWith("/whatsapp/")) {
+      if (request.method !== "POST") return new Response("ok");
+      if (!env.WA_HOOK_HASH || (await sha256hex(url.pathname.slice(10))) !== env.WA_HOOK_HASH) return new Response("No autorizado", { status: 403 });
+      let ev = null;
+      try { ev = await request.json(); } catch {}
+      if (ev) ctx.waitUntil(recibirWhatsApp(env, ev).catch((e) => diag(env, "wa", { ok: false, paso: "recibir", error: String((e && e.message) || e).slice(0, 160) })));
+      return new Response(null, { status: 204 });
+    }
+    // Ajustes de WhatsApp desde Meraki CRM: encender/apagar, clave de YCloud (nunca se devuelve) y números que Leo no contesta
+    if (url.pathname === "/whatsapp-ajustes") {
+      const okApp = env.AVISOS_HASH && (await huellaClave(request)) === env.AVISOS_HASH;
+      const okDiag = env.META_APP_SECRET && request.headers.get("x-diag") === env.META_APP_SECRET;
+      if (!okApp && !okDiag) return new Response("No autorizado", { status: 403 });
+      const cfg = await configWA(env);
+      if (request.method === "POST") {
+        let b = null;
+        try { b = await request.json(); } catch {}
+        if (!b || typeof b !== "object") return json({ error: "Formato inválido" }, 400);
+        if (typeof b.clave === "string") {
+          const clave = b.clave.trim();
+          if (clave && !/^[\w.-]{16,200}$/.test(clave)) return json({ error: "Esa clave no parece de YCloud" }, 400);
+          if (clave) await env.LEO.put("wa:clave", clave); else await env.LEO.delete("wa:clave");
+          cfg.clave = clave;
+        }
+        if (typeof b.activo === "boolean") cfg.activo = b.activo;
+        if (b.ignorar !== undefined) {
+          const lista = limpiarIgnorar(b.ignorar);
+          if (!lista) return json({ error: "Lista inválida" }, 400);
+          cfg.ignorar = lista;
+        }
+        await env.LEO.put("wa:cfg", JSON.stringify({ activo: cfg.activo, ignorar: cfg.ignorar }));
+      }
+      return json({ ok: true, activo: cfg.activo, clave: !!cfg.clave, ignorar: cfg.ignorar, listo: !!env.WA_HOOK_HASH && !!env.CHAT_WA });
+    }
+
     // Avisos de Jose para Leo (promos, cierres): los lee y guarda la app Meraki CRM con la misma clave de /avisos.
     // Las pruebas desde GitHub entran con x-diag.
     if (url.pathname === "/ajustes") {
@@ -1108,3 +1275,26 @@ export default {
     return new Response("Hola, soy Leo, el asistente de IA de Meraki Barbershop 🦁💈", { headers: { "content-type": "text/plain; charset=utf-8" } });
   },
 };
+
+// Un «ChatWA» por cliente de WhatsApp (Durable Object): guarda lo que llega, espera unos segundos
+// por si el cliente sigue escribiendo, y lo atiende todo junto. Así nunca contesta dos veces a la vez.
+export class ChatWA {
+  constructor(state, env) { this.state = state; this.env = env; }
+  async fetch(request) {
+    const m = await request.json();
+    const vistos = (await this.state.storage.get("vistos")) || [];
+    if (vistos.includes(m.id)) return new Response("repetido");
+    await this.state.storage.put("vistos", [...vistos, m.id].slice(-60));
+    const cola = (await this.state.storage.get("cola")) || [];
+    await this.state.storage.put("cola", [...cola, m].slice(-20));
+    await this.state.storage.setAlarm(Date.now() + ESPERA_WA_MS);
+    return new Response("ok");
+  }
+  async alarm() {
+    const cola = (await this.state.storage.get("cola")) || [];
+    await this.state.storage.delete("cola");
+    if (!cola.length) return;
+    try { await atenderWhatsApp(this.env, cola); }
+    catch (e) { await diag(this.env, "wa", { ok: false, paso: "atender", error: String((e && e.message) || e).slice(0, 160) }); }
+  }
+}
