@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://josemontes20201234-pixel.github.io/sitemap.xml

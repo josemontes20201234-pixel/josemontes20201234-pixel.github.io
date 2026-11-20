@@ -7,7 +7,7 @@ jobs:
     steps:
       - name: Ver si las páginas se abren desde internet
         run: |
-          for p in privacidad eliminar-datos terminos; do
+          for p in privacidad eliminar-datos terminos meraki citas; do
             u="https://josemontes20201234-pixel.github.io/$p/"
             code=$(curl -s -o /tmp/p.html -w "%{http_code}" -A "facebookexternalhit/1.1" "$u")
             echo "$u -> $code | $(grep -o '<title>[^<]*' /tmp/p.html | sed 's/<title>//')"
