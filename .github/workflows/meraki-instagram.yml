@@ -1,0 +1,112 @@
+name: Meraki web — fotos de Instagram
+# Baja las últimas publicaciones de @meraki20256 para la galería de la página web.
+# Nunca imprime la llave ni los enlaces privados de Instagram: solo conteos.
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 11 * * *" # 5:17 a. m. en El Salvador, todos los días
+permissions:
+  contents: write
+  pages: write
+concurrency:
+  group: meraki-instagram
+  cancel-in-progress: false
+jobs:
+  fotos:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Bajar fotos
+        env:
+          T: ${{ secrets.META_IG_TOKEN }}
+        run: |
+          pip install --quiet pillow
+          python3 - <<'PY'
+          import io, json, os, urllib.error, urllib.request, datetime
+          from PIL import Image
+          IG, G = "17841479582218392", "https://graph.facebook.com/v23.0/"
+          CAMPOS = "id,media_type,media_url,thumbnail_url,permalink,timestamp,children{media_type,media_url,thumbnail_url}"
+          CARPETA, MAX = "meraki/ig", 30
+
+          def pedir(url):
+              req = urllib.request.Request(url, headers={"Authorization": "Bearer " + os.environ["T"]})
+              try:
+                  with urllib.request.urlopen(req, timeout=40) as r:
+                      return r.status, json.load(r)
+              except urllib.error.HTTPError as e:
+                  try:
+                      b = json.load(e)
+                  except Exception:
+                      b = {}
+                  return e.code, b
+
+          st, b = pedir(G + IG + "/media?fields=" + CAMPOS + "&limit=" + str(MAX))
+          if st != 200:
+              e = b.get("error") or {}
+              print("Instagram respondió", st, "|", e.get("code"), str(e.get("message", ""))[:140])
+              raise SystemExit(1)
+
+          os.makedirs(CARPETA, exist_ok=True)
+          fotos, nuevas = [], 0
+          for m in (b.get("data") or [])[:MAX]:
+              tipo = m.get("media_type")
+              src = m.get("thumbnail_url") if tipo == "VIDEO" else m.get("media_url")
+              if tipo == "CAROUSEL_ALBUM":
+                  hijos = (m.get("children") or {}).get("data") or []
+                  if hijos:
+                      h = hijos[0]
+                      src = h.get("thumbnail_url") if h.get("media_type") == "VIDEO" else h.get("media_url")
+              if not src:
+                  continue
+              nombre = m["id"] + ".webp"
+              ruta = os.path.join(CARPETA, nombre)
+              if not os.path.exists(ruta):
+                  try:
+                      with urllib.request.urlopen(src, timeout=60) as r:
+                          im = Image.open(io.BytesIO(r.read())).convert("RGB")
+                  except Exception as ex:
+                      print("No se pudo bajar una foto:", type(ex).__name__)
+                      continue
+                  if im.width > 720:
+                      im = im.resize((720, round(im.height * 720 / im.width)), Image.LANCZOS)
+                  im.save(ruta, "WEBP", quality=78, method=6)
+                  nuevas += 1
+              with Image.open(ruta) as im:
+                  ancho, alto = im.size
+              fotos.append({
+                  "id": m["id"],
+                  "tipo": "video" if tipo == "VIDEO" else "foto",
+                  "img": "ig/" + nombre,
+                  "ancho": ancho,
+                  "alto": alto,
+                  "enlace": m.get("permalink", ""),
+                  "fecha": str(m.get("timestamp", ""))[:10],
+              })
+
+          guardar = {f["img"].split("/")[-1] for f in fotos}
+          borradas = 0
+          for f in os.listdir(CARPETA):
+              if f.endswith(".webp") and f not in guardar:
+                  os.remove(os.path.join(CARPETA, f))
+                  borradas += 1
+          viejo = {}
+          try:
+              viejo = json.load(open(os.path.join(CARPETA, "galeria.json"), encoding="utf-8"))
+          except Exception:
+              pass
+          if viejo.get("fotos") != fotos:
+              json.dump({"actualizado": datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%MZ"), "fotos": fotos},
+                        open(os.path.join(CARPETA, "galeria.json"), "w", encoding="utf-8"), ensure_ascii=False, indent=1)
+          videos = sum(1 for f in fotos if f["tipo"] == "video")
+          print(f"Publicaciones: {len(fotos)} ({videos} videos) | nuevas: {nuevas} | quitadas: {borradas}")
+          PY
+      - name: Guardar y publicar
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git add meraki/ig
+          if git diff --cached --quiet; then echo "Sin cambios"; exit 0; fi
+          git -c user.name="Meraki Bot" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" commit -q -m "Fotos de Instagram para la web"
+          git push -q
+          curl -s -o /dev/null -w "Página web reconstruida: %{http_code}\n" -X POST -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" "https://api.github.com/repos/${GITHUB_REPOSITORY}/pages/builds"
