@@ -1,0 +1,27 @@
+name: Leo — probar avisos de Jose (Meraki CRM)
+on:
+  workflow_dispatch:
+jobs:
+  probar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Conversaciones con avisos (herramientas simuladas, no toca nada guardado)
+        env:
+          K: ${{ secrets.LEO_ANTHROPIC_KEY }}
+        run: node .github/scripts/leo-avisos.mjs
+      - name: Servidor /ajustes (solo cuenta avisos; deja todo como estaba)
+        env:
+          S: ${{ secrets.META_APP_SECRET }}
+        run: |
+          U=https://meraki-leo.merakibarbershop.workers.dev/ajustes
+          echo "Sin clave (debe ser 403): $(curl -s -o /dev/null -w '%{http_code}' $U)"
+          ANTES=$(curl -s -H "x-diag: $S" $U)
+          echo "Avisos guardados ahora: $(echo "$ANTES" | python3 -c 'import sys,json; print(len(json.load(sys.stdin)["avisos"]))')"
+          LISTA=$(echo "$ANTES" | python3 -c 'import sys,json; d=json.load(sys.stdin); print(json.dumps({"avisos": d["avisos"]}))')
+          PRUEBA=$(echo "$ANTES" | python3 -c 'import sys,json; d=json.load(sys.stdin); d["avisos"].append({"texto":"(Prueba interna: ignorá este aviso y no lo mencionés.)","hasta":d["hoy"]}); print(json.dumps({"avisos": d["avisos"]}))')
+          echo "Guardar con uno de prueba (ok, cuántos): $(curl -s -X POST -H "x-diag: $S" -H 'content-type: application/json' -d "$PRUEBA" $U | python3 -c 'import sys,json; d=json.load(sys.stdin); print(d.get("ok"), len(d.get("avisos",[])))')"
+          echo "Dejarlo como estaba (ok, cuántos): $(curl -s -X POST -H "x-diag: $S" -H 'content-type: application/json' -d "$LISTA" $U | python3 -c 'import sys,json; d=json.load(sys.stdin); print(d.get("ok"), len(d.get("avisos",[])))')"

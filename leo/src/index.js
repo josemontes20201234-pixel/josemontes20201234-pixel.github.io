@@ -48,6 +48,40 @@ const diaSemana = (f) => new Date(f + "T12:00:00-06:00").getUTCDay();
 const hTxt = (h) => (h % 12 || 12) + ":00 " + (h < 12 ? "a. m." : "p. m.");
 const sumarDias = (f, n) => ymdSV(instante(f, 12).getTime() + n * 86400e3);
 
+/* ---------- avisos de Jose (los escribe en Meraki CRM → Ajustes → Avisos para Leo) ---------- */
+// Se guardan en KV («ajustes:avisos»). Leo solo usa los vigentes: sin fecha, o con fecha de hoy en adelante.
+const MAX_AVISOS = 12, MAX_LARGO_AVISO = 400;
+function limpiarAvisos(lista, hoy) {
+  if (!Array.isArray(lista)) return null;
+  const limite = sumarDias(hoy, -7); // los vencidos hace más de una semana se borran solos
+  const out = [];
+  for (const a of lista) {
+    if (out.length >= MAX_AVISOS) break;
+    if (!a || typeof a !== "object") continue;
+    const texto = String(a.texto || "").replace(/\s+/g, " ").trim().slice(0, MAX_LARGO_AVISO);
+    if (!texto) continue;
+    const hasta = /^\d{4}-\d{2}-\d{2}$/.test(String(a.hasta || "")) ? String(a.hasta) : "";
+    if (hasta && hasta < limite) continue;
+    const id = /^[a-z0-9]{1,24}$/i.test(String(a.id || "")) ? String(a.id) : Date.now().toString(36) + out.length;
+    out.push({ id, texto, hasta });
+  }
+  return out;
+}
+let cacheAvisos = { t: 0, v: [] };
+async function avisosDeJose(env) {
+  if (Date.now() - cacheAvisos.t > 30e3) {
+    let v = [];
+    try { v = JSON.parse((await env.LEO.get("ajustes:avisos")) || "[]"); } catch {}
+    cacheAvisos = { t: Date.now(), v: Array.isArray(v) ? v : [] };
+  }
+  const hoy = ymdSV(Date.now());
+  return cacheAvisos.v.filter((a) => a && a.texto && (!a.hasta || a.hasta >= hoy));
+}
+async function huellaClave(request) { // en el código público solo está la huella (SHA-256) de la clave de la app
+  const d = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(request.headers.get("x-avisos") || ""));
+  return [...new Uint8Array(d)].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
 /* ---------- Firestore (reglas públicas de citas y ocupado) ---------- */
 async function horasLibres(fecha) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha)) return { error: "Fecha inválida. Usá el formato AAAA-MM-DD." };
@@ -135,7 +169,7 @@ async function apartarCita({ fecha, hora, nombre, tel, servicio, nota, otra }, e
 }
 
 /* ---------- cerebro de Leo ---------- */
-function sistema(env, canal, extra = "") {
+function sistema(env, canal, extra = "", jose = []) {
   const hoy = ymdSV(Date.now());
   const ahora = new Date(Date.now() - SV_MS);
   const lineas = [
@@ -194,6 +228,12 @@ function sistema(env, canal, extra = "") {
   if (hoy >= CAMBIO_PRECIOS && hoy <= TARJETA_RESPETA_HASTA) {
     avisos.push("TARJETA MERAKI: hasta el 31 de enero de 2027, los clientes que ya tenían su Tarjeta Meraki antes del 15 de diciembre todavía pagan los precios anteriores (Jose lo verifica en persona con la tarjeta; las tarjetas nuevas pagan los precios de ahora). Mencionalo cuando pregunten precios, se quejen del aumento o digan que tienen la tarjeta, sin repetirlo en cada mensaje. Precios anteriores:", ...listaPrecios(SERVICIOS));
   }
+  // Lo que Jose escribió en su app (promos, cierres, avisos de la semana)
+  if (jose.length) {
+    avisos.push("AVISOS DE JOSE (los puso él desde su app; si algo choca con los datos de arriba, vale lo que dice el aviso):",
+      ...jose.map((a) => "- " + a.texto + (a.hasta ? " (vale hasta el " + DL[diaSemana(a.hasta)] + " " + a.hasta + ")" : "")),
+      "Usalos solo cuando vengan al caso (si preguntan horario, precios, promociones o citas en esas fechas), sin repetirlos en cada mensaje y sin inventar nada que el aviso no diga. Si un aviso dice que Jose no atiende cierto día u hora, no ofrezcás ni apartés citas en ese horario aunque horas_libres las muestre.");
+  }
   const hora = lineas.pop() + (avisos.length ? "\n" + avisos.join("\n") : "") + (extra ? "\n" + extra : "");
   return [
     { type: "text", text: lineas.join("\n"), cache_control: { type: "ephemeral" } }, // fijo: se reutiliza entre mensajes
@@ -232,11 +272,12 @@ const HERRAMIENTAS = [
 ];
 
 async function llamarClaude(env, mensajes, canal, extra = "") {
+  const jose = await avisosDeJose(env).catch(() => []);
   const r = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: { "content-type": "application/json", "x-api-key": env.LEO_ANTHROPIC_KEY, "anthropic-version": "2023-06-01" },
     body: JSON.stringify({
-      model: env.LEO_MODELO || MODELO, max_tokens: 700, system: sistema(env, canal, extra), tools: HERRAMIENTAS, messages: mensajes,
+      model: env.LEO_MODELO || MODELO, max_tokens: 700, system: sistema(env, canal, extra, jose), tools: HERRAMIENTAS, messages: mensajes,
       ...(env.LEO_PENSAR ? { thinking: { type: env.LEO_PENSAR } } : {}),
       ...(env.LEO_ESFUERZO ? { output_config: { effort: env.LEO_ESFUERZO } } : {}),
     }),
@@ -883,8 +924,7 @@ export default {
     // van protegidos con su propia clave, que solo tiene la app de Jose. Casi siempre cuesta una sola lectura.
     if (url.pathname === "/avisos") {
       // En el código público solo está la huella (SHA-256) de la clave; la clave la tiene únicamente la app de Jose.
-      const huella = [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(request.headers.get("x-avisos") || "")))].map((b) => b.toString(16).padStart(2, "0")).join("");
-      if (!env.AVISOS_HASH || huella !== env.AVISOS_HASH) return new Response("No autorizado", { status: 403 });
+      if (!env.AVISOS_HASH || (await huellaClave(request)) !== env.AVISOS_HASH) return new Response("No autorizado", { status: 403 });
       const desde = Number(url.searchParams.get("desde")) || 0;
       const ultimo = Number(await env.LEO.get("aviso:ultimo")) || 0;
       const avisos = [];
@@ -897,6 +937,27 @@ export default {
         }
       }
       return new Response(JSON.stringify({ avisos, ahora: Date.now() }), { headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" } });
+    }
+
+    // Avisos de Jose para Leo (promos, cierres): los lee y guarda la app Meraki CRM con la misma clave de /avisos.
+    // Las pruebas desde GitHub entran con x-diag.
+    if (url.pathname === "/ajustes") {
+      const okApp = env.AVISOS_HASH && (await huellaClave(request)) === env.AVISOS_HASH;
+      const okDiag = env.META_APP_SECRET && request.headers.get("x-diag") === env.META_APP_SECRET;
+      if (!okApp && !okDiag) return new Response("No autorizado", { status: 403 });
+      const hoy = ymdSV(Date.now());
+      if (request.method === "POST") {
+        let cuerpo = null;
+        try { cuerpo = await request.json(); } catch {}
+        const lista = limpiarAvisos(cuerpo && cuerpo.avisos, hoy);
+        if (!lista) return json({ error: "Formato inválido" }, 400);
+        await env.LEO.put("ajustes:avisos", JSON.stringify(lista));
+        cacheAvisos = { t: Date.now(), v: lista };
+        return json({ ok: true, avisos: lista, hoy });
+      }
+      let v = [];
+      try { v = JSON.parse((await env.LEO.get("ajustes:avisos")) || "[]"); } catch {}
+      return json({ avisos: limpiarAvisos(v, hoy) || [], hoy });
     }
 
     // Aviso de prueba (sin datos de clientes) para revisar que le llegan a la app de Jose

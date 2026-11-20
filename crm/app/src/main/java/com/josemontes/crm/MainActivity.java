@@ -303,6 +303,23 @@ public class MainActivity extends Activity {
         @JavascriptInterface
         public void sincronizar(String json) { Alarmas.sincronizar(MainActivity.this, json); }
 
+        /** ¿Ya está la clave de Leo (la del enlace de activación)? */
+        @JavascriptInterface
+        public boolean leoActivo() { return Leo.activo(MainActivity.this); }
+
+        /** Avisos para Leo (GET o POST a /ajustes). La clave la pone Java: nunca pasa al JavaScript. Respuesta en window.__http. */
+        @JavascriptInterface
+        public void leo(final String id, final String metodo, final String cuerpo) {
+            String clave = Leo.prefs(MainActivity.this).getString("clave", "");
+            if (clave.isEmpty()) {
+                js("window.__http&&window.__http(" + JSONObject.quote(id) + ",0," + JSONObject.quote("{\"error\":{\"message\":\"Falta activar los avisos de Leo en este teléfono\"}}") + ")");
+                return;
+            }
+            String encabezados;
+            try { encabezados = new JSONObject().put("x-avisos", clave).toString(); } catch (Exception e) { encabezados = "{}"; }
+            http(id, "POST".equals(metodo) ? "POST" : "GET", Leo.URL_AJUSTES, encabezados, "POST".equals(metodo) ? cuerpo : "", "json");
+        }
+
         @JavascriptInterface
         public String version() {
             try { return getPackageManager().getPackageInfo(getPackageName(), 0).versionName; } catch (Exception e) { return "?"; }

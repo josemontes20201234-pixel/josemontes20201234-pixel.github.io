@@ -981,9 +981,53 @@ function conectarGuia(B) {
 }
 
 /* ----- AJUSTES ----- */
+/* ================================================================ Avisos para Leo (promos, cierres) */
+// Se guardan en el servidor de Leo. La clave la pone la parte nativa de la app (nunca pasa por aquí).
+let leoAvisos = null, leoHoy = "", leoCuando = 0;
+const LEO_APP = () => APP && typeof Android.leo === "function";
+const fechaAviso = f => { const d = new Date(f + "T12:00:00-06:00"); return ["dom","lun","mar","mié","jue","vie","sáb"][d.getUTCDay()] + " " + d.getUTCDate() + " " + ["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"][d.getUTCMonth()]; };
+function leoPedir(metodo, cuerpo) {
+  return new Promise(ok => { const id = uid(); esperando[id] = ok; Android.leo(id, metodo, cuerpo ? JSON.stringify(cuerpo) : ""); })
+    .then(r => { let j = null; try { j = JSON.parse(r.texto); } catch(e) {} return {estado:r.estado, json:j, texto:r.texto}; });
+}
+async function leoCargar() {
+  if (!LEO_APP()) return;
+  leoCuando = Date.now();
+  const r = await leoPedir("GET");
+  if (r.estado === 200 && r.json && Array.isArray(r.json.avisos)) { leoAvisos = r.json.avisos; leoHoy = r.json.hoy || ymdSV(Date.now()); }
+  else leoAvisos = {error: r.estado === 403 ? "La clave de Leo no coincide. Abrí otra vez tu enlace para activar los avisos de Leo." : r.estado === 0 ? "Sin conexión. Revisá el internet." : errorDe(r)};
+  leoPintar();
+}
+function leoPintar() {
+  const L = $("#leoLista"); if (!L) return;
+  if (!leoAvisos) { L.innerHTML = '<div class="small mut" style="margin-top:10px"><span class="cargando"></span> Cargando…</div>'; return; }
+  if (leoAvisos.error) { L.innerHTML = '<div class="small warn" style="margin-top:10px;line-height:1.4">' + esc(leoAvisos.error) + '</div><button class="mini" style="margin-top:8px" id="leoReint">Intentar otra vez</button>'; return; }
+  if (!leoAvisos.length) { L.innerHTML = '<div class="small mut" style="margin-top:10px">Todavía no hay avisos.</div>'; return; }
+  L.innerHTML = leoAvisos.map(a => {
+    const vencido = a.hasta && a.hasta < leoHoy;
+    return '<div class="row" style="margin-top:12px;align-items:flex-start;gap:10px' + (vencido ? ';opacity:.55' : '') + '"><div style="flex:1;min-width:0"><div style="line-height:1.4;overflow-wrap:anywhere">' + esc(a.texto) + '</div><div class="small mut" style="margin-top:3px">' +
+      (a.hasta ? (vencido ? "Ya se quitó (" + fechaAviso(a.hasta) + ")" : "Hasta el " + fechaAviso(a.hasta)) : "Sin fecha: queda hasta que lo borrés") + '</div></div><button class="mini" data-leoborrar="' + esc(a.id) + '">Borrar</button></div>';
+  }).join("");
+}
+async function leoGuardar(lista, msg) {
+  const r = await leoPedir("POST", {avisos: lista});
+  if (r.estado === 200 && r.json && r.json.ok) { leoAvisos = r.json.avisos; leoHoy = r.json.hoy || leoHoy; leoPintar(); toast(msg); return true; }
+  toast(r.estado === 403 ? "La clave de Leo no coincide" : r.estado === 0 ? "Sin conexión: no se guardó" : "No se pudo guardar: " + errorDe(r));
+  return false;
+}
+
 function pintarAjustes() {
   const A = $("#ajustes"), aj = D.aj;
-  let h = '<h2 style="margin-top:8px">Tarjeta Meraki</h2><div class="card">';
+  let h = '<h2 style="margin-top:8px">Avisos para Leo 🦁</h2><div class="card">';
+  if (!LEO_APP()) h += '<div class="small mut">Esto se usa desde la app del teléfono.</div>';
+  else if (!Android.leoActivo()) h += '<div class="small mut" style="line-height:1.5">Primero activá los avisos de Leo en este teléfono con tu enlace de activación.</div>';
+  else h += '<div class="small mut" style="line-height:1.5">Lo que escribás aquí, Leo lo sabe y se lo dice a los clientes cuando venga al caso: promos, días que cerrás temprano, avisos de la semana. Si cerrás unas horas, bloquealas también en Citas.</div>' +
+    '<div id="leoLista"></div>' +
+    '<label class="l">Nuevo aviso</label><textarea id="leoTxt" maxlength="400" style="min-height:80px" placeholder="Ej.: El sábado 28 cierro a las 2:00 p. m."></textarea>' +
+    '<label class="l">Se quita solo el… (opcional)</label><input type="date" id="leoHasta">' +
+    '<button class="btn full" style="margin-top:10px" id="leoAdd">Guardar aviso</button>';
+  h += '</div>';
+  h += '<h2>Tarjeta Meraki</h2><div class="card">';
   if (aj.rt) h += '<div class="row"><b class="ok">✓ Conectado</b><span class="sp"></span><button class="mini" id="aSync">Actualizar</button></div><div class="small mut" style="margin-top:6px">' + D.tm.clientes.length + ' clientes · actualizado ' + (D.tm.cuando ? hora(D.tm.cuando) : "—") + (D.tm.error ? ' · <span class="warn">' + esc(D.tm.error) + '</span>' : '') + '</div>' +
     (aj.crmNube === false ? '<div class="small" style="margin-top:12px;line-height:1.5"><b class="warn">Falta un permiso para guardar el CRM en tu Firebase</b> (así no perdés nada si cambiás de teléfono). En Firebase → Firestore → Reglas, pegá esto debajo de <code>match /databases/{database}/documents {</code> y tocá Publicar:<pre style="white-space:pre-wrap;background:var(--card2);padding:10px;border-radius:10px;font-size:11.5px;color:var(--gold2)">' + esc(REGLA_CRM) + '</pre><div class="row"><button class="mini" id="aRegla">Copiar regla</button><button class="mini" id="aProbar">Ya la puse</button></div></div>' : aj.crmNube ? '<div class="small ok" style="margin-top:6px">✓ Tu CRM se respalda en tu Firebase</div>' : '') +
     '<button class="btn dark sm" style="margin-top:10px" id="aSalir">Desconectar</button>';
@@ -1001,8 +1045,28 @@ function pintarAjustes() {
   h += '<h2>Respaldo</h2><div class="card"><div class="small mut" style="line-height:1.5">' + D.personas.filter(p => !p.borrado).length + ' contactos y ' + D.posts.filter(p => !p.borrado).length + ' publicaciones. ' + (aj.crmNube ? "Se respaldan solos en tu Firebase (las fotos quedan en el teléfono)." : "Copiá el respaldo y guardalo en tus notas o en Drive.") + '</div><div class="row" style="margin-top:10px"><button class="mini" id="aExp">Copiar respaldo</button><button class="mini" id="aImp">Pegar respaldo</button></div></div>';
   h += '<div class="small mut" style="text-align:center;margin:24px 0 8px">Meraki CRM ' + (APP ? Android.version() : "web") + '</div>';
   A.innerHTML = h;
+  leoPintar();
+  if (LEO_APP() && Android.leoActivo() && (!Array.isArray(leoAvisos) || Date.now() - leoCuando > 60e3)) leoCargar();
   A.onclick = async e => {
     const b = e.target.closest("button"); if (!b) return;
+    if (b.id === "leoAdd") {
+      const texto = $("#leoTxt").value.replace(/\s+/g, " ").trim(), hasta = $("#leoHasta").value;
+      if (!texto) { toast("Escribí el aviso"); return; }
+      if (hasta && hasta < ymdSV(Date.now())) { toast("Esa fecha ya pasó"); return; }
+      if (!Array.isArray(leoAvisos)) { toast("Esperá a que carguen los avisos"); return; }
+      if (leoAvisos.length >= 12) { toast("Máximo 12 avisos: borrá alguno"); return; }
+      b.disabled = true;
+      const listo = await leoGuardar([...leoAvisos, {texto, hasta}], "Listo ✓ Leo lo usa en un minuto");
+      b.disabled = false;
+      if (listo) { $("#leoTxt").value = ""; $("#leoHasta").value = ""; }
+      return;
+    }
+    if (b.dataset.leoborrar) {   // dos toques para borrar (los diálogos del navegador no salen en la app)
+      if (b.dataset.seguro !== "1") { b.dataset.seguro = "1"; b.textContent = "¿Seguro?"; b.style.color = "var(--warn)"; setTimeout(() => { if (b.isConnected) { b.dataset.seguro = ""; b.textContent = "Borrar"; b.style.color = ""; } }, 3000); return; }
+      if (Array.isArray(leoAvisos)) await leoGuardar(leoAvisos.filter(a => a.id !== b.dataset.leoborrar), "Aviso borrado ✓");
+      return;
+    }
+    if (b.id === "leoReint") { leoAvisos = null; leoPintar(); leoCargar(); return; }
     if (b.hasAttribute("data-entrar")) entrarTarjeta();
     if (b.dataset.open) abrir(b.dataset.open);
     if (b.id === "aSync") { await traerTarjeta(true); pintarAjustes(); toast("Actualizado"); }

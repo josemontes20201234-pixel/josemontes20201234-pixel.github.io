@@ -29,6 +29,7 @@ public class Leo {
     static final String CANAL = "leo_v1";
     static final String ACCION = "com.josemontes.crm.LEO";
     static final String URL_AVISOS = "https://meraki-leo.merakibarbershop.workers.dev/avisos";
+    static final String URL_AJUSTES = "https://meraki-leo.merakibarbershop.workers.dev/ajustes";   // avisos de Jose para Leo
     static final long CADA = 5 * 60 * 1000L;
 
     static SharedPreferences prefs(Context c) { return c.getSharedPreferences("leo", Context.MODE_PRIVATE); }
