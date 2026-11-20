@@ -1,0 +1,57 @@
+name: Transcribir privado (cifrado)
+# El audio llega cifrado a una rama temporal y el texto se devuelve cifrado.
+# En los registros no aparece ni la clave ni el texto.
+on:
+  workflow_dispatch:
+    inputs:
+      rama:
+        description: Rama temporal con el audio cifrado
+        required: true
+      archivo:
+        description: Ruta del audio cifrado dentro de la rama
+        required: true
+      clave:
+        description: Clave (no se muestra en los registros)
+        required: true
+      modelo:
+        description: Modelo de Whisper
+        default: small
+permissions:
+  contents: write
+jobs:
+  transcribir:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Ocultar la clave
+        run: echo "::add-mask::$(jq -r '.inputs.clave' "$GITHUB_EVENT_PATH")"
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.rama }}
+      - name: Preparar
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg > /dev/null
+          pip install -q faster-whisper==1.1.1 numpy
+      - name: Transcribir
+        run: |
+          K=$(jq -r '.inputs.clave' "$GITHUB_EVENT_PATH")
+          F=$(jq -r '.inputs.archivo' "$GITHUB_EVENT_PATH")
+          M=$(jq -r '.inputs.modelo' "$GITHUB_EVENT_PATH")
+          openssl enc -d -aes-256-cbc -pbkdf2 -pass "pass:$K" -in "$F" -out /tmp/audio.ogg
+          ffmpeg -v error -y -i /tmp/audio.ogg -ac 1 -ar 16000 -f f32le /tmp/audio.f32
+          python3 - "$M" > /tmp/texto.txt <<'PY'
+          import sys, numpy as np
+          from faster_whisper import WhisperModel
+          audio = np.fromfile("/tmp/audio.f32", dtype=np.float32)
+          m = WhisperModel(sys.argv[1], device="cpu", compute_type="int8")
+          segs, info = m.transcribe(audio, language="es", vad_filter=True, beam_size=1)
+          for s in segs:
+              print(f"[{int(s.start // 60):02d}:{int(s.start % 60):02d}] {s.text.strip()}", flush=True)
+          PY
+          echo "líneas: $(wc -l < /tmp/texto.txt)"
+          openssl enc -aes-256-cbc -pbkdf2 -pass "pass:$K" -in /tmp/texto.txt -out "$F.txt.enc"
+          git config user.name "transcriptor"
+          git config user.email "transcriptor@users.noreply.github.com"
+          git add "$F.txt.enc"
+          git commit -qm "texto cifrado"
+          git push -q origin "HEAD:$(jq -r '.inputs.rama' "$GITHUB_EVENT_PATH")"
