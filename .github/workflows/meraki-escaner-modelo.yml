@@ -1,0 +1,35 @@
+name: Meraki web — modelo del escáner facial
+# Baja el modelo oficial de MediaPipe (Face Landmarker, licencia Apache 2.0) y lo guarda en la página
+# para que el escáner de visagismo corra completo en el teléfono del cliente (la imagen no sale de ahí).
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+  pages: write
+jobs:
+  modelo:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Bajar el modelo
+        run: |
+          set -e
+          destino=meraki/visagismo/escaner/face_landmarker.task
+          mkdir -p "$(dirname "$destino")"
+          curl -fsSL --retry 3 -o /tmp/modelo.task \
+            https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task
+          tam=$(stat -c %s /tmp/modelo.task)
+          firma=$(head -c 2 /tmp/modelo.task)
+          echo "Tamaño: $tam bytes | SHA-256: $(sha256sum /tmp/modelo.task | cut -d' ' -f1)"
+          if [ "$tam" -lt 1000000 ] || [ "$firma" != "PK" ]; then echo "El archivo no parece el modelo"; exit 1; fi
+          cp /tmp/modelo.task "$destino"
+      - name: Guardar y publicar
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git add meraki/visagismo/escaner/face_landmarker.task
+          if git diff --cached --quiet; then echo "Sin cambios"; exit 0; fi
+          git -c user.name="Meraki Bot" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" commit -q -m "Modelo del escáner facial (MediaPipe Face Landmarker)"
+          git push -q
+          curl -s -o /dev/null -w "Página web reconstruida: %{http_code}\n" -X POST -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" "https://api.github.com/repos/${GITHUB_REPOSITORY}/pages/builds"
