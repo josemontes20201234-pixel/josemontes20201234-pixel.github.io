@@ -304,17 +304,50 @@
   }
 
   /* ---------- foto ---------- */
+  // Ángulo de la cámara que tomó la foto (distancia focal equivalente en 35 mm, de los datos EXIF del JPG).
+  // Sirve para corregir bien la perspectiva: no es lo mismo una selfie que un retrato con zoom.
+  function anguloDeFoto(f) {
+    if (!f.slice || !window.DataView) return Promise.resolve(0);
+    return f.slice(0, 131072).arrayBuffer().then(function (buf) {
+      var v = new DataView(buf), n = v.byteLength, o = 2;
+      if (n < 4 || v.getUint16(0) !== 0xFFD8) return 0;
+      while (o + 4 < n) {
+        var marca = v.getUint16(o), largo = v.getUint16(o + 2);
+        if (marca === 0xFFE1 && v.getUint32(o + 4) === 0x45786966) { // "Exif"
+          var t = o + 10, le = v.getUint16(t) === 0x4949;
+          var u16 = function (i) { return v.getUint16(t + i, le); }, u32 = function (i) { return v.getUint32(t + i, le); };
+          var buscar = function (ifd, etiqueta) {
+            if (t + ifd + 2 > n) return null;
+            for (var k = 0, cant = u16(ifd); k < cant; k++) {
+              var e = ifd + 2 + k * 12;
+              if (t + e + 12 > n) return null;
+              if (u16(e) === etiqueta) return e;
+            }
+            return null;
+          };
+          var exif = buscar(u32(4), 0x8769);
+          if (exif === null) return 0;
+          var focal = buscar(u32(exif + 8), 0xA405);
+          var mm = focal === null ? 0 : u16(focal + 8);
+          return mm >= 10 && mm <= 300 ? 2 * Math.atan(43.27 / (2 * mm)) * 180 / Math.PI : 0;
+        }
+        if ((marca & 0xFF00) !== 0xFF00) return 0;
+        o += 2 + largo;
+      }
+      return 0;
+    }).catch(function () { return 0; });
+  }
   botonFoto.addEventListener("click", function () { archivo.value = ""; archivo.click(); });
   archivo.addEventListener("change", function () {
     var f = archivo.files && archivo.files[0];
     if (!f) return;
     ver("intro");
     avisar("Preparando el escáner…");
-    var img = new Image(), url = URL.createObjectURL(f);
+    var img = new Image(), url = URL.createObjectURL(f), fov = 0, angulo = anguloDeFoto(f);
     var imagen = new Promise(function (ok, mal) { img.onload = ok; img.onerror = mal; img.src = url; });
     cargar(function (p) { if (!detector) avisar("Cargando el escáner… " + Math.round(p * 100) + " %"); })
-      .then(function () { return imagen; })
-      .then(function () { return usarModo("IMAGE"); })
+      .then(function () { return Promise.all([imagen, angulo]); })
+      .then(function (r) { fov = r[1]; return usarModo("IMAGE"); })
       .then(function () {
         URL.revokeObjectURL(url);
         avisar("Analizando tu foto…");
@@ -326,7 +359,7 @@
         var r = detector.detect(c);
         var lm = r && r.faceLandmarks && r.faceLandmarks[0];
         if (!lm) { avisar(""); fallar("No encontré una cara en la foto. Usá una foto de frente, con buena luz y sin gorra."); return; }
-        var m = M.medir(lm, cw, ch), p = M.pose(lm, cw, ch);
+        var m = M.medir(lm, cw, ch, fov), p = M.pose(lm, cw, ch);
         if (!M.razonable(m)) { avisar(""); fallar("No pude medir bien la cara de la foto. Probá con otra foto de frente o con la cámara."); return; }
         // Recorte alrededor de la cara (3 de ancho por 4 de alto)
         var fw = Math.abs(lm[454].x - lm[234].x) * cw;

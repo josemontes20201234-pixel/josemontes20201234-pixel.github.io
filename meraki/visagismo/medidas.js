@@ -22,14 +22,14 @@
   var PESO = { l: 1, f: 0.9, j: 0.9, b: 0.5, c: 0.5 };
   var CERCA = 0.9; // si la segunda forma queda así de cerca, se menciona
 
-  function factorK(ancho, alto) {
-    return 2 * Math.tan(FOV_DIAGONAL * Math.PI / 360) * ancho / Math.sqrt(ancho * ancho + alto * alto);
+  function factorK(ancho, alto, fov) {
+    return 2 * Math.tan((fov || FOV_DIAGONAL) * Math.PI / 360) * ancho / Math.sqrt(ancho * ancho + alto * alto);
   }
 
   // La cámara cerca de la cara agranda lo que está adelante (nariz, frente) y achica los lados.
   // Con la profundidad de cada punto se deshace ese efecto, como si la foto se tomara de lejos.
-  function corregir(lm, ancho, alto) {
-    var k = factorK(ancho, alto), rel = alto / ancho;
+  function corregir(lm, ancho, alto, fov) {
+    var k = factorK(ancho, alto, fov), rel = alto / ancho;
     var zref = (lm[10].z + lm[152].z + lm[234].z + lm[454].z) / 4;
     var out = new Array(lm.length);
     for (var i = 0; i < lm.length; i++) {
@@ -53,8 +53,9 @@
     };
   }
 
-  function medir(lm, ancho, alto) {
-    var c = corregir(lm, ancho, alto);
+  // fov: ángulo de la cámara en grados (diagonal), si se sabe (por ejemplo, de los datos de la foto)
+  function medir(lm, ancho, alto, fov) {
+    var c = corregir(lm, ancho, alto, fov);
     var W = dist(c[234], c[454]);
     var J = dist(c[58], c[288]);
     return {

@@ -17,7 +17,7 @@ async def main():
 
         # 1) Escáner con una foto
         await pg.goto(URL + "/visagismo/", wait_until="networkidle")
-        await pg.set_input_files("#esc-foto", "leo/media/leo-cara.jpg")
+        await pg.set_input_files("#esc-foto", ".github/scripts/leo-prueba.jpg")
         for _ in range(90):
             await pg.wait_for_timeout(1000)
             listo = await pg.evaluate("!document.getElementById('resultado').hidden || !document.getElementById('esc-error').hidden")
