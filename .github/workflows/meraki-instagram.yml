@@ -23,10 +23,10 @@ jobs:
         run: |
           pip install --quiet pillow
           python3 - <<'PY'
-          import io, json, os, urllib.error, urllib.request, datetime
+          import io, json, os, urllib.error, urllib.request, datetime, unicodedata
           from PIL import Image
           IG, G = "17841479582218392", "https://graph.facebook.com/v23.0/"
-          CAMPOS = "id,media_type,media_url,thumbnail_url,permalink,timestamp,children{media_type,media_url,thumbnail_url}"
+          CAMPOS = "id,caption,media_type,media_url,thumbnail_url,permalink,timestamp,children{media_type,media_url,thumbnail_url}"
           CARPETA, MAX = "meraki/ig", 30
 
           def pedir(url):
@@ -53,14 +53,52 @@ jobs:
               ocultar = {x.split("#")[0].strip() for x in open(os.path.join(CARPETA, "ocultar.txt"), encoding="utf-8")} - {""}
           except FileNotFoundError:
               pass
-          fotos, nuevas = [], 0
+          def bajar(src, ruta, ancho_fijo=None, alto_fijo=None):
+              # Baja una imagen, la deja de 720 px de ancho y opcionalmente la recorta a un alto fijo
+              if os.path.exists(ruta):
+                  return True
+              try:
+                  with urllib.request.urlopen(src, timeout=60) as r:
+                      im = Image.open(io.BytesIO(r.read())).convert("RGB")
+              except Exception as ex:
+                  print("No se pudo bajar una foto:", type(ex).__name__)
+                  return False
+              if im.width != 720:
+                  im = im.resize((720, round(im.height * 720 / im.width)), Image.LANCZOS)
+              if alto_fijo and im.height != alto_fijo:
+                  sobra = im.height - alto_fijo
+                  if sobra > 0:
+                      im = im.crop((0, sobra // 2, 720, sobra // 2 + alto_fijo))
+                  else:
+                      im = im.resize((720, alto_fijo), Image.LANCZOS)
+              im.save(ruta, "WEBP", quality=78, method=6)
+              return True
+
+          def plano(t):
+              t = unicodedata.normalize("NFD", t or "").lower()
+              return "".join(c for c in t if unicodedata.category(c) != "Mn").replace(" ", "")
+
+          def fuente(x):
+              return x.get("thumbnail_url") if x.get("media_type") == "VIDEO" else x.get("media_url")
+
+          fotos, antes_despues, nuevas = [], [], 0
           for m in (b.get("data") or [])[:MAX]:
               if m.get("id") in ocultar:
                   continue
               tipo = m.get("media_type")
+              hijos = (m.get("children") or {}).get("data") or []
+              # Carrusel con #antesydespues: la 1.ª foto es el antes y la 2.ª el después
+              if tipo == "CAROUSEL_ALBUM" and len(hijos) >= 2 and "#antesydespues" in plano(m.get("caption")):
+                  ra, rd = os.path.join(CARPETA, "ad-" + m["id"] + "-a.webp"), os.path.join(CARPETA, "ad-" + m["id"] + "-d.webp")
+                  if bajar(fuente(hijos[1]), rd):
+                      with Image.open(rd) as im:
+                          ancho, alto = im.size
+                      if bajar(fuente(hijos[0]), ra, alto_fijo=alto):
+                          antes_despues.append({"id": m["id"], "antes": "ig/" + os.path.basename(ra), "despues": "ig/" + os.path.basename(rd),
+                                                "ancho": ancho, "alto": alto, "enlace": m.get("permalink", ""), "fecha": str(m.get("timestamp", ""))[:10]})
+                  continue
               src = m.get("thumbnail_url") if tipo == "VIDEO" else m.get("media_url")
               if tipo == "CAROUSEL_ALBUM":
-                  hijos = (m.get("children") or {}).get("data") or []
                   if hijos:
                       h = hijos[0]
                       src = h.get("thumbnail_url") if h.get("media_type") == "VIDEO" else h.get("media_url")
@@ -92,6 +130,7 @@ jobs:
               })
 
           guardar = {f["img"].split("/")[-1] for f in fotos}
+          guardar |= {x[k].split("/")[-1] for x in antes_despues for k in ("antes", "despues")}
           borradas = 0
           for f in os.listdir(CARPETA):
               if f.endswith(".webp") and f not in guardar:
@@ -102,11 +141,11 @@ jobs:
               viejo = json.load(open(os.path.join(CARPETA, "galeria.json"), encoding="utf-8"))
           except Exception:
               pass
-          if viejo.get("fotos") != fotos:
-              json.dump({"actualizado": datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%MZ"), "fotos": fotos},
+          if viejo.get("fotos") != fotos or viejo.get("antesDespues", []) != antes_despues:
+              json.dump({"actualizado": datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%MZ"), "fotos": fotos, "antesDespues": antes_despues},
                         open(os.path.join(CARPETA, "galeria.json"), "w", encoding="utf-8"), ensure_ascii=False, indent=1)
           videos = sum(1 for f in fotos if f["tipo"] == "video")
-          print(f"Publicaciones: {len(fotos)} ({videos} videos) | nuevas: {nuevas} | quitadas: {borradas}")
+          print(f"Publicaciones: {len(fotos)} ({videos} videos) | antes y después: {len(antes_despues)} | nuevas: {nuevas} | quitadas: {borradas}")
           PY
       - name: Guardar y publicar
         env:

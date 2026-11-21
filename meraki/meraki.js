@@ -26,10 +26,36 @@
   // Aviso de arriba
   var cinta = $("cinta");
   if (cinta) {
-    if (entre("2026-12-01", "2026-12-07")) cinta.textContent = "Semana Aniversario Meraki, del martes 8 al domingo 13 de diciembre: con cada visita, un boleto para la rifa de un Servicio full detalle.";
-    else if (entre("2026-12-08", "2026-12-13")) cinta.textContent = "Estamos de aniversario: con cada visita te llevás un boleto para la rifa de un Servicio full detalle, el domingo 13.";
+    var raiz = document.body.getAttribute("data-raiz") || "./";
+    var aniv = function (t) { cinta.innerHTML = '<a href="' + raiz + 'aniversario/">' + t + "</a>"; };
+    if (entre("2026-12-01", "2026-12-07")) aniv("Semana Aniversario Meraki, del martes 8 al domingo 13 de diciembre: con cada visita, un boleto para la rifa de un Servicio full detalle.");
+    else if (entre("2026-12-08", "2026-12-13")) aniv("Estamos de aniversario: con cada visita te llevás un boleto para la rifa de un Servicio full detalle, el domingo 13.");
     else if (entre("2026-12-15", "2027-01-31")) cinta.textContent = "¿Tu Tarjeta Meraki es de antes del 15 de diciembre? Te respetamos el precio anterior hasta el 31 de enero.";
     else cinta.textContent = "Ahora aceptamos tarjeta de crédito y débito.";
+  }
+
+  // Cosas que solo se muestran hasta cierta fecha
+  Array.prototype.forEach.call(document.querySelectorAll("[data-hasta]"), function (el) {
+    if (hoy > el.getAttribute("data-hasta")) el.hidden = true;
+  });
+
+  // Semana Aniversario: antes (cuenta regresiva), durante (8 al 13 de diciembre) y después
+  var INICIO = Date.UTC(2026, 11, 8, 12), FIN = Date.UTC(2026, 11, 14, 6); // 8 dic 6:00 a. m. y 14 dic 0:00 en El Salvador
+  var fase = Date.now() < INICIO ? "antes" : Date.now() < FIN ? "durante" : "despues";
+  Array.prototype.forEach.call(document.querySelectorAll("[data-fase]"), function (el) {
+    el.hidden = el.getAttribute("data-fase").split(" ").indexOf(fase) < 0;
+  });
+  var cuentas = document.querySelectorAll(".cuenta");
+  if (cuentas.length && fase === "antes") {
+    var tic = function () {
+      var r = Math.max(0, INICIO - Date.now()), t = Math.floor(r / 1000);
+      var v = [Math.floor(t / 86400), Math.floor(t % 86400 / 3600), Math.floor(t % 3600 / 60), t % 60];
+      Array.prototype.forEach.call(cuentas, function (c) {
+        Array.prototype.forEach.call(c.querySelectorAll("b"), function (n, i) { n.textContent = (v[i] < 10 ? "0" : "") + v[i]; });
+      });
+      if (r === 0) location.reload();
+    };
+    tic(); setInterval(tic, 1000);
   }
 
   // ¿Abierto ahora?
@@ -68,13 +94,27 @@
   }
 
   // Galería: lo último de Instagram (se actualiza sola cada mañana)
-  var galeria = $("galeria");
-  if (galeria && window.fetch) {
+  var galeria = $("galeria"), adCaja = $("antes-despues");
+  if ((galeria || adCaja) && window.fetch) {
     var MESES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
     var PLAY = '<span class="galeria__play" aria-hidden="true"><svg viewBox="0 0 12 14"><path d="M0 0l12 7-12 7z" fill="currentColor"/></svg></span>';
     fetch("ig/galeria.json", { cache: "no-cache" }).then(function (r) { return r.json(); }).then(function (g) {
+      var ad = (g.antesDespues || []).slice(0, 4);
+      if (adCaja && ad.length) {
+        adCaja.innerHTML = ad.map(function (x) {
+          return '<div class="comparar"><img src="' + x.despues + '" width="' + x.ancho + '" height="' + x.alto + '" loading="lazy" decoding="async" alt="Después del corte">' +
+            '<div class="comparar__antes"><img src="' + x.antes + '" loading="lazy" decoding="async" alt="Antes del corte"></div>' +
+            '<input class="comparar__rango" type="range" min="0" max="100" value="50" aria-label="Deslizá para comparar el antes y el después">' +
+            '<span class="comparar__linea" aria-hidden="true"></span><span class="comparar__etiqueta comparar__etiqueta--antes">Antes</span>' +
+            '<span class="comparar__etiqueta comparar__etiqueta--despues">Después</span></div>';
+        }).join("");
+        Array.prototype.forEach.call(adCaja.querySelectorAll(".comparar__rango"), function (r) {
+          r.addEventListener("input", function () { r.parentNode.style.setProperty("--corte", r.value + "%"); });
+        });
+        $("antes-despues-seccion").hidden = false;
+      }
       var fotos = (g.fotos || []).slice(0, 9);
-      if (!fotos.length) return;
+      if (!galeria || !fotos.length) return;
       galeria.innerHTML = fotos.map(function (f) {
         var p = String(f.fecha).split("-");
         var cuando = p.length === 3 ? Number(p[2]) + " de " + MESES[Number(p[1]) - 1] + " de " + p[0] : "";

@@ -17,6 +17,7 @@
   --alto-cabecera:4.25rem;
 }
 *,*::before,*::after{box-sizing:border-box}
+[hidden]{display:none!important}
 html{-webkit-text-size-adjust:100%;scroll-behavior:smooth;scroll-padding-top:calc(var(--alto-cabecera) + .5rem)}
 body{margin:0;background:var(--vitrina);color:var(--hueso);font:400 1.0625rem/1.65 var(--f-texto);-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
 body.menu-abierto{overflow:hidden}
@@ -219,3 +220,62 @@ p{margin:0}
 }
 .pie__lema{margin-top:1rem}
 .portada--chica .portada__fotos{grid-template-columns:1fr;grid-template-rows:1fr}
+
+/* Tu corte ideal (visagismo) */
+.forma-icono{width:2.6rem;height:3.1rem;fill:none;stroke:var(--oro);stroke-width:2.4;stroke-linejoin:round}
+.formas-mini{display:flex;flex-wrap:wrap;gap:.5rem;margin-top:1.5rem}
+.test{margin-top:2rem;padding:1.6rem 1.25rem;border:1px solid rgba(201,162,74,.45);border-radius:1rem;background:var(--carbon)}
+.test__paso{color:var(--oro-alto);font-size:.9rem;font-weight:700}
+.test__pregunta{margin-top:.5rem;font-size:clamp(1.5rem,5.5vw,2rem)}
+.opciones{display:grid;gap:.6rem;margin-top:1.25rem}
+.opcion{display:flex;align-items:center;gap:.9rem;width:100%;min-height:3.4rem;padding:.8rem 1rem;border:1px solid var(--linea);border-radius:.7rem;background:var(--vitrina);color:var(--hueso);font:600 1.02rem/1.3 var(--f-texto);text-align:left;cursor:pointer}
+.opcion:hover{border-color:var(--oro)}
+.opcion .forma-icono{flex:none;width:2rem;height:2.4rem}
+.test__abajo{display:flex;flex-wrap:wrap;justify-content:space-between;gap:.75rem;margin-top:1.25rem}
+.enlace-boton{padding:.5rem 0;border:0;background:none;color:var(--oro-alto);font:600 .95rem/1.3 var(--f-texto);text-decoration:underline;text-underline-offset:.2em;cursor:pointer}
+.formas{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.6rem;margin-top:1.25rem}
+.formas .opcion{flex-direction:column;justify-content:center;gap:.5rem;padding:1rem .5rem;text-align:center}
+.formas .opcion .forma-icono{width:2.6rem;height:3.1rem}
+.resultado{margin-top:2rem}
+.resultado__cabeza{display:flex;align-items:center;gap:1rem}
+.resultado__cabeza .forma-icono{flex:none;width:3.6rem;height:4.3rem}
+.resultado__meta{margin-top:1rem;color:var(--oro-alto);font:500 1.25rem/1.4 var(--f-rotulo)}
+.resultado h3{margin-top:1.6rem;font-size:1.15rem}
+.lista{margin:.6rem 0 0;padding:0;list-style:none}
+.lista li{position:relative;padding:.35rem 0 .35rem 1.6rem}
+.lista li::before{position:absolute;top:.35rem;left:0;font-weight:800}
+.lista--si li::before{content:"✓";color:var(--abierto)}
+.lista--no li::before{content:"✕";color:#d98b7a}
+.chips{display:flex;flex-wrap:wrap;gap:.5rem;margin-top:.6rem}
+.chip{padding:.4rem .75rem;border:1px solid rgba(201,162,74,.5);border-radius:.45rem;color:var(--oro-alto);font-size:.9rem;font-weight:700}
+.aviso{margin-top:1.5rem;color:var(--ceniza);font-size:.93rem}
+
+/* Antes y después */
+.antes-despues{display:grid;gap:1.25rem;margin-top:2rem}
+.comparar{position:relative;max-width:30rem;overflow:hidden;border:1px solid rgba(201,162,74,.35);border-radius:1rem;user-select:none;-webkit-user-select:none}
+.comparar img{width:100%}
+.comparar__antes{position:absolute;inset:0;clip-path:inset(0 calc(100% - var(--corte,50%)) 0 0)}
+.comparar__antes img{height:100%;object-fit:cover}
+.comparar__linea{position:absolute;top:0;bottom:0;left:var(--corte,50%);width:2px;margin-left:-1px;background:var(--oro-alto);pointer-events:none}
+.comparar__linea::after{content:"";position:absolute;top:50%;left:50%;width:2.6rem;height:2.6rem;margin:-1.3rem 0 0 -1.3rem;border:2px solid var(--oro-alto);border-radius:50%;background:rgba(13,12,10,.7)}
+.comparar__rango{position:absolute;inset:0;width:100%;height:100%;margin:0;opacity:0;cursor:ew-resize}
+.comparar__rango:focus-visible + .comparar__linea{box-shadow:0 0 0 3px rgba(230,196,109,.5)}
+.comparar__etiqueta{position:absolute;top:.75rem;padding:.25rem .6rem;border-radius:.35rem;background:rgba(13,12,10,.75);font-size:.85rem;font-weight:700;pointer-events:none}
+.comparar__etiqueta--antes{left:.75rem}
+.comparar__etiqueta--despues{right:.75rem}
+
+/* Cuenta regresiva de la Semana Aniversario */
+.cuenta{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:.5rem;max-width:26rem;margin-top:1.5rem}
+.cuenta div{padding:.8rem .3rem;border:1px solid rgba(201,162,74,.45);border-radius:.7rem;background:var(--vitrina);text-align:center}
+.cuenta b{display:block;color:var(--oro-alto);font:700 clamp(1.7rem,7vw,2.4rem)/1 var(--f-rotulo);font-variant-numeric:lining-nums tabular-nums}
+.cuenta span{display:block;margin-top:.35rem;color:var(--ceniza);font-size:.8rem}
+.centro .cuenta{margin-inline:auto}
+.cinta a{color:inherit}
+
+@media (min-width:40rem){
+  .formas{grid-template-columns:repeat(4,minmax(0,1fr))}
+  .test{padding:2.25rem}
+}
+@media (min-width:60rem){
+  .antes-despues{grid-template-columns:repeat(2,minmax(0,1fr))}
+}

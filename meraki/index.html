@@ -44,7 +44,7 @@
 }
 </script>
 </head>
-<body>
+<body data-raiz="./">
 <a class="saltar" href="#contenido">Saltar al contenido</a>
 <p class="cinta" id="cinta">Ahora aceptamos tarjeta de crédito y débito.</p>
 
@@ -55,8 +55,8 @@
       <ul>
         <li><a class="nav__enlace" href="#servicios">Servicios</a></li>
         <li><a class="nav__enlace" href="#trabajo">Trabajo</a></li>
+        <li><a class="nav__enlace" href="visagismo/">Tu corte ideal</a></li>
         <li><a class="nav__enlace" href="academia/">Academia</a></li>
-        <li><a class="nav__enlace" href="#tienda">Tienda</a></li>
         <li><a class="nav__enlace" href="#contacto">Contacto</a></li>
         <li><a class="boton boton--chico" href="../citas/">Apartar mi cita</a></li>
       </ul>
@@ -81,8 +81,10 @@
     <ul>
       <li><a class="menu-movil__enlace" href="#servicios">Servicios y precios</a></li>
       <li><a class="menu-movil__enlace" href="#trabajo">Nuestro trabajo</a></li>
+      <li><a class="menu-movil__enlace" href="visagismo/">¿Qué corte te queda?</a></li>
       <li><a class="menu-movil__enlace" href="#leo">Leo</a></li>
       <li><a class="menu-movil__enlace" href="academia/">Academia</a></li>
+      <li data-hasta="2026-12-13"><a class="menu-movil__enlace" href="aniversario/">Semana Aniversario</a></li>
       <li><a class="menu-movil__enlace" href="#tienda">Tienda</a></li>
       <li><a class="menu-movil__enlace" href="#contacto">Horario y contacto</a></li>
     </ul>
@@ -112,6 +114,19 @@
     </div>
   </section>
 
+  <div class="franja" data-hasta="2026-12-13">
+    <section class="seccion seccion--angosta centro" id="aniversario" aria-labelledby="t-aniversario">
+      <span class="pronto">1 año en Apopa</span>
+      <h2 id="t-aniversario">Semana Aniversario Meraki</h2>
+      <p class="seccion__intro">Del martes 8 al domingo 13 de diciembre, con la rifa de un Servicio full detalle.</p>
+      <div class="cuenta" data-fase="antes" role="timer" aria-label="Falta poco para la Semana Aniversario">
+        <div><b>00</b><span>días</span></div><div><b>00</b><span>horas</span></div><div><b>00</b><span>minutos</span></div><div><b>00</b><span>segundos</span></div>
+      </div>
+      <p class="seccion__intro" data-fase="durante" hidden>¡Ya empezó! Con cada visita te llevás un boleto para la rifa.</p>
+      <div class="acciones"><a class="boton" href="aniversario/">Ver la Semana Aniversario</a></div>
+    </section>
+  </div>
+
   <section class="seccion" id="servicios" aria-labelledby="t-servicios">
     <div class="dos">
       <div>
@@ -136,15 +151,33 @@
   </section>
 
   <div class="franja">
-    <section class="seccion" id="trabajo" aria-labelledby="t-trabajo">
-      <h2 id="t-trabajo">Nuestro trabajo</h2>
-      <p class="seccion__intro">Lo más reciente de nuestro Instagram, @meraki20256.</p>
-      <ul class="galeria" id="galeria"></ul>
-      <div class="acciones"><a class="boton boton--linea" href="https://www.instagram.com/meraki20256/" target="_blank" rel="noopener">Ver más en Instagram</a></div>
+    <section class="seccion" id="corte-ideal" aria-labelledby="t-corte">
+      <div class="dos">
+        <div>
+          <h2 id="t-corte">¿Qué corte te queda?</h2>
+          <p class="seccion__intro">Contestá 3 preguntas frente al espejo y te decimos qué cortes y qué barba van con la forma de tu cara.</p>
+          <div class="acciones"><a class="boton" href="visagismo/">Hacer el test</a></div>
+        </div>
+        <div class="formas-mini" aria-hidden="true"><svg class="forma-icono" viewBox="0 0 60 72"><ellipse cx="30" cy="36" rx="19" ry="29"/></svg><svg class="forma-icono" viewBox="0 0 60 72"><circle cx="30" cy="36" r="24"/></svg><svg class="forma-icono" viewBox="0 0 60 72"><rect x="8" y="12" width="44" height="48" rx="9"/></svg><svg class="forma-icono" viewBox="0 0 60 72"><rect x="14" y="4" width="32" height="64" rx="12"/></svg><svg class="forma-icono" viewBox="0 0 60 72"><path d="M9 22C9 10 21 6 30 12C39 6 51 10 51 22C51 40 39 56 30 67C21 56 9 40 9 22Z"/></svg><svg class="forma-icono" viewBox="0 0 60 72"><path d="M30 4C38 15 51 26 51 35C51 45 39 58 30 68C21 58 9 45 9 35C9 26 22 15 30 4Z"/></svg><svg class="forma-icono" viewBox="0 0 60 72"><path d="M22 6C26 4 34 4 38 6C44 20 53 43 53 54C53 64 43 68 30 68C17 68 7 64 7 54C7 43 16 20 22 6Z"/></svg></div>
+      </div>
     </section>
   </div>
 
-  <section class="seccion" id="leo" aria-labelledby="t-leo">
+  <section class="seccion" id="trabajo" aria-labelledby="t-trabajo">
+    <h2 id="t-trabajo">Nuestro trabajo</h2>
+    <p class="seccion__intro">Lo más reciente de nuestro Instagram, @meraki20256.</p>
+    <ul class="galeria" id="galeria"></ul>
+    <div class="acciones"><a class="boton boton--linea" href="https://www.instagram.com/meraki20256/" target="_blank" rel="noopener">Ver más en Instagram</a></div>
+  </section>
+
+  <section class="seccion" id="antes-despues-seccion" aria-labelledby="t-antes" hidden>
+    <h2 id="t-antes">Antes y después</h2>
+    <p class="seccion__intro">Deslizá la barra para ver el cambio.</p>
+    <div class="antes-despues" id="antes-despues"></div>
+  </section>
+
+  <div class="franja">
+    <section class="seccion" id="leo" aria-labelledby="t-leo">
     <div class="dos">
       <figure class="video">
         <video controls playsinline preload="none" poster="img/leo-video.webp" width="640" height="1136" aria-label="Video de presentación de Leo">
@@ -157,7 +190,8 @@
         <div class="acciones"><a class="boton boton--linea" href="https://ig.me/m/meraki20256">Escribirle a Leo</a></div>
       </div>
     </div>
-  </section>
+    </section>
+  </div>
 
   <section class="seccion" id="academia" aria-labelledby="t-academia">
     <div class="panel">
@@ -252,6 +286,7 @@
       <ul>
         <li><a href="#servicios">Servicios y precios</a></li>
         <li><a href="#trabajo">Nuestro trabajo</a></li>
+        <li><a href="visagismo/">¿Qué corte te queda?</a></li>
         <li><a href="academia/">Academia Meraki</a></li>
         <li><a href="#tienda">Tienda Meraki</a></li>
         <li><a href="../citas/">Apartar cita</a></li>
