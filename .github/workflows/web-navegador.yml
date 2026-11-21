@@ -1,0 +1,28 @@
+name: Meraki web — probar en navegador
+# Abre merakibarbershop.com en un navegador real: prueba el escáner (con la foto de Leo) y el chat con Leo.
+on:
+  workflow_dispatch:
+jobs:
+  probar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            .github/scripts
+            leo/media
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Instalar navegador
+        run: |
+          pip install -q playwright
+          python -m playwright install --with-deps chromium > /dev/null
+      - name: Probar
+        run: python .github/scripts/web-navegador.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: capturas
+          path: capturas/
+          retention-days: 3
