@@ -50,4 +50,9 @@ jobs:
             echo "$u -> $r ${t:+| $t}"
           done
           curl -s --max-time 20 https://merakibarbershop.com/ | grep -o '<link rel="canonical"[^>]*>' || echo "sin canonical"
+          echo "Leo por internet (debe ser 404): $(curl -s -o /dev/null -w '%{http_code}' -X POST --max-time 20 https://meraki-leo.merakibarbershop.workers.dev/web/chat)"
+          echo "chat de otro sitio (debe ser 403): $(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'origin: https://otro.com' -H 'content-type: application/json' -d '{}' --max-time 20 https://merakibarbershop.com/api/leo)"
+          printf "chat de Leo -> "
+          curl -s --max-time 90 -X POST -H "content-type: application/json" -H "origin: https://merakibarbershop.com" \
+            -d "{\"id\":\"prueba-web-${GITHUB_RUN_ID}-x\",\"texto\":\"Hola, ¿cuánto cuesta el corte clásico?\"}" https://merakibarbershop.com/api/leo | head -c 700; echo
           curl -s -o /dev/null -r 0-99 --max-time 20 -w "video de Leo -> %{http_code} %{content_type}\n" https://merakibarbershop.com/leo/media/leo-presentacion.mp4 || echo "video de Leo -> sin respuesta"

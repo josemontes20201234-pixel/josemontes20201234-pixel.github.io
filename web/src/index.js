@@ -8,13 +8,23 @@ const APPS = ["/citas", "/academy", "/alumnos", "/privacidad", "/terminos", "/el
 const COMPARTIDOS = ["/leo/media/", "/icon-192.png", "/icon-512.png"];
 const QUITAR = ["x-github-request-id", "x-served-by", "x-cache", "x-cache-hits", "x-timer", "x-fastly-request-id", "via"];
 
+// Chat con Leo desde la página: la página le escribe aquí (mismo dominio) y este worker se lo pasa a Leo por un
+// enlace interno (service binding "LEO"). Límites por conexión y por persona para cuidar el saldo de Claude;
+// Leo además tiene su propio tope del día entre todas las personas.
+const LEO_TOPE_IP = 40;
+const LEO_TOPE_PERSONA = 25;
+const LEO_LLENO = { lleno: true, burbujas: ["Por hoy ya platicamos bastante por aquí 🙏", "Si necesitás algo más, escribile a Jose al WhatsApp 6061-8603 💈"], botones: [] };
+
 export default {
-  async fetch(req) {
+  async fetch(req, env) {
     const url = new URL(req.url);
     const dominioPropio = url.hostname === DOMINIO || url.hostname === "www." + DOMINIO;
     // www y http van siempre a https://merakibarbershop.com
     if (dominioPropio && (url.hostname !== DOMINIO || url.protocol === "http:")) {
       return Response.redirect("https://" + DOMINIO + url.pathname + url.search, 301);
+    }
+    if (url.pathname === "/api/leo") {
+      return url.hostname === DOMINIO ? chatLeo(req, env) : new Response("No encontrado", { status: 404 });
     }
     if (req.method !== "GET" && req.method !== "HEAD") return new Response("Método no permitido", { status: 405 });
 
@@ -51,6 +61,47 @@ export default {
     return new Response(r.body, { status: r.status, headers: limpiar(r.headers) });
   }
 };
+
+async function chatLeo(req, env) {
+  const salida = (o, s = 200) => new Response(JSON.stringify(o), {
+    status: s, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", "x-content-type-options": "nosniff" },
+  });
+  if (req.method !== "POST") return salida({ error: "metodo" }, 405);
+  if ((req.headers.get("origin") || "") !== "https://" + DOMINIO) return salida({ error: "origen" }, 403);
+  if (!env || !env.LEO) return salida({ error: "sin-leo" }, 503);
+  if (Number(req.headers.get("content-length") || 0) > 4000) return salida({ error: "muy-largo" }, 413);
+  let cuerpo = {};
+  try { cuerpo = await req.json(); } catch { return salida({ error: "invalido" }, 400); }
+  const id = String((cuerpo && cuerpo.id) || "");
+  const texto = String((cuerpo && cuerpo.texto) || "").trim().slice(0, 600);
+  if (!/^[a-z0-9-]{16,40}$/i.test(id) || !texto) return salida({ error: "invalido" }, 400);
+  const dia = new Date(Date.now() - 6 * 3600e3).toISOString().slice(0, 10); // día en El Salvador
+  const ip = req.headers.get("cf-connecting-ip") || "sin-ip";
+  if (!(await contar("ip-" + (await huella(ip)) + "-" + dia, LEO_TOPE_IP))) return salida(LEO_LLENO);
+  if (!(await contar("p-" + id + "-" + dia, LEO_TOPE_PERSONA))) return salida(LEO_LLENO);
+  let r;
+  try {
+    r = await env.LEO.fetch("https://interno.leo/web/chat", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ id, texto }) });
+  } catch { return salida({ error: "leo" }, 502); }
+  const j = await r.json().catch(() => ({ error: "leo" }));
+  return salida(j, r.ok ? 200 : 502);
+}
+
+// Contador por día con la caché de Cloudflare (gratis y sin escrituras en KV). Cuenta por centro de datos; para estos topes basta.
+async function contar(clave, tope) {
+  const cache = caches.default;
+  const k = new Request("https://" + DOMINIO + "/__limites/" + encodeURIComponent(clave));
+  const previo = await cache.match(k);
+  const n = previo ? Number(await previo.text()) || 0 : 0;
+  if (n >= tope) return false;
+  await cache.put(k, new Response(String(n + 1), { headers: { "cache-control": "public, max-age=172800" } }));
+  return true;
+}
+
+async function huella(t) {
+  const d = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(t));
+  return [...new Uint8Array(d)].slice(0, 12).map(b => b.toString(16).padStart(2, "0")).join("");
+}
 
 function limpiar(h) {
   const salida = new Headers(h);

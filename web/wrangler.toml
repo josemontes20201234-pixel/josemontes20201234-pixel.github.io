@@ -2,4 +2,9 @@ name = "meraki-web"
 main = "src/index.js"
 compatibility_date = "2026-11-01"
 workers_dev = true
-# Las rutas de merakibarbershop.com las agrega el workflow cuando Cloudflare ya ve el dominio
+# La ruta *merakibarbershop.com/* está en el panel de Cloudflare (la llave no tiene permiso de rutas)
+
+# Enlace interno con Leo, para el chat de la página (/api/leo)
+[[services]]
+binding = "LEO"
+service = "meraki-leo"
