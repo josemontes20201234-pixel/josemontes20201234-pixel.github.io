@@ -19,9 +19,15 @@ jobs:
           curl -fsSL --retry 3 -o /tmp/modelo.task \
             https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task
           tam=$(stat -c %s /tmp/modelo.task)
-          firma=$(head -c 2 /tmp/modelo.task)
           echo "Tamaño: $tam bytes | SHA-256: $(sha256sum /tmp/modelo.task | cut -d' ' -f1)"
-          if [ "$tam" -lt 1000000 ] || [ "$firma" != "PK" ]; then echo "El archivo no parece el modelo"; exit 1; fi
+          echo "Inicio: $(head -c 8 /tmp/modelo.task | od -An -tx1 | tr -s ' ')"
+          # El .task es un paquete zip con los modelos TFLite adentro
+          if unzip -l /tmp/modelo.task > /tmp/lista.txt 2>/dev/null; then
+            echo "Contenido:"; awk 'NR>3 && $4 != "" {print "  " $4 " (" $1 " bytes)"}' /tmp/lista.txt | grep -v "^  -" | head -10
+          else
+            echo "No se pudo abrir como zip"
+          fi
+          if [ "$tam" -lt 1000000 ] || ! grep -q "tflite" /tmp/lista.txt; then echo "El archivo no parece el modelo"; exit 1; fi
           cp /tmp/modelo.task "$destino"
       - name: Guardar y publicar
         env:
