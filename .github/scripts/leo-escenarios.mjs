@@ -49,3 +49,9 @@ const hecha = [...reserva,
 ];
 await escena("2) Pide comprobante por WhatsApp (cita ya hecha)", hecha, "Excelente, ¿me mandás el comprobante por WhatsApp?", true);
 await escena("3) Quiere otra cita para su hermano", hecha, "Y también quiero apartar una para mi hermano mañana a las 11", true);
+// Página web (21 nov 2026): Leo pasa los links solo cuando vienen al caso
+await escena("4) Pregunta por la página", [], "Hola, ¿tienen página web?", false);
+await escena("5) No sabe qué corte le queda", [], "No sé qué corte me queda bien 😅", false);
+await escena("6) Pregunta dónde quedan", [], "¿Dónde quedan ustedes?", false);
+await escena("7) Pregunta por clases", [], "¿Dan clases de barbería?", false);
+await escena("8) Quiere cita (no debe mandarlo a la página)", [], "Quiero un corte para el sábado", false);
