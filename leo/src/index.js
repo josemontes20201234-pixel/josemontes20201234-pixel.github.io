@@ -1041,6 +1041,13 @@ try{const r=await fetch("/probar/chat",{method:"POST",headers:{"content-type":"a
 add("Escribí como si fueras un cliente. Por ejemplo: «hola, cuánto cuesta un corte?»","l");
 </script></html>`;
 
+/* ---------- chat de la página web ---------- */
+const WEB_TOPE_DIA = 80; // mensajes al día entre todas las personas de la página (cada uno cuesta saldo de Claude)
+const WEB_LLENO = ["Por hoy ya no puedo seguir platicando por aquí 🙏", "Escribile a Jose al WhatsApp 6061-8603 y él te atiende 💈"];
+const NOTA_WEB = "Esta persona te escribe desde el chat de la página web merakibarbershop.com. La página ya le mostró tu saludo, así que no te volvás a presentar. "
+  + "No le pasés el link de la página principal (ya está ahí); los links del test de visagismo, la Academia o Google Maps sí le sirven. "
+  + "Si te cuenta el resultado de su escáner o test de visagismo, tomalo en cuenta al recomendarle el servicio.";
+
 export default {
   // Se espera aquí mismo (no con waitUntil): waitUntil se corta a los 30 s y las revisiones de 32, 40 y 48 s no corrían.
   async scheduled(controller, env, ctx) {
@@ -1052,6 +1059,30 @@ export default {
     const json = (o, s = 200) => new Response(JSON.stringify(o), { status: s, headers: { "content-type": "application/json; charset=utf-8" } });
 
     if (url.pathname === "/salud") return json({ ok: true, quien: "Leo", negocio: "Meraki Barbershop", cerebro: !!env.LEO_ANTHROPIC_KEY, meta: !!env.META_APP_SECRET });
+
+    // Chat de la página web (merakibarbershop.com). Solo entra por el enlace interno (service binding) desde el worker
+    // meraki-web, que cuida los límites por persona y por conexión; por internet (workers.dev) no existe.
+    // Aquí va el tope general del día, para cuidar el saldo de Claude.
+    if (url.pathname === "/web/chat") {
+      if (url.hostname !== "interno.leo" || request.method !== "POST") return new Response("No encontrado", { status: 404 });
+      if (!env.LEO_ANTHROPIC_KEY) return json({ error: "sin-cerebro" }, 503);
+      let cuerpo = {};
+      try { cuerpo = await request.json(); } catch {}
+      const id = String((cuerpo && cuerpo.id) || "");
+      const texto = String((cuerpo && cuerpo.texto) || "").trim().slice(0, 600);
+      if (!/^[a-z0-9-]{16,40}$/i.test(id) || !texto) return json({ error: "mensaje-invalido" }, 400);
+      const dia = "web:cupo:" + ymdSV(Date.now());
+      const usados = Number((await env.LEO.get(dia)) || 0);
+      if (usados >= WEB_TOPE_DIA) return json({ lleno: true, burbujas: WEB_LLENO, botones: [] });
+      await env.LEO.put(dia, String(usados + 1), { expirationTtl: 172800 });
+      try {
+        const { burbujas, botones } = prepararRespuesta(await responder(env, "web", id, texto, "chat de la página web", NOTA_WEB));
+        return json({ burbujas, botones });
+      } catch (e) {
+        await diag(env, "web", { error: String(e.message || e).slice(0, 200) });
+        return json({ error: "leo-no-pudo" }, 502);
+      }
+    }
 
     // Avisos para la app Meraki CRM (citas nuevas, clientes que piden hablar con Jose). Tienen datos de clientes:
     // van protegidos con su propia clave, que solo tiene la app de Jose. Casi siempre cuesta una sola lectura.
