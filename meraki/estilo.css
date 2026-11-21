@@ -378,3 +378,54 @@ html.leo-abierto body{overflow:hidden}
   .escaner__barra span{transition:none}
 }
 .resultado:focus{outline:none}
+
+/* Tarjeta de regalo */
+.regalo-pagina h1{font-size:clamp(2.3rem,8.5vw,3.8rem);letter-spacing:-.015em;text-wrap:balance}
+.regalo{display:grid;gap:2.25rem;margin-top:2.25rem}
+.regalo__campos{min-width:0}
+.campo{display:grid;gap:.45rem;min-width:0;margin:1.5rem 0 0;padding:0;border:0}
+.regalo__campos > .campo:first-child{margin-top:0}
+.campo__nombre{padding:0;color:var(--hueso);font:700 1rem/1.3 var(--f-texto)}
+.campo__opcional{color:var(--ceniza);font-weight:500}
+.campo input:not([type=radio]),.campo textarea{width:100%;min-height:3.2rem;padding:.75rem 1rem;border:1px solid var(--linea);border-radius:.6rem;background:var(--vitrina);color:var(--hueso);font:400 1.05rem/1.4 var(--f-texto)}
+.campo textarea{min-height:5.4rem;resize:vertical}
+.campo input::placeholder,.campo textarea::placeholder{color:#7d755f}
+.campo input:not([type=radio]):focus,.campo textarea:focus{border-color:var(--oro);outline:2px solid rgba(201,162,74,.35);outline-offset:1px}
+.campo input[aria-invalid="true"]{border-color:#d98b7a}
+.campo__ayuda{color:var(--ceniza);font-size:.88rem}
+.campo__error{color:#e8a493;font-size:.93rem;font-weight:600}
+.regalo__servicios{display:grid;gap:.55rem;margin-top:.35rem}
+.regalo__opcion{display:flex;align-items:center;gap:.9rem;min-height:3.6rem;padding:.8rem 1rem;border:1px solid var(--linea);border-radius:.7rem;background:var(--vitrina);cursor:pointer}
+.regalo__opcion:hover{border-color:rgba(201,162,74,.7)}
+.regalo__opcion:has(input:checked){border-color:var(--oro);background:linear-gradient(180deg,rgba(201,162,74,.12),rgba(201,162,74,.04))}
+.regalo__opcion input{flex:none;display:grid;place-items:center;width:1.3rem;height:1.3rem;margin:0;border:1.5px solid var(--ceniza);border-radius:50%;background:transparent;-webkit-appearance:none;appearance:none;cursor:pointer}
+.regalo__opcion input::before{content:"";width:.66rem;height:.66rem;border-radius:50%;background:var(--oro-alto);transform:scale(0);transition:transform .15s ease}
+.regalo__opcion input:checked{border-color:var(--oro-alto)}
+.regalo__opcion input:checked::before{transform:scale(1)}
+.regalo__opcion input:focus-visible{outline:2px solid var(--oro-alto);outline-offset:3px}
+.regalo__texto{flex:1;min-width:0}
+.regalo__nombre{display:block;font-weight:700;line-height:1.3}
+.regalo__desc{display:block;margin-top:.15rem;color:var(--ceniza);font-size:.86rem;line-height:1.4}
+.regalo__precio{flex:none;color:var(--oro-alto);font:700 1.2rem/1 var(--f-rotulo);font-variant-numeric:lining-nums tabular-nums}
+.regalo__vista{width:100%;max-width:23rem;margin:0;justify-self:center}
+.regalo__vista canvas{display:block;width:100%;height:auto;aspect-ratio:1080/1350;border-radius:.8rem;background:#100e0a;box-shadow:0 1.6rem 3.2rem rgba(0,0,0,.6),0 0 0 1px rgba(201,162,74,.18)}
+.regalo__vista figcaption{margin-top:.9rem;color:var(--ceniza);font-size:.9rem;text-align:center}
+.regalo__boton{width:100%}
+.regalo__boton svg{flex:none}
+.regalo__nota{margin-top:.9rem;color:var(--ceniza);font-size:.93rem}
+.regalo__listo{margin-top:1rem;padding:.85rem 1rem;border:1px solid rgba(111,191,138,.45);border-radius:.6rem;background:rgba(111,191,138,.08);color:var(--hueso);font-weight:600}
+.condiciones{display:grid;gap:.8rem;margin:1.5rem 0 0;padding:0;list-style:none}
+.condiciones li{position:relative;padding-left:1.5rem}
+.condiciones li::before{content:"";position:absolute;top:.62rem;left:.2rem;width:.45rem;height:.45rem;transform:rotate(45deg);background:var(--oro)}
+.regalo-inicio__img{width:100%;max-width:16rem;margin:0 auto;border-radius:.8rem;box-shadow:0 1.4rem 3rem rgba(0,0,0,.55),0 0 0 1px rgba(201,162,74,.18)}
+@media (min-width:60rem){
+  .regalo{grid-template-columns:minmax(0,1fr) minmax(0,23rem);grid-template-areas:"campos vista" "enviar vista";column-gap:4.5rem;row-gap:2rem;align-items:start}
+  .regalo__campos{grid-area:campos}
+  .regalo__vista{grid-area:vista;position:sticky;top:calc(var(--alto-cabecera) + 1.5rem)}
+  .regalo__enviar{grid-area:enviar}
+  .regalo__boton{width:auto}
+  .regalo-inicio__img{max-width:21rem}
+}
+@media (prefers-reduced-motion:reduce){
+  .regalo__opcion input::before{transition:none}
+}

@@ -73,18 +73,28 @@ if (location.hostname === "josemontes20201234-pixel.github.io" && location.pathn
     else texto.textContent = "Ya cerramos. Mañana abrimos a las 6:00 a. m.";
   }
 
-  // Precios: desde el martes 15 de diciembre de 2026 entran los nuevos
+  // Precios: desde el martes 15 de diciembre de 2026 entran los nuevos (los mismos están en Leo y en la app de la Tarjeta Meraki)
+  var ACTUALES = [
+    ["Corte clásico", 3.5, "Corte a tijera o máquina, acabado limpio y perfilado de patillas."],
+    ["Corte moderno", 4, "Degradados, cortes a cero, técnicas de tendencia y acabado con producto."],
+    ["Combo el patrón", 5, "Corte moderno o clásico, perfilado de cejas y tónico refrescante."],
+    ["Servicio full detalle", 6, "Corte moderno o clásico, barba perfilada con navaja y toalla tibia."],
+    ["Diseño de barba el patrón", 3.5, "Diseño y definición de barba."],
+    ["Perfilado express", 2, "Perfilado rápido."],
+    ["Ritual Meraki Spa", 5, "Cuidado y relajación. Preguntanos los detalles."]
+  ];
+  var NUEVOS = [
+    ["Corte clásico", 4, "Corte a tijera o máquina, acabado limpio y perfilado de patillas."],
+    ["Corte moderno", 5, "Degradados, cortes a cero, técnicas de tendencia y acabado con producto."],
+    ["Combo el patrón", 6.5, "Corte moderno o clásico, perfilado de cejas y tónico refrescante."],
+    ["Servicio full detalle", 8, "Corte moderno o clásico, barba perfilada con navaja y toalla tibia."],
+    ["Diseño de barba Meraki", 4.5, "Diseño y definición de barba."],
+    ["Perfilado express", 2.5, "Perfilado rápido."],
+    ["Ritual Meraki Spa", 6.5, "Cuidado y relajación. Preguntanos los detalles."]
+  ];
+  window.MerakiPrecios = hoy >= "2026-12-15" ? NUEVOS : ACTUALES; // la página de regalo los usa
   var lista = $("servicios-lista");
   if (lista && hoy >= "2026-12-15") {
-    var NUEVOS = [
-      ["Corte clásico", 4, "Corte a tijera o máquina, acabado limpio y perfilado de patillas."],
-      ["Corte moderno", 5, "Degradados, cortes a cero, técnicas de tendencia y acabado con producto."],
-      ["Combo el patrón", 6.5, "Corte moderno o clásico, perfilado de cejas y tónico refrescante."],
-      ["Servicio full detalle", 8, "Corte moderno o clásico, barba perfilada con navaja y toalla tibia."],
-      ["Diseño de barba Meraki", 4.5, "Diseño y definición de barba."],
-      ["Perfilado express", 2.5, "Perfilado rápido."],
-      ["Ritual Meraki Spa", 6.5, "Cuidado y relajación. Preguntanos los detalles."]
-    ];
     lista.innerHTML = NUEVOS.map(function (s) {
       return '<li class="servicio"><div class="servicio__fila"><h3 class="servicio__nombre">' + s[0] +
         '</h3><span class="servicio__puntos" aria-hidden="true"></span><span class="servicio__precio">$' + s[1].toFixed(2) +

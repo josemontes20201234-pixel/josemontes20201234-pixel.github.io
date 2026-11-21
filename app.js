@@ -259,6 +259,9 @@ const Admin = {
       if (this.loaded) this.publicarResumen();
     }, e => { clearTimeout(slow); this.banner("No se pudo leer la lista ("+e.code+"). Revisá las reglas de Firestore en la guía.","warn"); }));
     stopFns.push(onSnapshot(doc(db,"config","programa"), s => { cfg = mergeCfg(s.exists() ? s.data() : {}); this.render(); this.fillConfig(); if (this.loaded) this.publicarResumen(); }, () => {}));
+    this.regalos = []; this.regListos = false; this.regError = "";
+    this.escucharRegalos();
+    stopFns.push(() => { this.regStop?.(); this.regStop = null; });
   },
   // Sólo números para la tarjeta «Hoy en Meraki» del launcher: nunca nombres ni teléfonos
   publicarResumen(){
@@ -281,13 +284,19 @@ const Admin = {
     $("#app").innerHTML =
     '<div class="wrap">'+
       '<header class="top"><div class="brand"><h1>Meraki <em>Barbershop</em></h1><span class="sub">Panel del barbero · <button class="linkbtn" data-logout>Salir</button></span></div>'+
-      '<nav class="tabs" role="tablist"><button role="tab" aria-selected="true" data-tab="clientes">Clientes</button><button role="tab" aria-selected="false" data-tab="avisos">Avisos</button><button role="tab" aria-selected="false" data-tab="ajustes">Ajustes</button></nav></header>'+
+      '<nav class="tabs" role="tablist"><button role="tab" aria-selected="true" data-tab="clientes">Clientes</button><button role="tab" aria-selected="false" data-tab="regalos">Regalos</button><button role="tab" aria-selected="false" data-tab="avisos">Avisos</button><button role="tab" aria-selected="false" data-tab="ajustes">Ajustes</button></nav></header>'+
       '<div id="banner" class="banner" hidden></div>'+
       '<section class="view" id="v-clientes">'+
         '<div class="stats" id="stats"></div>'+
         '<button class="btn gold lg" data-scan>'+ICON.scan+'Escanear tarjeta</button>'+
         '<div class="toolbar"><input id="q" class="search" type="search" placeholder="Nombre, teléfono o Nº de tarjeta" aria-label="Buscar cliente"><button class="btn" data-nuevo>+ Nuevo cliente</button></div>'+
         '<div class="chips" id="filtros"></div><div class="list" id="lista"></div>'+
+      '</section>'+
+      '<section class="view" id="v-regalos" hidden>'+
+        '<div class="actions"><button class="btn gold lg" data-reg-nueva>+ Nueva tarjeta de regalo</button><button class="btn lg" data-scan>'+ICON.scan+'Escanear</button></div>'+
+        '<div id="reg-aviso"></div>'+
+        '<div class="toolbar"><input id="rq" class="search" type="search" placeholder="Código o nombre" aria-label="Buscar tarjeta de regalo" autocomplete="off"></div>'+
+        '<div class="chips" id="reg-filtros"></div><div class="list" id="reg-lista"></div>'+
       '</section>'+
       '<section class="view" id="v-avisos" hidden><div class="panel"><h2>Enviar avisos</h2>'+
         '<p>Elegí a quién y qué mensaje. WhatsApp abre el chat de cada cliente con el texto listo; vos tocás enviar. El correo se manda a todos de un solo, en copia oculta.</p>'+
@@ -310,6 +319,7 @@ const Admin = {
     $("#c-txt").value = cfg.plantillas.premio; $("#c-seg").value = "premio"; $("#c-tpl").value = "premio";
     this.fillConfig();
     let qT; $("#q").addEventListener("input", e => { clearTimeout(qT); qT = setTimeout(()=>{ this.query = e.target.value; this.renderLista(); }, 120); });
+    let rT; $("#rq").addEventListener("input", e => { clearTimeout(rT); rT = setTimeout(()=>{ this.regQuery = e.target.value; this.renderRegalos(); }, 120); });
     let tT; $("#c-txt").addEventListener("input", () => { clearTimeout(tT); tT = setTimeout(()=>this.renderAvisos(), 250); });
   },
   banner(msg, kind){ const b = $("#banner"); if (!b) return; if (!msg){ b.hidden = true; return; } b.textContent = msg; b.dataset.kind = kind||""; b.hidden = false; },
@@ -370,7 +380,7 @@ const Admin = {
     c.sellos-=cfg.meta; c.premiosCanjeados=(c.premiosCanjeados||0)+1; this.hist(c,"canje",cfg.premio);
     try { await this.save(c); toast("Premio canjeado. Tarjeta nueva para "+firstName(c)); } catch(e){ toast("No se pudo guardar."); }
   },
-  onSheetClosed(){ this.openId = null; this.scannedId = null; },
+  onSheetClosed(){ this.openId = null; this.scannedId = null; this.regOpen = null; this.regScanned = null; },
   renderDetail(){
     const c = this.clientes.find(x=>x.id===this.openId); if (!c){ closeSheetEl(); this.onSheetClosed(); return; }
     const e = estado(c), t = tier(c.visitasTotales||0);
@@ -463,7 +473,8 @@ const Admin = {
   switchTab(tab){
     this.tab = tab;
     document.querySelectorAll("nav.tabs button").forEach(b=>b.setAttribute("aria-selected", b.dataset.tab===tab));
-    ["clientes","avisos","ajustes"].forEach(v=>$("#v-"+v).hidden = v!==tab);
+    ["clientes","regalos","avisos","ajustes"].forEach(v=>$("#v-"+v).hidden = v!==tab);
+    if (tab==="regalos") this.renderRegalos();
     if (tab==="avisos") this.renderAvisos();
     if (tab==="ajustes") this.fillConfig();
   },
@@ -506,6 +517,232 @@ const Admin = {
   }
 };
 
+/* ================================================================
+   TARJETAS DE REGALO
+   La persona la pide en merakibarbershop.com/regalo/ (le llega a Jose por WhatsApp), paga,
+   y Jose la activa aquí: sale la imagen con su código y QR para mandarla. Al usarla, se escanea.
+   ================================================================ */
+// Los mismos servicios y precios de la página (meraki/meraki.js) y de Leo. Vale el precio del día en que se paga.
+const REGALO_SERV = [["Corte clásico",3.5],["Corte moderno",4],["Combo el patrón",5],["Servicio full detalle",6],["Diseño de barba el patrón",3.5],["Perfilado express",2],["Ritual Meraki Spa",5]];
+const REGALO_SERV_NUEVOS = [["Corte clásico",4],["Corte moderno",5],["Combo el patrón",6.5],["Servicio full detalle",8],["Diseño de barba Meraki",4.5],["Perfilado express",2.5],["Ritual Meraki Spa",6.5]];
+const CAMBIO_PRECIOS = "2026-12-15", REGALO_MESES = 3;
+const ABC = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"; // sin 0/O, 1/I/L, para que no se confundan al dictarlos
+const PAGOS = {efectivo:"Efectivo", tarjeta:"Tarjeta", transferencia:"Transferencia"};
+const ESTADO_REG = {activa:"Activa", usada:"Usada", vencida:"Vencida"};
+const hoySV = () => new Date(Date.now() - 6*3600e3).toISOString().slice(0,10); // El Salvador: UTC-6 todo el año
+const serviciosRegalo = () => hoySV() >= CAMBIO_PRECIOS ? REGALO_SERV_NUEVOS : REGALO_SERV;
+const sumarMeses = (ymd, m) => { const [y,mo,d] = ymd.split("-").map(Number); const ult = new Date(Date.UTC(y, mo-1+m+1, 0)).getUTCDate(); return new Date(Date.UTC(y, mo-1+m, Math.min(d, ult))).toISOString().slice(0,10); };
+const fmtCodigo = c => { c = String(c||""); return c.length === 8 ? c.slice(0,4)+"-"+c.slice(4) : c; };
+const fmtDia = ymd => ymd ? new Date(ymd+"T12:00:00Z").toLocaleDateString("es-SV",{day:"numeric",month:"short",year:"numeric",timeZone:"UTC"}) : "—";
+const money = n => "$" + Number(n||0).toFixed(2);
+const estadoRegalo = r => r.usada ? "usada" : (r.vence && hoySV() > r.vence ? "vencida" : "activa");
+const qrRegalo = c => "MERAKI-REGALO:" + c;
+// Lo que lee el escáner: tarjeta de cliente o tarjeta de regalo
+const leerQR = t => { const s = String(t||"").trim(); const m = s.match(/^MERAKI-REGALO:([A-Za-z0-9]{8})$/); if (m) return {tipo:"regalo", id:m[1].toUpperCase()}; const id = idFromText(s); return id ? {tipo:"cliente", id} : null; };
+const nuevoCodigo = usados => { for (;;) { const c = Array.from(crypto.getRandomValues(new Uint32Array(8)), n => ABC[n % ABC.length]).join(""); if (!usados.has(c)) return c; } };
+const reglaRegalos = () => "    match /regalos/{codigo} {\n      allow read, write: if request.auth != null && request.auth.token.email_verified == true && request.auth.token.email.lower() == \"" + String(ADMIN_EMAIL).toLowerCase() + "\";\n    }";
+// El pedido que manda la página: «Servicio: X ($4.00)», «Para: …», «De: …», «Mensaje: …»
+function leerPedido(t){
+  const v = k => { const m = String(t||"").match(new RegExp("^[ \\t*_]*" + k + "[ \\t*_]*:[ \\t]*(.+)$", "mi")); return m ? m[1].replace(/[*_]+$/,"").trim() : ""; };
+  const serv = v("Servicio"), p = serv.match(/\(\s*\$\s*([\d]+(?:[.,]\d{1,2})?)\s*\)\s*$/);
+  return { servicio: serv.replace(/\s*\(\s*\$\s*[\d.,]+\s*\)\s*$/, ""), precio: p ? Number(p[1].replace(",", ".")) : null, para: v("Para"), de: v("De"), mensaje: v("Mensaje") };
+}
+const buscarServicio = nombre => { const n = String(nombre||"").toLowerCase().trim(); const L = serviciosRegalo(); return L.find(s => s[0].toLowerCase() === n) || (n.startsWith("diseño de barba") ? L.find(s => s[0].toLowerCase().startsWith("diseño de barba")) : null); };
+
+Object.assign(Admin, {
+  regalos: [], regListos: false, regError: "", regFiltro: "activa", regQuery: "", regOpen: null, regScanned: null, regImg: {}, regStop: null,
+
+  escucharRegalos(){
+    this.regStop?.();
+    this.regStop = onSnapshot(collection(db,"regalos"), snap => {
+      this.regalos = snap.docs.map(d => ({id:d.id, ...d.data()}));
+      if (!snap.metadata.fromCache){ this.regListos = true; this.regError = ""; }
+      this.renderRegalos();
+      if (this.regOpen && !document.activeElement?.closest?.(".sheet form") && !document.querySelector("#reg-zona .confirm, #reg-del .confirm")) this.renderRegalo();
+    }, e => { this.regError = e.code || "error"; this.regListos = true; this.renderRegalos(); });
+  },
+  errorRegalo(e){
+    if ((e && e.code) === "permission-denied"){
+      this.regError = "permission-denied"; closeSheetEl(); this.onSheetClosed(); this.switchTab("regalos");
+      toast("Falta un permiso en Firebase. Mirá las instrucciones arriba.");
+    } else toast("No se pudo guardar ("+((e && e.code)||"error")+"). Revisá tu internet.");
+  },
+
+  renderRegalos(){
+    const box = $("#reg-lista"); if (!box) return;
+    $("#reg-aviso").innerHTML = !this.regError ? "" : this.regError === "permission-denied"
+      ? '<div class="panel"><h2>Falta un permiso en Firebase</h2><p>Para guardar las tarjetas de regalo, entrá a Firebase → Firestore → Reglas, pegá esto debajo de <code>match /databases/{database}/documents {</code> y tocá Publicar:</p>'+
+        '<pre class="regla">'+esc(reglaRegalos())+'</pre><div class="actions"><button class="btn gold" data-reg-copiar>Copiar regla</button><button class="btn" data-reg-reintentar>Ya la puse</button></div></div>'
+      : '<div class="banner" data-kind="warn">No se pudieron leer las tarjetas de regalo ('+esc(this.regError)+'). Revisá tu internet.</div>';
+    const n = {activa:0, usada:0, vencida:0}; this.regalos.forEach(r => n[estadoRegalo(r)]++);
+    $("#reg-filtros").innerHTML = [["activa","Activas"],["vencida","Vencidas"],["usada","Usadas"],["todas","Todas"]]
+      .map(([k,t]) => '<button class="chip" data-reg-f="'+k+'" aria-pressed="'+(this.regFiltro===k)+'">'+t+(k==="todas"?"":" · "+n[k])+'</button>').join("");
+    if (this.regError === "permission-denied"){ box.innerHTML = ""; return; }
+    if (!this.regListos){ box.innerHTML = '<div class="empty" style="grid-column:1/-1">Cargando tarjetas de regalo…</div>'; return; }
+    if (!this.regalos.length){ box.innerHTML = '<div class="empty" style="grid-column:1/-1"><h3>Todavía no hay tarjetas de regalo</h3><span>Cuando alguien te pague una, creala aquí y mandala por WhatsApp.</span><button class="btn gold" data-reg-nueva>+ Nueva tarjeta de regalo</button></div>'; return; }
+    // Buscando se ve en todas (para encontrar un código aunque ya esté usada o vencida)
+    const q = this.regQuery.trim().toLowerCase(), qc = q.toUpperCase().replace(/[^A-Z0-9]/g,"");
+    const rows = (q ? this.regalos.filter(r => (qc.length >= 3 && r.id.includes(qc)) || String(r.para||"").toLowerCase().includes(q) || String(r.de||"").toLowerCase().includes(q))
+                    : this.regalos.filter(r => this.regFiltro === "todas" || estadoRegalo(r) === this.regFiltro))
+      .sort((a,b) => String(b.creado||"").localeCompare(String(a.creado||"")));
+    if (!rows.length){ box.innerHTML = '<div class="empty" style="grid-column:1/-1">'+(q ? "Ninguna tarjeta de regalo coincide con esa búsqueda." : "No hay tarjetas en este grupo.")+'</div>'; return; }
+    box.innerHTML = rows.map(r => {
+      const e = estadoRegalo(r);
+      const cuando = e === "usada" ? "usada el "+fmtDate(r.usada) : (e === "vencida" ? "venció el " : "vence el ")+fmtDia(r.vence);
+      return '<article class="card"><button class="row" data-reg-abrir="'+esc(r.id)+'" style="background:none;border:0;padding:0;text-align:left;width:100%">'+
+        '<div style="min-width:0"><h3>Para '+esc(r.para||"—")+'</h3><div class="meta">De '+esc(r.de||"—")+' · <span class="num">'+esc(fmtCodigo(r.id))+'</span></div></div>'+
+        '<span class="state '+e+'">'+ESTADO_REG[e]+'</span></button>'+
+        '<div class="meta">'+esc(r.servicio||"")+' · '+money(r.precio)+' · '+cuando+'</div></article>';
+    }).join("");
+  },
+
+  abrirRegalo(id, escaneada){
+    this.switchTab("regalos");
+    if (!this.regalos.some(r => r.id === id)){
+      toast(this.regListos ? "Ese código no es de ninguna tarjeta de regalo. No la aceptés sin revisar." : "Todavía se están cargando las tarjetas. Probá otra vez.");
+      return;
+    }
+    this.openId = null; this.regOpen = id; this.regScanned = escaneada ? id : null; this.renderRegalo();
+  },
+
+  // La imagen de la tarjeta (con su QR), hecha con la misma función de la página web
+  async imagenRegalo(r){
+    const key = [r.id, r.servicio, r.para, r.de, r.mensaje, r.vence].join("|");
+    if (this.regImg[key]) return this.regImg[key];
+    if (!window.MerakiRegalo || !window.qrcode) throw new Error("sin-librerias");
+    const q = qrcode(0,"M"); q.addData(qrRegalo(r.id)); q.make();
+    const cv = document.createElement("canvas");
+    await MerakiRegalo.dibujar(cv, {servicio:r.servicio, para:r.para, de:r.de, mensaje:r.mensaje, codigo:r.id, vence:r.vence, qr:q});
+    const blob = await new Promise(ok => cv.toBlob(ok, "image/png"));
+    return this.regImg[key] = {blob, url: URL.createObjectURL(blob)};
+  },
+
+  renderRegalo(){
+    const r = this.regalos.find(x => x.id === this.regOpen); if (!r){ closeSheetEl(); this.onSheetClosed(); return; }
+    const e = estadoRegalo(r), aviso = this.regScanned === r.id;
+    const banner = !aviso ? "" : e === "activa" ? '<div class="scanned">✓ Tarjeta válida: '+esc(r.servicio)+'. Marcala como usada cuando termines.</div>'
+      : e === "usada" ? '<div class="scanned bad">Esta tarjeta YA SE USÓ el '+fmtDate(r.usada)+'.</div>'
+      : '<div class="scanned bad">Esta tarjeta venció el '+fmtDia(r.vence)+'.</div>';
+    sheet('<h2>Para '+esc(r.para||"—")+'</h2><div class="label num" style="margin-top:-10px">Tarjeta de regalo '+esc(fmtCodigo(r.id))+'</div>'+banner+
+      '<img class="regalo-img'+(e === "activa" ? "" : " apagada")+'" id="reg-img" alt="Tarjeta de regalo de '+esc(r.servicio)+' para '+esc(r.para)+'">'+
+      '<div class="actions" id="reg-zona">'+
+        (e === "usada" ? '<button class="btn" data-reg-reactivar="'+esc(r.id)+'">Reactivar</button>' : '<button class="btn gold" data-reg-usar="'+esc(r.id)+'">Marcar como usada</button>')+
+        (e === "usada" ? '' : '<button class="btn wa" data-reg-compartir="'+esc(r.id)+'">'+ICON.wa+'Compartir tarjeta</button>')+'</div>'+
+      '<dl class="kv"><dt>Servicio</dt><dd>'+esc(r.servicio)+'</dd><dt>Pagó</dt><dd>'+money(r.precio)+(r.pago ? ' · '+esc(PAGOS[r.pago]||r.pago) : '')+'</dd>'+
+        '<dt>De</dt><dd>'+esc(r.de||"—")+'</dd>'+(r.mensaje ? '<dt>Mensaje</dt><dd>'+esc(r.mensaje)+'</dd>' : '')+
+        '<dt>Activada</dt><dd>'+fmtDate(r.creado)+'</dd><dt>Vence</dt><dd>'+fmtDia(r.vence)+'</dd>'+(r.usada ? '<dt>Usada</dt><dd>'+fmtDate(r.usada)+'</dd>' : '')+'</dl>'+
+      '<span class="hint-sm">Si prefiere otro servicio, se le toma a cuenta lo que pagó ('+money(r.precio)+'); si cuesta más, paga la diferencia.</span>'+
+      '<div class="actions"><button class="btn ghost" data-reg-editar="'+esc(r.id)+'">Editar datos</button><span id="reg-del"><button class="btn danger" data-reg-askdel>Eliminar</button></span></div>');
+    this.imagenRegalo(r).then(img => { const im = $("#reg-img"); if (im && this.regOpen === r.id) im.src = img.url; })
+      .catch(() => { const im = $("#reg-img"); if (im) im.alt = "La imagen no cargó. Revisá tu internet."; });
+  },
+
+  formRegalo(r){
+    const nueva = !r, L = serviciosRegalo().slice();
+    if (r && !L.some(s => s[0] === r.servicio)) L.push([r.servicio, r.precio]);
+    const sel = r ? r.servicio : "Corte moderno", precio = r ? r.precio : (L.find(s => s[0] === sel) || [0,0])[1];
+    this.openId = null; this.regOpen = null; this.regScanned = null;
+    sheet('<h2>'+(nueva ? "Nueva tarjeta de regalo" : "Editar tarjeta de regalo")+'</h2>'+
+      (nueva ? '<div class="field"><label class="label" for="rg-pegar">¿Te llegó el pedido por WhatsApp?</label><textarea id="rg-pegar" rows="3" placeholder="Copiá el mensaje del pedido y pegalo aquí: los datos se llenan solos."></textarea><small id="rg-pegado"></small></div>' : '')+
+      '<form class="grid" id="f-regalo">'+
+        '<div class="field"><label class="label" for="rg-serv">Servicio</label><select id="rg-serv">'+L.map(s => '<option value="'+esc(s[0])+'" data-precio="'+s[1]+'"'+(s[0] === sel ? " selected" : "")+'>'+esc(s[0])+' · '+money(s[1])+'</option>').join("")+'</select></div>'+
+        '<div class="field"><label class="label" for="rg-precio">Precio que pagó ($)</label><input id="rg-precio" type="number" inputmode="decimal" min="0" step="0.25" required value="'+esc(precio)+'"></div>'+
+        '<div class="field"><label class="label" for="rg-para">Para</label><input id="rg-para" required maxlength="40" autocomplete="off" value="'+esc(r ? r.para : "")+'"></div>'+
+        '<div class="field"><label class="label" for="rg-de">De</label><input id="rg-de" required maxlength="40" autocomplete="off" value="'+esc(r ? r.de : "")+'"></div>'+
+        '<div class="field full"><label class="label" for="rg-msj">Mensaje (si quieren)</label><textarea id="rg-msj" maxlength="90" rows="2">'+esc(r ? r.mensaje : "")+'</textarea></div>'+
+        '<div class="field"><label class="label" for="rg-pago">Pagó con</label><select id="rg-pago">'+Object.entries(PAGOS).map(([k,t]) => '<option value="'+k+'"'+((r ? r.pago : "efectivo") === k ? " selected" : "")+'>'+t+'</option>').join("")+'</select></div>'+
+        '<div class="field"><span class="label">Vence</span><span style="padding:10px 0">'+fmtDia(r ? r.vence : sumarMeses(hoySV(), REGALO_MESES))+(nueva ? " (3 meses)" : "")+'</span></div>'+
+        '<div class="actions full"><button class="btn gold" type="submit">'+(nueva ? "Activar tarjeta" : "Guardar cambios")+'</button><button class="btn ghost" type="button" data-close>Cancelar</button></div>'+
+        (nueva ? '<span class="hint-sm full">Activala solo cuando ya te pagaron. Sale con un código único y vale 3 meses desde hoy.</span>' : '')+
+      '</form>');
+    $("#rg-pegar")?.addEventListener("input", ev => {
+      const p = leerPedido(ev.target.value), s = buscarServicio(p.servicio), nota = $("#rg-pegado");
+      if (s){ $("#rg-serv").value = s[0]; $("#rg-precio").value = s[1]; }
+      if (p.precio !== null && p.precio >= 0) $("#rg-precio").value = p.precio; // el precio que vio la persona en la página
+      if (p.para) $("#rg-para").value = p.para.slice(0,40);
+      if (p.de) $("#rg-de").value = p.de.slice(0,40);
+      if (p.mensaje) $("#rg-msj").value = p.mensaje.slice(0,90);
+      const ok = !!(s || p.para || p.de);
+      nota.textContent = !ev.target.value.trim() ? "" : ok ? "✓ Listo, revisá los datos" + (p.servicio && !s ? " (el servicio no lo reconocí: escogelo vos)" : "") + "." : "No encontré los datos del pedido. Llenalos a mano.";
+    });
+    $("#f-regalo").addEventListener("submit", ev => { ev.preventDefault(); this.guardarRegalo(r); });
+  },
+
+  async guardarRegalo(r){
+    const limpio = s => String(s||"").replace(/\s+/g," ").trim();
+    const datos = { servicio: $("#rg-serv").value, precio: Math.round((parseFloat($("#rg-precio").value)||0)*100)/100,
+      para: limpio($("#rg-para").value), de: limpio($("#rg-de").value), mensaje: limpio($("#rg-msj").value), pago: $("#rg-pago").value };
+    if (!datos.para || !datos.de) return toast("Escribí para quién es y de parte de quién.");
+    const boton = document.querySelector('#f-regalo button[type="submit"]'); if (boton) boton.disabled = true;
+    try {
+      if (!r){
+        const id = nuevoCodigo(new Set(this.regalos.map(x => x.id)));
+        Object.assign(datos, { creado: nowISO(), vence: sumarMeses(hoySV(), REGALO_MESES), usada: null });
+        await setDoc(doc(db,"regalos",id), datos);
+        if (!this.regalos.some(x => x.id === id)) this.regalos.push({id, ...datos});
+        this.regOpen = id; this.renderRegalo(); this.renderRegalos();
+        toast("Tarjeta activada. Tocá «Compartir tarjeta» para mandarla.");
+      } else {
+        await updateDoc(doc(db,"regalos",r.id), datos);
+        this.regOpen = r.id; this.renderRegalo();
+        toast("Datos guardados");
+      }
+    } catch(e){ if (boton) boton.disabled = false; this.errorRegalo(e); }
+  },
+
+  async compartirRegalo(id){
+    const r = this.regalos.find(x => x.id === id); if (!r) return;
+    let img; try { img = await this.imagenRegalo(r); } catch { return toast("No cargó la tarjeta. Revisá tu internet."); }
+    const file = new File([img.blob], "Tarjeta de regalo Meraki - "+String(r.para||"").replace(/[^\p{L}\p{N} ]/gu,"").trim()+".png", {type:"image/png"});
+    const text = "🎁 Tarjeta de regalo Meraki para "+r.para+": "+r.servicio+".\nVale hasta el "+MerakiRegalo.fechaLarga(r.vence)+". Para usarla, apartá tu cita en merakibarbershop.com o al WhatsApp 6061-8603 y enseñá la tarjeta en la barbería.";
+    if (navigator.canShare && navigator.canShare({files:[file]})){
+      try { await navigator.share({files:[file], text}); } catch(e){ if (e.name !== "AbortError") toast("No se pudo compartir."); }
+    } else {
+      const a = document.createElement("a"); a.href = img.url; a.download = file.name; document.body.appendChild(a); a.click(); a.remove();
+      toast("Imagen descargada. Mandala por WhatsApp.");
+    }
+  },
+
+  async marcarRegalo(id, usada){
+    try {
+      await updateDoc(doc(db,"regalos",id), {usada: usada ? nowISO() : null});
+      if (this.regOpen === id && !document.querySelector("#reg-zona .confirm")) this.renderRegalo();
+      if (usada) toast("Tarjeta marcada como usada", '<button data-reg-deshacer="'+esc(id)+'">Deshacer</button>');
+      else toast("La tarjeta quedó activa otra vez");
+    } catch(e){ this.errorRegalo(e); }
+  },
+
+  // Botones de la pestaña Regalos. Devuelve true si el clic era de aquí.
+  async clicRegalo(t){
+    const d = t.dataset;
+    if (t.hasAttribute("data-reg-nueva")){ this.formRegalo(null); return true; }
+    if (d.regF){ this.regFiltro = d.regF; this.regQuery = ""; const q = $("#rq"); if (q) q.value = ""; this.renderRegalos(); return true; }
+    if (d.regAbrir){ this.abrirRegalo(d.regAbrir, false); return true; }
+    if (d.regCompartir){ this.compartirRegalo(d.regCompartir); return true; }
+    if (d.regEditar){ this.formRegalo(this.regalos.find(x => x.id === d.regEditar)); return true; }
+    if (d.regUsar){
+      const r = this.regalos.find(x => x.id === d.regUsar); if (!r) return true;
+      const vencida = estadoRegalo(r) === "vencida";
+      $("#reg-zona").innerHTML = '<span class="confirm">'+(vencida ? "Venció el "+fmtDia(r.vence)+". ¿La aceptás igual?" : "¿Ya usó la tarjeta? Queda marcada y no se puede volver a usar.")+
+        ' <button class="btn sm gold" data-reg-si="'+esc(r.id)+'">'+(vencida ? "Sí, aceptarla" : "Sí, ya la usó")+'</button><button class="btn sm ghost" data-reg-no>No</button></span>';
+      return true;
+    }
+    if (d.regSi){ $("#reg-zona").innerHTML = '<span class="hint-sm">Guardando…</span>'; await this.marcarRegalo(d.regSi, true); return true; }
+    if (t.hasAttribute("data-reg-no")){ this.renderRegalo(); return true; }
+    if (d.regReactivar){ await this.marcarRegalo(d.regReactivar, false); return true; }
+    if (d.regDeshacer){ $("#toast-root").innerHTML = ""; await this.marcarRegalo(d.regDeshacer, false); return true; }
+    if (t.hasAttribute("data-reg-askdel")){ $("#reg-del").innerHTML = '<span class="confirm">¿Eliminar esta tarjeta? Ya no se va a poder usar. <button class="btn sm danger" data-reg-del>Sí, eliminar</button><button class="btn sm ghost" data-reg-no>No</button></span>'; return true; }
+    if (t.hasAttribute("data-reg-del")){
+      const id = this.regOpen; closeSheetEl(); this.onSheetClosed();
+      try { await deleteDoc(doc(db,"regalos",id)); toast("Tarjeta de regalo eliminada"); } catch(e){ this.errorRegalo(e); }
+      return true;
+    }
+    if (t.hasAttribute("data-reg-copiar")){ copy(reglaRegalos(), "Regla copiada. Pegala en Firebase."); return true; }
+    if (t.hasAttribute("data-reg-reintentar")){ this.regError = ""; this.regListos = false; this.renderRegalos(); this.escucharRegalos(); return true; }
+    return false;
+  }
+});
+
 /* ---- Eventos del panel ---- */
 document.addEventListener("click", async ev => {
   if (!$("#v-clientes")) return;
@@ -515,7 +752,11 @@ document.addEventListener("click", async ev => {
   if (t.dataset.f){ A.filtro = t.dataset.f; return A.render(); }
   if (t.dataset.seg){ A.filtro = t.dataset.seg; return A.render(); }
   if (t.hasAttribute("data-nuevo")) return A.openForm(null);
-  if (t.hasAttribute("data-scan")) return Scanner.open(id => { if (!A.openScanned(id)) toast("Esa tarjeta no está registrada."); });
+  if (t.hasAttribute("data-scan")) return Scanner.open(r => {
+    if (r.tipo === "regalo") return A.abrirRegalo(r.id, true);
+    if (!A.openScanned(r.id)) toast("Esa tarjeta no está registrada.");
+  });
+  if (await A.clicRegalo(t)) return;
   if (t.dataset.open){ A.openId = t.dataset.open; return A.renderDetail(); }
   if (t.dataset.stamp) return A.stamp(t.dataset.stamp, 1);
   if (t.dataset.stamp2) return A.stamp(t.dataset.stamp2, 2);
@@ -533,6 +774,7 @@ document.addEventListener("click", async ev => {
 });
 document.addEventListener("change", ev => {
   if (!$("#v-clientes")) return;
+  if (ev.target.id==="rg-serv"){ const o = ev.target.selectedOptions[0]; if (o) $("#rg-precio").value = o.dataset.precio; return; }
   if (ev.target.id==="d-tpl") Admin.renderDetail();
   if (ev.target.id==="c-tpl"){ $("#c-txt").value = cfg.plantillas[ev.target.value]; Admin.renderAvisos(); }
   if (ev.target.id==="c-seg") Admin.renderAvisos();
@@ -548,7 +790,7 @@ const Scanner = {
     this.done = onFound;
     if (!window.jsQR) return toast("El lector no cargó. Revisá tu internet.");
     this.el = document.createElement("div"); this.el.className = "scanner";
-    this.el.innerHTML = '<video playsinline muted></video><div class="frame"></div><div class="bar"><span id="sc-msg">Apuntá al código QR de la tarjeta</span><button class="btn lg" id="sc-close">Cancelar</button></div>';
+    this.el.innerHTML = '<video playsinline muted></video><div class="frame"></div><div class="bar"><span id="sc-msg">Apuntá al código QR de la tarjeta Meraki o de la tarjeta de regalo</span><button class="btn lg" id="sc-close">Cancelar</button></div>';
     document.body.appendChild(this.el);
     this.el.querySelector("#sc-close").onclick = () => this.close();
     try {
@@ -569,9 +811,9 @@ const Scanner = {
         g.drawImage(v,0,0,cv.width,cv.height);
         const code = jsQR(g.getImageData(0,0,cv.width,cv.height).data, cv.width, cv.height, {inversionAttempts:"dontInvert"});
         if (code){
-          const id = idFromText(code.data);
-          if (id){ navigator.vibrate?.(60); this.close(); this.done(id); return; }
-          this.el.querySelector("#sc-msg").textContent = "Ese QR no es de una tarjeta Meraki.";
+          const r = leerQR(code.data);
+          if (r){ navigator.vibrate?.(60); this.close(); this.done(r); return; }
+          this.el.querySelector("#sc-msg").textContent = "Ese QR no es de Meraki.";
         }
       }
       this.raf = requestAnimationFrame(tick);

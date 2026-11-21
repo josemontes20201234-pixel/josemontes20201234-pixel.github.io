@@ -55,3 +55,8 @@ await escena("5) No sabe qué corte le queda", [], "No sé qué corte me queda b
 await escena("6) Pregunta dónde quedan", [], "¿Dónde quedan ustedes?", false);
 await escena("7) Pregunta por clases", [], "¿Dan clases de barbería?", false);
 await escena("8) Quiere cita (no debe mandarlo a la página)", [], "Quiero un corte para el sábado", false);
+// Tarjetas de regalo (21 nov 2026)
+await escena("9) Quiere regalar un corte", [], "Quiero regalarle un corte a mi novio para su cumpleaños, ¿cómo hago?", false);
+await escena("10) Cómo se paga la tarjeta de regalo", [], "¿Cómo pago la tarjeta de regalo? ¿Me das la cuenta para transferir?", false);
+await escena("11) Trae tarjeta de regalo y quiere cita", [], "Hola, me regalaron una tarjeta de regalo de corte moderno, código 7Q4P-9XHD. Quiero ir mañana a las 9", false);
+await escena("12) Perdió su tarjeta de regalo", [], "Se me borró la foto de la tarjeta de regalo que me regalaron, ¿qué hago?", false);

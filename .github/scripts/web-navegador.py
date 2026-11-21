@@ -43,6 +43,25 @@ async def main():
         print("Leo respondió:", json.dumps(respuesta, ensure_ascii=False))
         await pg.screenshot(path="capturas/2-chat-leo.png")
 
+        # 3) Tarjeta de regalo: la vista previa se dibuja y el botón arma el pedido de WhatsApp (sin abrirlo)
+        pg3 = await ctx.new_page()
+        pg3.on("pageerror", lambda e: errores.append(str(e)[:200]))
+        pg3.on("request", lambda r: fuera.add(r.url.split("/")[2]) if not r.url.startswith((URL, "data:", "blob:")) else None)
+        await pg3.add_init_script("window.open = (u) => { window.__wa = u; return {}; };")
+        await pg3.goto(URL + "/regalo/", wait_until="networkidle")
+        await pg3.fill("#rg-para", "Carlos"); await pg3.fill("#rg-de", "Ana"); await pg3.fill("#rg-mensaje", "Feliz cumpleaños")
+        await pg3.click("text=Servicio full detalle"); await pg3.wait_for_timeout(1500)
+        dibujo = await pg3.evaluate("""() => { const c = document.getElementById('rg-lienzo'), g = c.getContext('2d');
+            const px = g.getImageData(540, 560, 1, 1).data, fondo = g.getImageData(540, 1300, 1, 1).data;
+            return {ancho: c.width, alto: c.height, centro: [...px].slice(0, 3), abajo: [...fondo].slice(0, 3), etiqueta: c.getAttribute('aria-label'),
+                    servicios: [...document.querySelectorAll('#rg-servicios input')].map(i => i.value + ' $' + i.dataset.precio)}; }""")
+        print("Regalo, vista previa:", json.dumps(dibujo, ensure_ascii=False))
+        await pg3.click(".regalo__boton"); await pg3.wait_for_timeout(300)
+        wa = await pg3.evaluate("window.__wa || ''")
+        from urllib.parse import unquote
+        print("Regalo, pedido:", wa.split("?")[0], "|", unquote(wa.split("text=")[1]).replace("\n", " / ") if "text=" in wa else "(no se armó)")
+        await pg3.screenshot(path="capturas/3-regalo.png", full_page=True)
+
         print("Sitios fuera de merakibarbershop.com que se contactaron:", sorted(fuera) or "ninguno")
         print("Errores de la página:", errores or "ninguno")
         await b.close()
