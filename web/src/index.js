@@ -56,11 +56,26 @@ export default {
     const pareceArchivo = /\.[a-z0-9]{1,5}$/i.test(ruta) && !/\.html?$/i.test(ruta);
     if (r.status === 404 && !compartido && !pareceArchivo) {
       const p = await fetch(ORIGEN + "/meraki/404.html", { cf: { cacheEverything: true, cacheTtl: 300 } });
-      if (p.ok) return new Response(req.method === "HEAD" ? null : p.body, { status: 404, headers: limpiar(p.headers) });
+      if (p.ok) {
+        const h = limpiar(p.headers);
+        h.set("cache-control", "no-cache");
+        return new Response(req.method === "HEAD" ? null : p.body, { status: 404, headers: h });
+      }
     }
-    return new Response(r.body, { status: r.status, headers: limpiar(r.headers) });
+    const salida = limpiar(r.headers);
+    if (r.status === 200 || r.status === 304 || r.status === 206) salida.set("cache-control", cacheNavegador(ruta, url, salida.get("content-type") || ""));
+    return new Response(r.body, { status: r.status, headers: salida });
   }
 };
+
+// Cuánto guarda el navegador cada cosa. Las páginas se revisan siempre (si no cambiaron, la respuesta es mínima),
+// así los cambios se ven de inmediato. El CSS y el JS llevan ?v= en la página: cuando cambian, cambia la dirección.
+function cacheNavegador(ruta, url, tipo) {
+  if (/text\/html/i.test(tipo)) return "no-cache";
+  if (url.searchParams.has("v")) return "public, max-age=31536000, immutable";
+  if (/\.json$/i.test(ruta)) return "public, max-age=300";
+  return "public, max-age=3600";
+}
 
 async function chatLeo(req, env) {
   const salida = (o, s = 200) => new Response(JSON.stringify(o), {
