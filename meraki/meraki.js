@@ -328,7 +328,84 @@ if (location.hostname === "josemontes20201234-pixel.github.io" && location.pathn
     ponerSesion("leo-abierto", "");
     burbuja.focus();
   }
-  burbuja.addEventListener("click", function () { abrir(); });
+  /* La burbuja se puede mover con el dedo o el mouse. Al soltarla se pega al borde más cercano
+     (izquierdo o derecho) y el teléfono recuerda dónde quedó. Un toque sin mover abre el chat. */
+  var lugar = null, arrastre = null, sinClick = false;
+  try { lugar = JSON.parse(leerLocal("leo-lugar") || "null"); } catch (e) {}
+  if (!lugar || (lugar.lado !== "izq" && lugar.lado !== "der") || typeof lugar.y !== "number") lugar = null;
+  var limites = function () {
+    var tam = burbuja.offsetWidth || 50, margen = window.innerWidth >= 960 ? 24 : 16;
+    var cab = document.querySelector(".cabecera");
+    var arriba = Math.max(8, (cab ? cab.getBoundingClientRect().bottom : 0) + 8);
+    var abajo = Math.max(arriba, window.innerHeight - tam - margen);
+    return { tam: tam, margen: margen, arriba: arriba, abajo: abajo };
+  };
+  var ponerEn = function (x, y) {
+    burbuja.style.left = x + "px";
+    burbuja.style.top = y + "px";
+    burbuja.style.right = "auto";
+    burbuja.style.bottom = "auto";
+  };
+  var acomodar = function (animar) {
+    if (!lugar) return;
+    var l = limites();
+    var y = l.arriba + Math.min(1, Math.max(0, lugar.y)) * (l.abajo - l.arriba);
+    var x = lugar.lado === "izq" ? l.margen : window.innerWidth - l.tam - l.margen;
+    if (animar) {
+      burbuja.classList.add("leo-burbuja--pegando");
+      setTimeout(function () { burbuja.classList.remove("leo-burbuja--pegando"); }, 320);
+    }
+    ponerEn(x, y);
+    // el saludito, a la par de la burbuja
+    aviso.style.top = Math.max(0, y + l.tam / 2 - 17) + "px";
+    aviso.style.bottom = "auto";
+    aviso.style.left = lugar.lado === "izq" ? (l.margen + l.tam + 10) + "px" : "auto";
+    aviso.style.right = lugar.lado === "izq" ? "auto" : (l.margen + l.tam + 10) + "px";
+  };
+  acomodar(false);
+  window.addEventListener("resize", function () { acomodar(false); });
+
+  burbuja.addEventListener("pointerdown", function (e) {
+    if (e.button !== undefined && e.button !== 0) return;
+    var r = burbuja.getBoundingClientRect();
+    arrastre = { id: e.pointerId, x: e.clientX, y: e.clientY, izq: r.left, arriba: r.top, movio: false };
+    try { burbuja.setPointerCapture(e.pointerId); } catch (err) {}
+  });
+  burbuja.addEventListener("pointermove", function (e) {
+    if (!arrastre || e.pointerId !== arrastre.id) return;
+    var dx = e.clientX - arrastre.x, dy = e.clientY - arrastre.y;
+    if (!arrastre.movio && Math.abs(dx) + Math.abs(dy) < 8) return;
+    arrastre.movio = true;
+    burbuja.classList.add("leo-burbuja--moviendo");
+    aviso.hidden = true;
+    var l = limites();
+    ponerEn(Math.min(window.innerWidth - l.tam - 4, Math.max(4, arrastre.izq + dx)),
+            Math.min(window.innerHeight - l.tam - 4, Math.max(l.arriba, arrastre.arriba + dy)));
+  });
+  var soltar = function (e) {
+    if (!arrastre || e.pointerId !== arrastre.id) return;
+    var movio = arrastre.movio;
+    arrastre = null;
+    burbuja.classList.remove("leo-burbuja--moviendo");
+    if (!movio) return;
+    sinClick = true; // al soltar después de mover, no se abre el chat
+    setTimeout(function () { sinClick = false; }, 400);
+    var r = burbuja.getBoundingClientRect(), l = limites();
+    lugar = {
+      lado: r.left + r.width / 2 < window.innerWidth / 2 ? "izq" : "der",
+      y: l.abajo > l.arriba ? (r.top - l.arriba) / (l.abajo - l.arriba) : 1
+    };
+    lugar.y = Math.round(Math.min(1, Math.max(0, lugar.y)) * 1000) / 1000;
+    ponerLocal("leo-lugar", JSON.stringify(lugar));
+    acomodar(true);
+  };
+  burbuja.addEventListener("pointerup", soltar);
+  burbuja.addEventListener("pointercancel", soltar);
+
+  burbuja.addEventListener("click", function (e) {
+    if (sinClick) { sinClick = false; e.preventDefault(); return; }
+    abrir();
+  });
   aviso.addEventListener("click", function () { abrir(); });
   // Enlaces «Escribirle a Leo» de la página: abren este chat (sin JavaScript siguen a Instagram)
   document.addEventListener("click", function (e) {
