@@ -1,6 +1,6 @@
 name: Meraki web (merakibarbershop.com)
 # Publica el worker que hace que merakibarbershop.com muestre la página de /meraki/.
-# Las rutas del dominio (merakibarbershop.com/* y www) se agregaron a mano en el panel de Cloudflare.
+# La ruta del dominio (*merakibarbershop.com/*, cubre con y sin www) se agregó a mano en el panel de Cloudflare.
 on:
   push:
     branches: [main]
@@ -18,7 +18,7 @@ jobs:
           r=$(curl -s -H "Authorization: Bearer $CF_TOKEN" "https://api.cloudflare.com/client/v4/zones?name=merakibarbershop.com")
           estado=$(echo "$r" | python3 -c "import sys,json; d=json.load(sys.stdin); z=d.get('result') or []; print(z[0].get('status','') if z else ('no-visible' if d.get('success') else 'sin-permiso'))")
           echo "Estado del dominio en Cloudflare: $estado"
-          echo "(Las rutas merakibarbershop.com/* y www.merakibarbershop.com/* se agregan en el panel de Cloudflare: la llave no tiene permiso de rutas)"
+          echo "(La ruta *merakibarbershop.com/* está en el panel de Cloudflare: la llave no tiene permiso de rutas)"
       - name: Publicar en Cloudflare
         uses: cloudflare/wrangler-action@v3
         with:
@@ -27,9 +27,23 @@ jobs:
           workingDirectory: web
       - name: Probar
         run: |
-          sleep 10
-          for u in https://meraki-web.merakibarbershop.workers.dev/ https://meraki-web.merakibarbershop.workers.dev/academia https://merakibarbershop.com/ https://www.merakibarbershop.com/; do
-            r=$(curl -s -o /tmp/p.html -w "%{http_code} %{redirect_url}" --max-time 20 "$u" || echo "sin respuesta")
+          sleep 15
+          for u in \
+            https://meraki-web.merakibarbershop.workers.dev/ \
+            https://merakibarbershop.com/ \
+            https://www.merakibarbershop.com/academia/ \
+            http://merakibarbershop.com/ \
+            https://merakibarbershop.com/academia/ \
+            https://merakibarbershop.com/visagismo/ \
+            https://merakibarbershop.com/aniversario/ \
+            https://merakibarbershop.com/meraki/visagismo/ \
+            https://merakibarbershop.com/citas/ \
+            https://merakibarbershop.com/estilo.css \
+            https://merakibarbershop.com/ig/galeria.json \
+            https://merakibarbershop.com/no-existe; do
+            rm -f /tmp/p.html
+            r=$(curl -s -o /tmp/p.html -w "%{http_code} %{content_type} %{redirect_url}" --max-time 20 "$u" || echo "sin respuesta")
             t=$(grep -o "<title>[^<]*" /tmp/p.html 2>/dev/null | head -1 | sed 's/<title>//')
-            echo "$u -> $r | $t"
+            echo "$u -> $r ${t:+| $t}"
           done
+          curl -s -o /dev/null -r 0-99 --max-time 20 -w "video de Leo -> %{http_code} %{content_type}\n" https://merakibarbershop.com/leo/media/leo-presentacion.mp4 || echo "video de Leo -> sin respuesta"
