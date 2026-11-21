@@ -1,6 +1,6 @@
 name: Meraki web (merakibarbershop.com)
 # Publica el worker que hace que merakibarbershop.com muestre la página de /meraki/.
-# Las rutas del dominio se agregan solo cuando Cloudflare ya tiene el dominio activo.
+# Las rutas del dominio (merakibarbershop.com/* y www) se agregaron a mano en el panel de Cloudflare.
 on:
   push:
     branches: [main]
@@ -18,10 +18,7 @@ jobs:
           r=$(curl -s -H "Authorization: Bearer $CF_TOKEN" "https://api.cloudflare.com/client/v4/zones?name=merakibarbershop.com")
           estado=$(echo "$r" | python3 -c "import sys,json; d=json.load(sys.stdin); z=d.get('result') or []; print(z[0].get('status','') if z else ('no-visible' if d.get('success') else 'sin-permiso'))")
           echo "Estado del dominio en Cloudflare: $estado"
-          if [ "$estado" = "active" ]; then
-            printf '\nroutes = [\n  { pattern = "merakibarbershop.com/*", zone_name = "merakibarbershop.com" },\n  { pattern = "www.merakibarbershop.com/*", zone_name = "merakibarbershop.com" }\n]\n' >> web/wrangler.toml
-            echo "Se agregan las rutas de merakibarbershop.com"
-          fi
+          echo "(Las rutas merakibarbershop.com/* y www.merakibarbershop.com/* se agregan en el panel de Cloudflare: la llave no tiene permiso de rutas)"
       - name: Publicar en Cloudflare
         uses: cloudflare/wrangler-action@v3
         with:
