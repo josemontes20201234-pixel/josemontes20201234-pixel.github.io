@@ -1,0 +1,5 @@
+name = "meraki-web"
+main = "src/index.js"
+compatibility_date = "2026-11-01"
+workers_dev = true
+# Las rutas de merakibarbershop.com las agrega el workflow cuando Cloudflare ya ve el dominio
