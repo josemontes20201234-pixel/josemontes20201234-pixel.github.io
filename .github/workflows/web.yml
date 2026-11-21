@@ -40,10 +40,14 @@ jobs:
             https://merakibarbershop.com/citas/ \
             https://merakibarbershop.com/estilo.css \
             https://merakibarbershop.com/ig/galeria.json \
-            https://merakibarbershop.com/no-existe; do
+            https://merakibarbershop.com/robots.txt \
+            https://merakibarbershop.com/sitemap.xml \
+            https://merakibarbershop.com/no-existe \
+            https://merakibarbershop.com/img/no-existe.webp; do
             rm -f /tmp/p.html
             r=$(curl -s -o /tmp/p.html -w "%{http_code} %{content_type} %{redirect_url}" --max-time 20 "$u" || echo "sin respuesta")
             t=$(grep -o "<title>[^<]*" /tmp/p.html 2>/dev/null | head -1 | sed 's/<title>//')
             echo "$u -> $r ${t:+| $t}"
           done
+          curl -s --max-time 20 https://merakibarbershop.com/ | grep -o '<link rel="canonical"[^>]*>' || echo "sin canonical"
           curl -s -o /dev/null -r 0-99 --max-time 20 -w "video de Leo -> %{http_code} %{content_type}\n" https://merakibarbershop.com/leo/media/leo-presentacion.mp4 || echo "video de Leo -> sin respuesta"

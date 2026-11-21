@@ -42,10 +42,20 @@ export default {
         : loc.startsWith("/meraki") ? loc.slice(7) : loc;
       return new Response(null, { status: r.status, headers: { location: nuevo || "/" } });
     }
-    const salida = new Headers(r.headers);
-    QUITAR.forEach(k => salida.delete(k));
-    salida.set("x-content-type-options", "nosniff");
-    salida.set("referrer-policy", "strict-origin-when-cross-origin");
-    return new Response(r.body, { status: r.status, headers: salida });
+    // Una dirección que no existe muestra la página 404 de Meraki; un archivo que falta (foto, css) sigue con el 404 normal.
+    const pareceArchivo = /\.[a-z0-9]{1,5}$/i.test(ruta) && !/\.html?$/i.test(ruta);
+    if (r.status === 404 && !compartido && !pareceArchivo) {
+      const p = await fetch(ORIGEN + "/meraki/404.html", { cf: { cacheEverything: true, cacheTtl: 300 } });
+      if (p.ok) return new Response(req.method === "HEAD" ? null : p.body, { status: 404, headers: limpiar(p.headers) });
+    }
+    return new Response(r.body, { status: r.status, headers: limpiar(r.headers) });
   }
 };
+
+function limpiar(h) {
+  const salida = new Headers(h);
+  QUITAR.forEach(k => salida.delete(k));
+  salida.set("x-content-type-options", "nosniff");
+  salida.set("referrer-policy", "strict-origin-when-cross-origin");
+  return salida;
+}
