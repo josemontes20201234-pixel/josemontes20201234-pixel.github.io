@@ -4,14 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>¿Qué corte te queda? Test de visagismo | Meraki Barbershop</title>
-<meta name="description" content="Contestá 3 preguntas frente al espejo y descubrí qué cortes y qué barba van con la forma de tu cara: ovalada, redonda, cuadrada, alargada, corazón, diamante o triangular. Meraki Barbershop, Apopa.">
+<meta name="description" content="Escaneá tu cara con la cámara o contestá 3 preguntas, y descubrí qué cortes y qué barba van con la forma de tu cara: ovalada, redonda, cuadrada, alargada, corazón, diamante o triangular. Meraki Barbershop, Apopa.">
 <link rel="canonical" href="https://merakibarbershop.com/visagismo/">
 <meta name="theme-color" content="#0d0c0a">
 <meta property="og:type" content="website">
 <meta property="og:locale" content="es_SV">
 <meta property="og:site_name" content="Meraki Barbershop">
 <meta property="og:title" content="¿Qué corte te queda? Test de visagismo de Meraki">
-<meta property="og:description" content="3 preguntas frente al espejo y te decimos qué cortes y qué barba van con tu cara.">
+<meta property="og:description" content="Escaneá tu cara con la cámara y te decimos qué cortes y qué barba van con vos.">
 <meta property="og:url" content="https://merakibarbershop.com/visagismo/">
 <meta property="og:image" content="https://merakibarbershop.com/img/og.jpg">
 <meta name="twitter:card" content="summary_large_image">
@@ -77,12 +77,49 @@
     </div>
     <div class="portada__contenido">
       <h1 class="titular" id="t-portada">¿Qué corte te queda?</h1>
-      <p class="bajada">Contestá 3 preguntas frente al espejo y te decimos qué cortes y qué barba van con la forma de tu cara.</p>
-      <div class="acciones"><a class="boton" href="#test">Hacer el test</a></div>
+      <p class="bajada">Escaneá tu cara con la cámara o contestá 3 preguntas, y te decimos qué cortes y qué barba van con vos.</p>
+      <div class="acciones"><a class="boton" href="#escaner">Escanear mi cara</a><a class="boton boton--linea" href="#test">Contestar 3 preguntas</a></div>
     </div>
   </section>
 
-  <section class="seccion seccion--angosta" id="test" aria-label="Test de visagismo">
+  <section class="seccion seccion--angosta" id="escaner" aria-labelledby="t-escaner">
+    <div class="test escaner" id="esc-caja">
+      <div id="esc-intro">
+        <p class="test__paso">Escáner facial</p>
+        <h2 class="test__pregunta" id="t-escaner">Escaneá tu cara</h2>
+        <p class="escaner__texto">La cámara mide tu frente, tus pómulos, tu quijada y el largo de tu cara, y te dice qué forma tiene. Toma unos segundos.</p>
+        <ul class="escaner__datos">
+          <li>Todo pasa en tu teléfono: tu imagen no se envía ni se guarda.</li>
+          <li>La primera vez descarga el escáner (<span id="esc-peso">unos 8 MB</span>). Después ya no.</li>
+          <li>Sale mejor con buena luz, de frente, sin gorra ni lentes y con el pelo fuera de la frente.</li>
+        </ul>
+        <div class="acciones">
+          <button class="boton" id="esc-camara" type="button">Escanear con la cámara</button>
+          <button class="boton boton--linea" id="esc-subir" type="button">Usar una foto</button>
+        </div>
+        <input class="sr" id="esc-foto" type="file" accept="image/*" tabindex="-1" aria-hidden="true">
+        <p class="escaner__estado" id="esc-estado" role="status" hidden></p>
+      </div>
+      <div class="escaner__vista" id="esc-vista" hidden>
+        <div class="escaner__marco" id="esc-marco">
+          <video id="esc-video" playsinline muted></video>
+          <canvas id="esc-lienzo" aria-hidden="true"></canvas>
+          <p class="escaner__guia" id="esc-guia" role="status">Abriendo la cámara…</p>
+        </div>
+        <div class="escaner__barra" aria-hidden="true"><span id="esc-barra"></span></div>
+        <div class="test__abajo"><button class="enlace-boton" id="esc-cancelar" type="button">Cancelar</button></div>
+      </div>
+      <div class="escaner__error" id="esc-error" hidden>
+        <p id="esc-error-texto"></p>
+        <div class="acciones">
+          <button class="boton" id="esc-reintentar" type="button">Probar otra vez</button>
+          <a class="boton boton--linea" href="#test">Contestar 3 preguntas</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="seccion seccion--angosta seccion--pegada" id="test" aria-label="Test de visagismo">
     <div class="test" id="test-caja">
       <p class="test__paso" id="test-paso" aria-live="polite">Pregunta 1 de 3</p>
       <h2 class="test__pregunta" id="test-pregunta">Frente al espejo, ¿qué parte de tu cara es la más ancha?</h2>
@@ -97,8 +134,18 @@
       <div class="resultado__cabeza">
         <svg class="forma-icono" id="r-icono" viewBox="0 0 60 72" aria-hidden="true"></svg>
         <div>
-          <p class="test__paso">Tu forma de cara</p>
+          <p class="test__paso" id="r-paso">Tu forma de cara</p>
           <h2 id="r-nombre">Ovalada</h2>
+        </div>
+      </div>
+      <p class="escaner__tambien" id="r-tambien" hidden></p>
+      <div class="escaneo" id="r-escaneo" hidden>
+        <canvas class="escaneo__foto" id="r-foto" role="img" aria-label="Tu cara con las medidas del escáner"></canvas>
+        <div class="escaneo__datos">
+          <h3>Ancho de tu cara</h3>
+          <div class="medidas" id="r-medidas"></div>
+          <p class="escaneo__nota">100 % es la parte más ancha de tu cara.</p>
+          <p class="escaneo__frases" id="r-frases"></p>
         </div>
       </div>
       <p class="resultado__meta" id="r-meta"></p>
@@ -111,11 +158,15 @@
       <h3>Pedí en Meraki</h3>
       <div class="chips" id="r-servicios"></div>
       <div class="acciones">
-        <a class="boton" href="../../citas/">Apartar mi cita</a>
+        <a class="boton" id="r-leo" href="../../citas/">Apartar con Leo</a>
         <a class="boton boton--linea" id="r-compartir" href="https://wa.me/" target="_blank" rel="noopener">Compartir mi resultado</a>
       </div>
+      <p class="aviso">Leo te recomienda el servicio y te aparta la hora en el chat. También podés apartar en la <a href="../../citas/">agenda en línea</a>.</p>
       <p class="aviso">Es una guía general. En tu cita, Jose revisa tu tipo de cabello, tus remolinos y tu estilo para darte el corte exacto.</p>
-      <div class="test__abajo"><button class="enlace-boton" id="r-otra" type="button">Hacer el test otra vez</button></div>
+      <div class="test__abajo">
+        <button class="enlace-boton" id="r-otra" type="button">Hacer el test otra vez</button>
+        <button class="enlace-boton" id="r-preguntas" type="button" hidden>Contestar 3 preguntas</button>
+      </div>
     </div>
   </section>
 
@@ -151,7 +202,7 @@
         <li><a href="https://www.instagram.com/meraki20256/">Instagram @meraki20256</a></li>
         <li><a href="https://www.tiktok.com/@merakibarbershop.sv">TikTok @merakibarbershop.sv</a></li>
         <li><a href="https://www.facebook.com/share/18z2LGQuB7/">Facebook Meraki Barbershop</a></li>
-        <li><a href="https://ig.me/m/meraki20256">Escribirle a Leo</a></li>
+        <li><a href="https://ig.me/m/meraki20256" data-leo>Escribirle a Leo</a></li>
       </ul>
     </div>
     <div>
@@ -231,7 +282,7 @@
   };
   var icono = function (f) { return '<svg class="forma-icono" viewBox="0 0 60 72" aria-hidden="true">' + ICONOS[f] + "</svg>"; };
   var $ = function (id) { return document.getElementById(id); };
-  var caja = $("test-caja"), res = $("resultado"), pila = [], eligiendo = false;
+  var caja = $("test-caja"), res = $("resultado"), pila = [], eligiendo = false, ultimo = null;
 
   function preguntar(clave) {
     var p = PREGUNTAS[clave];
@@ -253,8 +304,18 @@
     }).join("") + "</div>";
     $("test-atras").hidden = false;
   }
-  function mostrar(f) {
-    var d = FORMAS[f];
+  function mostrar(f, extra) {
+    extra = extra || {};
+    var d = FORMAS[f], escaneo = extra.fuente === "escaner" || extra.fuente === "foto";
+    ultimo = { forma: f, fuente: escaneo ? extra.fuente : "test" };
+    $("r-paso").textContent = escaneo ? "Según el escáner, tu cara es" : "Tu forma de cara";
+    $("r-escaneo").hidden = !escaneo;
+    var tam = $("r-tambien");
+    tam.hidden = !(escaneo && extra.segunda && FORMAS[extra.segunda]);
+    if (!tam.hidden) tam.innerHTML = "También tiene rasgos de cara " + FORMAS[extra.segunda].nombre.toLowerCase() +
+      '. <button class="enlace-boton" type="button" data-ver="' + extra.segunda + '" data-de="' + f + '">Ver ese resultado</button>';
+    $("r-otra").textContent = escaneo ? "Escanear otra vez" : "Hacer el test otra vez";
+    $("r-preguntas").hidden = !escaneo;
     $("r-icono").innerHTML = ICONOS[f];
     $("r-nombre").textContent = d.nombre;
     $("r-meta").textContent = d.meta;
@@ -262,7 +323,7 @@
     $("r-no").innerHTML = d.no.map(function (x) { return "<li>" + x + "</li>"; }).join("");
     $("r-barba").textContent = d.barba;
     $("r-servicios").innerHTML = d.servicios.map(function (x) { return '<span class="chip">' + x + "</span>"; }).join("");
-    $("r-compartir").href = "https://wa.me/?text=" + encodeURIComponent("Hice el test de Meraki Barbershop: mi cara es " + d.nombre.toLowerCase() + ". ¿Y la tuya? " + location.href.split("#")[0]);
+    $("r-compartir").href = "https://wa.me/?text=" + encodeURIComponent((escaneo ? "Me escaneé la cara en la página de Meraki Barbershop: es " : "Hice el test de Meraki Barbershop: mi cara es ") + d.nombre.toLowerCase() + ". ¿Y la tuya? " + location.href.split("#")[0]);
     caja.hidden = true; res.hidden = false; res.focus({ preventScroll: true });
     res.scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
   }
@@ -278,7 +339,24 @@
     preguntar(pila[pila.length - 1]);
   });
   $("test-elegir").addEventListener("click", elegirForma);
-  $("r-otra").addEventListener("click", function () { empezar(); caja.scrollIntoView({ block: "start" }); });
+  $("r-otra").addEventListener("click", function () {
+    var escaneo = ultimo && ultimo.fuente !== "test" && window.MerakiEscaner;
+    empezar();
+    if (escaneo) window.MerakiEscaner.reiniciar(); else caja.scrollIntoView({ block: "start" });
+  });
+  $("r-preguntas").addEventListener("click", function () { empezar(); caja.scrollIntoView({ block: "start" }); });
+  $("r-tambien").addEventListener("click", function (e) {
+    var b = e.target.closest("[data-ver]"); if (!b) return;
+    mostrar(b.getAttribute("data-ver"), { fuente: ultimo.fuente, segunda: b.getAttribute("data-de") });
+  });
+  // Apartar con Leo: le cuenta el resultado y pide la cita (sin Leo, el enlace lleva a la agenda en línea)
+  $("r-leo").addEventListener("click", function (e) {
+    if (!window.MerakiLeo || !ultimo) return;
+    e.preventDefault();
+    var d = FORMAS[ultimo.forma];
+    window.MerakiLeo.mandar("Según " + (ultimo.fuente === "test" ? "el test de visagismo" : "el escáner de la página") + ", mi cara es " +
+      d.nombre.toLowerCase() + " y me recomienda " + d.servicios.join(" o ") + ". Quiero apartar una cita.");
+  });
 
   $("lista-formas").innerHTML = Object.keys(FORMAS).map(function (f) {
     return '<button class="opcion" type="button" data-forma="' + f + '">' + icono(f) + "<span><b>" + FORMAS[f].nombre + '</b><br><span style="color:var(--ceniza);font-weight:500;font-size:.88rem">' + FORMAS[f].pista + "</span></span></button>";
@@ -287,7 +365,10 @@
     var b = e.target.closest("[data-forma]"); if (b) mostrar(b.getAttribute("data-forma"));
   });
   empezar();
+  window.MerakiVisagismo = { mostrar: mostrar, FORMAS: FORMAS };
 })();
 </script>
+<script src="medidas.js" defer></script>
+<script src="escaner.js" defer></script>
 </body>
 </html>

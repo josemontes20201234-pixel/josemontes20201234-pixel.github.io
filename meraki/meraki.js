@@ -1,3 +1,8 @@
+// La dirección vieja (github.io/meraki/…) lleva a la nueva, merakibarbershop.com
+if (location.hostname === "josemontes20201234-pixel.github.io" && location.pathname.indexOf("/meraki/") === 0) {
+  location.replace("https://merakibarbershop.com" + location.pathname.slice(7) + location.search + location.hash);
+}
+
 (function () {
   // El Salvador está en UTC-6 todo el año (sin horario de verano)
   var sv = new Date(Date.now() - 6 * 3600 * 1000);
@@ -138,4 +143,230 @@
       if (ver) dock.removeAttribute("inert"); else dock.setAttribute("inert", "");
     }).observe(portada);
   }
+})();
+
+/* Leo, el asistente de IA, en la página: burbuja flotante y chat.
+   Los mensajes van a /api/leo (mismo dominio); la plática se guarda en el teléfono del cliente solo por el día. */
+(function () {
+  var raiz = document.body.getAttribute("data-raiz") || "./";
+  var avatar = raiz + "img/leo-avatar.webp";
+  var WA = "https://wa.me/50360618603?text=" + encodeURIComponent("Hola Meraki, vengo de la página web");
+  var HOY = new Date(Date.now() - 6 * 3600 * 1000).toISOString().slice(0, 10);
+  var SALUDO = ["Hola, soy Leo, el asistente de IA de Meraki Barbershop 🦁💈", "Te doy precios, reviso los horarios libres y te aparto tu cita. ¿En qué te ayudo?"];
+  var RAPIDOS = ["💈 Precios", "📅 Apartar cita", "📍 Ubicación"];
+  var leerLocal = function (k) { try { return localStorage.getItem(k); } catch (e) { return null; } };
+  var ponerLocal = function (k, v) { try { localStorage.setItem(k, v); } catch (e) {} };
+  var leerSesion = function (k) { try { return sessionStorage.getItem(k); } catch (e) { return null; } };
+  var ponerSesion = function (k, v) { try { sessionStorage.setItem(k, v); } catch (e) {} };
+
+  var ID = leerLocal("leo-id");
+  if (!ID || !/^[a-f0-9]{24}$/.test(ID)) {
+    var bytes = new Uint8Array(12);
+    if (window.crypto && crypto.getRandomValues) crypto.getRandomValues(bytes);
+    else for (var i = 0; i < 12; i++) bytes[i] = Math.floor(Math.random() * 256);
+    ID = Array.prototype.map.call(bytes, function (b) { return ("0" + b.toString(16)).slice(-2); }).join("");
+    ponerLocal("leo-id", ID);
+  }
+  var estado = null;
+  try { estado = JSON.parse(leerLocal("leo-platica") || "null"); } catch (e) {}
+  if (!estado || estado.dia !== HOY || !Array.isArray(estado.msgs)) estado = { dia: HOY, msgs: [], botones: [] };
+  var guardar = function () { ponerLocal("leo-platica", JSON.stringify(estado)); };
+
+  var burbuja = document.createElement("button");
+  burbuja.type = "button";
+  burbuja.className = "leo-burbuja" + (leerLocal("leo-visto") ? "" : " leo-burbuja--nuevo");
+  burbuja.setAttribute("aria-label", "Chatear con Leo, el asistente de Meraki");
+  burbuja.setAttribute("aria-haspopup", "dialog");
+  burbuja.setAttribute("aria-expanded", "false");
+  burbuja.setAttribute("aria-controls", "leo-panel");
+  burbuja.innerHTML = '<img src="' + avatar + '" alt="" width="96" height="96" decoding="async">';
+
+  var aviso = document.createElement("p");
+  aviso.className = "leo-aviso";
+  aviso.hidden = true;
+  aviso.textContent = "¿Te ayudo? Soy Leo 🦁";
+
+  var panel = document.createElement("section");
+  panel.className = "leo-panel";
+  panel.id = "leo-panel";
+  panel.hidden = true;
+  panel.setAttribute("role", "dialog");
+  panel.setAttribute("aria-label", "Chat con Leo, el asistente de Meraki");
+  panel.innerHTML =
+    '<header class="leo-panel__cabeza">' +
+      '<img class="leo-panel__foto" src="' + avatar + '" alt="" width="44" height="44">' +
+      '<div class="leo-panel__quien"><p class="leo-panel__nombre">Leo</p><p class="leo-panel__rol">Asistente de IA de Meraki Barbershop</p></div>' +
+      '<button class="leo-panel__cerrar" type="button" aria-label="Cerrar el chat"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>' +
+    "</header>" +
+    '<div class="leo-panel__mensajes" role="log" aria-live="polite"></div>' +
+    '<div class="leo-panel__rapidos" hidden></div>' +
+    '<form class="leo-panel__form" novalidate>' +
+      '<label class="sr" for="leo-texto">Escribile a Leo</label>' +
+      '<input id="leo-texto" type="text" maxlength="600" autocomplete="off" enterkeyhint="send" placeholder="Escribile a Leo…">' +
+      '<button class="leo-panel__enviar" type="submit" aria-label="Enviar"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.4 20.4 21 12 3.4 3.6 3.4 10.2 15 12 3.4 13.8z"/></svg></button>' +
+    "</form>" +
+    '<p class="leo-panel__nota">Leo es una IA y puede equivocarse. <a href="/privacidad/">Privacidad</a></p>';
+
+  document.body.appendChild(aviso);
+  document.body.appendChild(burbuja);
+  document.body.appendChild(panel);
+
+  var lista = panel.querySelector(".leo-panel__mensajes");
+  var rapidos = panel.querySelector(".leo-panel__rapidos");
+  var form = panel.querySelector("form");
+  var campo = panel.querySelector("input");
+  var enviar = panel.querySelector(".leo-panel__enviar");
+
+  // Texto con links que se pueden tocar (se arma con nodos, nunca con HTML)
+  function conLinks(el, texto) {
+    String(texto).split(/(https?:\/\/[^\s<>"]+)/g).forEach(function (p, i) {
+      if (!p) return;
+      if (i % 2 === 0) { el.appendChild(document.createTextNode(p)); return; }
+      var limpio = p.replace(/[.,;:!?)\]»”]+$/, "");
+      var a = document.createElement("a");
+      a.href = limpio;
+      a.textContent = limpio.replace(/^https?:\/\/(www\.)?/, "").replace(/\/$/, "");
+      if (!/^https:\/\/merakibarbershop\.com(\/|$)/.test(limpio)) { a.target = "_blank"; a.rel = "noopener"; }
+      el.appendChild(a);
+      if (p.length > limpio.length) el.appendChild(document.createTextNode(p.slice(limpio.length)));
+    });
+  }
+  function pintar(m) {
+    var div = document.createElement("div");
+    div.className = "leo-msj leo-msj--" + (m.de === "yo" ? "yo" : "leo");
+    conLinks(div, m.texto);
+    if (m.wa) {
+      var a = document.createElement("a");
+      a.className = "leo-msj__wa"; a.href = WA; a.target = "_blank"; a.rel = "noopener";
+      a.textContent = "Escribir por WhatsApp";
+      div.appendChild(document.createElement("br"));
+      div.appendChild(a);
+    }
+    lista.appendChild(div);
+  }
+  function bajar() { lista.scrollTop = lista.scrollHeight; }
+  function agregar(m) {
+    estado.msgs.push(m);
+    estado.msgs = estado.msgs.slice(-40);
+    guardar();
+    pintar(m);
+    bajar();
+  }
+  function ponerRapidos(botones) {
+    estado.botones = (botones || []).slice(0, 4);
+    guardar();
+    rapidos.innerHTML = "";
+    estado.botones.forEach(function (b) {
+      var bt = document.createElement("button");
+      bt.type = "button"; bt.className = "leo-rapido"; bt.textContent = b;
+      bt.addEventListener("click", function () { mandar(b); });
+      rapidos.appendChild(bt);
+    });
+    rapidos.hidden = !estado.botones.length;
+  }
+  estado.msgs.forEach(pintar);
+  ponerRapidos(estado.botones);
+
+  var ocupado = false;
+  function mandar(texto) {
+    texto = String(texto || "").trim().slice(0, 600);
+    if (!texto || ocupado) return;
+    ocupado = true;
+    enviar.disabled = true;
+    agregar({ de: "yo", texto: texto });
+    ponerRapidos([]);
+    var puntos = document.createElement("div");
+    puntos.className = "leo-msj leo-msj--leo leo-escribiendo";
+    puntos.setAttribute("aria-label", "Leo está escribiendo");
+    puntos.innerHTML = "<span></span><span></span><span></span>";
+    lista.appendChild(puntos);
+    bajar();
+    var ctrl = window.AbortController ? new AbortController() : null;
+    var reloj = setTimeout(function () { if (ctrl) ctrl.abort(); }, 60000);
+    fetch("/api/leo", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ id: ID, texto: texto }), signal: ctrl ? ctrl.signal : undefined })
+      .then(function (r) {
+        return r.json().then(function (j) {
+          if (!j || !Array.isArray(j.burbujas) || !j.burbujas.length) throw new Error("sin respuesta " + r.status);
+          return j;
+        });
+      })
+      .then(function (j) {
+        j.burbujas.forEach(function (t, i) { agregar({ de: "leo", texto: t, wa: !!j.lleno && i === j.burbujas.length - 1 }); });
+        ponerRapidos(j.botones);
+      })
+      .catch(function () {
+        agregar({ de: "leo", texto: "No me pude conectar ahorita 😕 Probá otra vez en un momento, o escribile a Jose por WhatsApp.", wa: true });
+      })
+      .then(function () {
+        clearTimeout(reloj);
+        if (puntos.parentNode) puntos.parentNode.removeChild(puntos);
+        ocupado = false;
+        enviar.disabled = false;
+        if (!panel.hidden && window.matchMedia("(pointer: fine)").matches) campo.focus();
+      });
+  }
+
+  function abrir(enfocar) {
+    panel.hidden = false;
+    aviso.hidden = true;
+    burbuja.setAttribute("aria-expanded", "true");
+    burbuja.classList.remove("leo-burbuja--nuevo");
+    document.documentElement.classList.add("leo-abierto");
+    ponerLocal("leo-visto", "1");
+    ponerSesion("leo-abierto", "1");
+    if (!estado.msgs.length) {
+      SALUDO.forEach(function (t) { agregar({ de: "leo", texto: t }); });
+      ponerRapidos(RAPIDOS);
+    }
+    bajar();
+    if (enfocar !== false && window.matchMedia("(pointer: fine)").matches) campo.focus();
+  }
+  function cerrar() {
+    panel.hidden = true;
+    burbuja.setAttribute("aria-expanded", "false");
+    document.documentElement.classList.remove("leo-abierto");
+    ponerSesion("leo-abierto", "");
+    burbuja.focus();
+  }
+  burbuja.addEventListener("click", function () { abrir(); });
+  aviso.addEventListener("click", function () { abrir(); });
+  // Enlaces «Escribirle a Leo» de la página: abren este chat (sin JavaScript siguen a Instagram)
+  document.addEventListener("click", function (e) {
+    var a = e.target.closest && e.target.closest("[data-leo]");
+    if (!a) return;
+    e.preventDefault();
+    abrir();
+  });
+  panel.querySelector(".leo-panel__cerrar").addEventListener("click", cerrar);
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape" && !panel.hidden) cerrar(); });
+  form.addEventListener("submit", function (e) {
+    e.preventDefault();
+    var t = campo.value;
+    campo.value = "";
+    mandar(t);
+  });
+
+  // Si venía platicando en otra página, el chat sigue abierto
+  if (leerSesion("leo-abierto") === "1") abrir(false);
+  // La primera vez, un saludito al lado de la burbuja (una sola vez por visita)
+  else if (!leerLocal("leo-visto") && !leerSesion("leo-aviso")) {
+    ponerSesion("leo-aviso", "1");
+    setTimeout(function () {
+      if (!panel.hidden) return;
+      aviso.hidden = false;
+      // Se va solo, o apenas la persona se mueve por la página o toca algo
+      var quitar = function (e) {
+        if (e && e.target === aviso) return; // tocar el saludito abre el chat
+        aviso.hidden = true;
+        window.removeEventListener("scroll", quitar);
+        document.removeEventListener("pointerdown", quitar);
+      };
+      window.addEventListener("scroll", quitar, { passive: true });
+      document.addEventListener("pointerdown", quitar);
+      setTimeout(quitar, 7000);
+    }, 2500);
+  }
+
+  // Para otras partes de la página (por ejemplo, el escáner de visagismo)
+  window.MerakiLeo = { abrir: abrir, mandar: function (t) { abrir(false); mandar(t); } };
 })();

@@ -50,6 +50,10 @@ jobs:
             echo "$u -> $r ${t:+| $t}"
           done
           curl -s --max-time 20 https://merakibarbershop.com/ | grep -o '<link rel="canonical"[^>]*>' || echo "sin canonical"
+          for f in visagismo/escaner/vision_bundle.mjs visagismo/escaner/wasm/vision_wasm_internal.js visagismo/escaner/wasm/vision_wasm_internal.wasm visagismo/escaner/face_landmarker.task visagismo/escaner.js visagismo/medidas.js img/leo-avatar.webp; do
+            curl -s -o /dev/null -D /tmp/h.txt -H "accept-encoding: gzip, br" -w "%{http_code} bajó=%{size_download}" --max-time 60 "https://merakibarbershop.com/$f" > /tmp/r.txt
+            echo "$f -> $(cat /tmp/r.txt) | $(grep -i '^content-type' /tmp/h.txt | tr -d '\r') | $(grep -i '^content-encoding' /tmp/h.txt | tr -d '\r') | $(grep -i '^cache-control' /tmp/h.txt | tr -d '\r')"
+          done
           echo "Leo por internet (debe ser 404): $(curl -s -o /dev/null -w '%{http_code}' -X POST --max-time 20 https://meraki-leo.merakibarbershop.workers.dev/web/chat)"
           echo "chat de otro sitio (debe ser 403): $(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'origin: https://otro.com' -H 'content-type: application/json' -d '{}' --max-time 20 https://merakibarbershop.com/api/leo)"
           printf "chat de Leo -> "
