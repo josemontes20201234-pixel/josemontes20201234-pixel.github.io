@@ -1,6 +1,15 @@
 {
- "actualizado": "2026-11-20T23:02Z",
+ "actualizado": "2026-11-22T11:55Z",
  "fotos": [
+  {
+   "id": "17891054745687646",
+   "tipo": "video",
+   "img": "ig/17891054745687646.webp",
+   "ancho": 640,
+   "alto": 1136,
+   "enlace": "https://www.instagram.com/reel/DgBkJPQkpHe/",
+   "fecha": "2026-11-22"
+  },
   {
    "id": "18236522875316750",
    "tipo": "video",
@@ -55,5 +64,6 @@
    "enlace": "https://www.instagram.com/p/DSGWd2PDZNO/",
    "fecha": "2025-12-10"
   }
- ]
+ ],
+ "antesDespues": []
 }
