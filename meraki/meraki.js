@@ -63,14 +63,95 @@ if (location.hostname === "josemontes20201234-pixel.github.io" && location.pathn
     tic(); setInterval(tic, 1000);
   }
 
-  // ¿Abierto ahora?
+  // ¿Abierto ahora? Jose puede poner un horario especial en Meraki CRM (cerrado hoy, abre más tarde, cierra más
+  // temprano, cerrado varios días); /api/horario lo trae. Sin aviso (o si no contesta) va el horario normal.
   var estado = $("estado"), texto = $("estado-texto");
-  if (estado && texto) {
-    if (dia === 1) texto.textContent = "Hoy lunes descansamos. Mañana abrimos a las 6:00 a. m.";
-    else if (hora < 6) texto.textContent = "Hoy abrimos a las 6:00 a. m.";
-    else if (hora < 17) { texto.textContent = "Abierto ahora, hasta las 5:00 p. m."; estado.classList.add("estado--abierto"); }
-    else if (dia === 0) texto.textContent = "Ya cerramos. Mañana lunes descansamos; abrimos el martes a las 6:00 a. m.";
-    else texto.textContent = "Ya cerramos. Mañana abrimos a las 6:00 a. m.";
+  var aviso = $("horario-aviso"), avisoLista = $("horario-aviso-lista");
+  var DIAS_L = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
+  var MESES_L = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
+  var ABRE = 6 * 60, CIERRA = 17 * 60;
+  var fechaD = function (f) { return new Date(f + "T12:00:00Z"); };
+  var sumarDias = function (f, n) { var d = fechaD(f); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
+  var minutos = function (t) { var p = /^(\d{1,2}):(\d{2})$/.exec(String(t || "")); return p ? Number(p[1]) * 60 + Number(p[2]) : NaN; };
+  var horaTxt = function (m) { var h = Math.floor(m / 60), mm = m % 60; return (h % 12 || 12) + ":" + (mm < 10 ? "0" : "") + mm + (h < 12 ? " a. m." : " p. m."); };
+  var fechaTxt = function (f) { var d = fechaD(f); return DIAS_L[d.getUTCDay()] + " " + d.getUTCDate() + " de " + MESES_L[d.getUTCMonth()]; };
+  var diaDe = function (f, lista) {
+    var r = { cerrado: fechaD(f).getUTCDay() === 1, abre: ABRE, cierra: CIERRA, especial: false };
+    lista.forEach(function (e) {
+      if (f < e.desde || f > e.hasta) return;
+      r.especial = true;
+      if (e.tipo === "cerrado") r.cerrado = true;
+      else if (e.tipo === "tarde") r.abre = Math.max(r.abre, minutos(e.hora));
+      else if (e.tipo === "temprano") r.cierra = Math.min(r.cierra, minutos(e.hora));
+    });
+    if (!(r.abre < r.cierra)) r.cerrado = true;
+    return r;
+  };
+  // Cuándo volvemos a abrir después de hoy
+  var volvemos = function (lista) {
+    for (var i = 1; i <= 60; i++) {
+      var f = sumarDias(hoy, i), d = diaDe(f, lista);
+      if (d.cerrado) continue;
+      if (i === 1) return "Mañana abrimos a las " + horaTxt(d.abre);
+      if (i === 2 && !diaDe(sumarDias(hoy, 1), lista).especial) return "Mañana lunes descansamos; abrimos el martes a las " + horaTxt(d.abre);
+      return "Volvemos el " + (i <= 6 ? DIAS_L[fechaD(f).getUTCDay()] : fechaTxt(f)) + " a las " + horaTxt(d.abre);
+    }
+    return "";
+  };
+  var pintarEstado = function (lista) {
+    if (!estado || !texto) return;
+    var d = diaDe(hoy, lista), m = hora * 60, abierto = false, t;
+    if (d.cerrado) t = (dia === 1 && !d.especial ? "Hoy lunes descansamos. " : "Hoy no abrimos. ") + volvemos(lista);
+    else if (m < d.abre) t = "Hoy abrimos a las " + horaTxt(d.abre) + (d.cierra < CIERRA ? " y cerramos a las " + horaTxt(d.cierra) : "");
+    else if (m < d.cierra) { t = "Abierto ahora, hasta las " + horaTxt(d.cierra); abierto = true; }
+    else t = "Ya cerramos. " + volvemos(lista);
+    texto.textContent = t.trim();
+    estado.classList.toggle("estado--abierto", abierto);
+    estado.classList.toggle("estado--aviso", d.especial && !abierto);
+  };
+  // En «Visitanos»: los días con horario especial de las próximas dos semanas
+  var rango = function (a, b) {
+    var da = fechaD(a), db = fechaD(b);
+    if (da.getUTCMonth() === db.getUTCMonth()) return "Del " + DIAS_L[da.getUTCDay()] + " " + da.getUTCDate() + " al " + fechaTxt(b);
+    return "Del " + fechaTxt(a) + " al " + fechaTxt(b);
+  };
+  var pintarAviso = function (lista) {
+    if (!aviso || !avisoLista) return;
+    var limite = sumarDias(hoy, 14), manana = sumarDias(hoy, 1), filas = [], porDia = {};
+    lista.filter(function (e) { return e.hasta >= hoy && e.desde <= limite; })
+      .sort(function (a, b) { return a.desde < b.desde ? -1 : a.desde > b.desde ? 1 : 0; })
+      .forEach(function (e) {
+        var ini = e.desde < hoy ? hoy : e.desde;
+        var cuando = ini !== e.hasta ? (ini === hoy ? "Desde hoy hasta el " + fechaTxt(e.hasta) : rango(ini, e.hasta))
+          : ini === hoy ? "Hoy, " + fechaTxt(ini) : ini === manana ? "Mañana, " + fechaTxt(ini) : fechaTxt(ini).charAt(0).toUpperCase() + fechaTxt(ini).slice(1);
+        if (e.tipo === "cerrado") return filas.push({ cuando: cuando, que: "cerrado." });
+        var frase = (e.tipo === "tarde" ? "abrimos a las " : "cerramos a las ") + horaTxt(minutos(e.hora));
+        // Si el mismo día abre más tarde y cierra más temprano, va en una sola línea
+        var clave = ini === e.hasta ? ini : null;
+        if (clave && porDia[clave]) { porDia[clave].que = e.tipo === "tarde" ? frase + " y " + porDia[clave].que : porDia[clave].que + " y " + frase; return; }
+        var fila = { cuando: cuando, que: frase };
+        if (clave) porDia[clave] = fila;
+        filas.push(fila);
+      });
+    avisoLista.textContent = "";
+    filas.forEach(function (f) {
+      var li = document.createElement("li");
+      li.textContent = f.cuando + ": " + f.que;
+      avisoLista.appendChild(li);
+    });
+    aviso.hidden = !filas.length;
+  };
+  if (estado || aviso) {
+    // Mientras llega el aviso queda el horario general; si tarda, va el normal (así no salta de «abierto» a «cerrado»)
+    var listo = false, espera = setTimeout(function () { listo = true; pintarEstado([]); }, 1500);
+    var poner = function (lista) { clearTimeout(espera); listo = true; pintarEstado(lista); pintarAviso(lista); };
+    var valida = function (e) { return e && /^\d{4}-\d{2}-\d{2}$/.test(e.desde) && /^\d{4}-\d{2}-\d{2}$/.test(e.hasta) && ["cerrado", "tarde", "temprano"].indexOf(e.tipo) >= 0 && (e.tipo === "cerrado" || !isNaN(minutos(e.hora))); };
+    if (window.fetch && location.protocol !== "file:") {
+      fetch("/api/horario", { cache: "no-store" })
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (j) { poner(j && Array.isArray(j.dias) ? j.dias.filter(valida) : []); })
+        .catch(function () { if (!listo) poner([]); });
+    } else poner([]);
   }
 
   // Precios: desde el martes 15 de diciembre de 2026 entran los nuevos (los mismos están en Leo y en la app de la Tarjeta Meraki)

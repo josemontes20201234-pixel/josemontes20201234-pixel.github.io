@@ -37,6 +37,8 @@ const buscarServicio = (lista, nombre) => {
 };
 const listaPrecios = (lista) => lista.map((s) => "  • " + s[0] + " $" + s[1].toFixed(2) + ": " + s[2] + ".");
 const HORAS = [6, 7, 8, 9, 10, 11, 13, 14, 15, 16]; // bloques de una hora; 12 a 1 es almuerzo
+// Waze lleva directo al pin de Google Maps (Plus Code RR2C+69R, Apopa)
+const WAZE = "https://waze.com/ul?ll=13.8006125,-89.1791094&navigate=yes";
 const DIAS_ADELANTE = 14;
 const DL = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
 const SV_MS = 6 * 3600e3; // El Salvador es UTC-6 todo el año
@@ -82,13 +84,102 @@ async function huellaClave(request) { // en el código público solo está la hu
   return [...new Uint8Array(d)].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
+/* ---------- horario especial de Jose (Meraki CRM → Citas → Horario especial) ---------- */
+// Días que Jose cierra, abre más tarde o cierra más temprano. Se guardan en KV («ajustes:horario») y de aquí los leen
+// Leo, la página web y la de citas (por /api/horario de meraki-web). Las horas que quedan fuera, la app de Jose además
+// las bloquea en Firestore (ocupado): así nadie las aparta aunque tenga la página de citas abierta desde antes.
+const ABRE_MIN = 6 * 60, CIERRA_MIN = 17 * 60; // horario normal, en minutos
+const MAX_HORARIO = 10, MAX_DIAS_HORARIO = 45;
+const MESES_L = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
+const minutosDe = (hhmm) => { const m = /^(\d{2}):(\d{2})$/.exec(String(hhmm || "")); return m ? Number(m[1]) * 60 + Number(m[2]) : NaN; };
+const horaMinTxt = (min) => { const h = Math.floor(min / 60), m = min % 60; return (h % 12 || 12) + ":" + String(m).padStart(2, "0") + " " + (h < 12 ? "a. m." : "p. m."); };
+const diasEntre = (a, b) => Math.round((instante(b, 12).getTime() - instante(a, 12).getTime()) / 86400e3);
+const fechaValida = (x) => /^\d{4}-\d{2}-\d{2}$/.test(String(x || "")) && !isNaN(Date.parse(x + "T12:00:00Z")) && new Date(x + "T12:00:00Z").toISOString().slice(0, 10) === x;
+function limpiarHorario(lista, hoy) {
+  if (!Array.isArray(lista)) return null;
+  const out = [];
+  for (const e of lista) {
+    if (out.length >= MAX_HORARIO) break;
+    if (!e || typeof e !== "object") continue;
+    const tipo = ["cerrado", "tarde", "temprano"].includes(e.tipo) ? e.tipo : "";
+    const desde = fechaValida(e.desde) ? String(e.desde) : "";
+    const hasta = e.hasta === undefined || e.hasta === "" ? desde : fechaValida(e.hasta) ? String(e.hasta) : "";
+    if (!tipo || !desde || !hasta || hasta < desde || hasta < hoy || diasEntre(desde, hasta) > MAX_DIAS_HORARIO) continue; // los vencidos se borran solos
+    let hora = "";
+    if (tipo !== "cerrado") {
+      const min = minutosDe(e.hora);
+      if (!(min > ABRE_MIN && min < CIERRA_MIN) || min % 30) continue; // de 6:30 a. m. a 4:30 p. m., cada media hora
+      hora = String(e.hora);
+    }
+    const id = /^[a-z0-9]{1,24}$/i.test(String(e.id || "")) ? String(e.id) : Date.now().toString(36) + out.length;
+    out.push({ id, tipo, desde, hasta, hora });
+  }
+  return out.sort((a, b) => (a.desde < b.desde ? -1 : a.desde > b.desde ? 1 : 0));
+}
+// Cómo queda un día: cerrado, o de qué hora a qué hora (en minutos)
+function horarioDelDia(fecha, lista) {
+  const r = { cerrado: diaSemana(fecha) === 1, abre: ABRE_MIN, cierra: CIERRA_MIN, especial: false };
+  for (const e of lista || []) {
+    if (fecha < e.desde || fecha > e.hasta) continue;
+    r.especial = true;
+    if (e.tipo === "cerrado") r.cerrado = true;
+    else if (e.tipo === "tarde") r.abre = Math.max(r.abre, minutosDe(e.hora));
+    else if (e.tipo === "temprano") r.cierra = Math.min(r.cierra, minutosDe(e.hora));
+  }
+  if (r.abre >= r.cierra) r.cerrado = true;
+  return r;
+}
+function proximoAbierto(fecha, lista) {
+  for (let i = 1; i <= 60; i++) {
+    const f = sumarDias(fecha, i), h = horarioDelDia(f, lista);
+    if (!h.cerrado) return { fecha: f, ...h };
+  }
+  return null;
+}
+let cacheHorario = { t: 0, v: [] };
+async function horarioDeJose(env) {
+  if (Date.now() - cacheHorario.t > 15e3) {
+    let v = [];
+    try { v = JSON.parse((await env.LEO.get("ajustes:horario")) || "[]"); } catch {}
+    cacheHorario = { t: Date.now(), v: Array.isArray(v) ? v : [] };
+  }
+  const hoy = ymdSV(Date.now());
+  return cacheHorario.v.filter((e) => e && e.hasta >= hoy);
+}
+// «hoy jueves 26 de noviembre», «mañana viernes 27 de noviembre», «el sábado 28 de noviembre»
+const fechaLeo = (f, hoy) => {
+  const d = new Date(f + "T12:00:00Z"), base = DL[d.getUTCDay()] + " " + d.getUTCDate() + " de " + MESES_L[d.getUTCMonth()];
+  return f === hoy ? "hoy " + base : f === sumarDias(hoy, 1) ? "mañana " + base : "el " + base;
+};
+const mayuscula = (t) => t.charAt(0).toUpperCase() + t.slice(1);
+function lineasHorario(lista, hoy) {
+  return lista.map((e) => {
+    const inicio = e.desde < hoy ? hoy : e.desde;
+    const cuando = inicio === e.hasta ? mayuscula(fechaLeo(inicio, hoy))
+      : inicio === hoy ? "Desde hoy hasta " + fechaLeo(e.hasta, hoy) : "Del " + fechaLeo(inicio, hoy).replace(/^(el|mañana) /, "") + " al " + fechaLeo(e.hasta, hoy).replace(/^el /, "");
+    if (e.tipo === "cerrado") {
+      const v = proximoAbierto(e.hasta, lista);
+      return "- " + cuando + ": Meraki está cerrado." + (v ? " Vuelve a abrir " + fechaLeo(v.fecha, hoy) + " a las " + horaMinTxt(v.abre) : ""); // «a. m.» ya cierra la frase
+    }
+    if (e.tipo === "tarde") return "- " + cuando + ": abre a las " + horaMinTxt(minutosDe(e.hora)) + " (no a las 6:00 a. m.).";
+    return "- " + cuando + ": cierra a las " + horaMinTxt(minutosDe(e.hora)) + " (no a las 5:00 p. m.).";
+  });
+}
+
 /* ---------- Firestore (reglas públicas de citas y ocupado) ---------- */
-async function horasLibres(fecha) {
+async function horasLibres(fecha, env) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha)) return { error: "Fecha inválida. Usá el formato AAAA-MM-DD." };
   const hoy = ymdSV(Date.now());
   if (fecha < hoy) return { error: "Esa fecha ya pasó." };
   if (fecha > sumarDias(hoy, DIAS_ADELANTE)) return { error: "Solo se puede apartar hasta " + DIAS_ADELANTE + " días adelante." };
   if (diaSemana(fecha) === 1) return { libres: [], nota: "Los lunes Meraki está cerrado." };
+  // Horario especial que puso Jose (cerrado, abre más tarde, cierra más temprano)
+  const especial = env && env.LEO ? await horarioDeJose(env).catch(() => []) : [];
+  const dia = horarioDelDia(fecha, especial);
+  if (dia.cerrado) {
+    const v = proximoAbierto(fecha, especial);
+    return { fecha, dia: DL[diaSemana(fecha)], libres: [], nota: "Ese día Meraki está cerrado (lo avisó Jose)." + (v ? " Vuelve a abrir el " + DL[diaSemana(v.fecha)] + " " + v.fecha + " a las " + horaMinTxt(v.abre) : "") };
+  }
   const r = await fetch(FS_BASE + ":runQuery?key=" + FS_KEY, {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -108,8 +199,11 @@ async function horasLibres(fecha) {
     filas.filter((x) => x.document).map((x) => x.document.name.split("/").pop())
   );
   const minimo = Date.now() + 3600e3; // mínimo una hora de aviso
-  const libres = HORAS.filter((h) => !ocupadas.has(fecha + "_" + String(h).padStart(2, "0")) && instante(fecha, h).getTime() >= minimo);
-  return { fecha, dia: DL[diaSemana(fecha)], libres: libres.map((h) => ({ hora: h, texto: hTxt(h) })) };
+  const libres = HORAS.filter((h) => !ocupadas.has(fecha + "_" + String(h).padStart(2, "0")) && instante(fecha, h).getTime() >= minimo
+    && h * 60 >= dia.abre && h * 60 + 60 <= dia.cierra);
+  const out = { fecha, dia: DL[diaSemana(fecha)], libres: libres.map((h) => ({ hora: h, texto: hTxt(h) })) };
+  if (dia.especial) out.nota = "Ese día Jose atiende de " + horaMinTxt(dia.abre) + " a " + horaMinTxt(dia.cierra) + " (horario especial que avisó Jose).";
+  return out;
 }
 
 // Citas que ya apartó cada cliente (KV). Así Leo siempre sabe que el cliente ya tiene cita, aunque la plática sea larga,
@@ -137,7 +231,7 @@ async function apartarCita({ fecha, hora, nombre, tel, servicio, nota, otra }, e
   if (nombre.length < 2 || nombre.length > 50) return { error: "Falta el nombre del cliente." };
   if (!/^[67]\d{7}$/.test(tel)) return { error: "El WhatsApp debe tener 8 dígitos y empezar con 6 o 7." };
   if (!HORAS.includes(hora)) return { error: "Esa hora no es de atención." };
-  const dispo = await horasLibres(fecha);
+  const dispo = await horasLibres(fecha, env);
   if (dispo.error) return dispo;
   if (!dispo.libres.some((x) => x.hora === hora)) return { error: "Esa hora ya no está libre.", libres: dispo.libres };
   const id = fecha + "_" + String(hora).padStart(2, "0");
@@ -169,7 +263,7 @@ async function apartarCita({ fecha, hora, nombre, tel, servicio, nota, otra }, e
 }
 
 /* ---------- cerebro de Leo ---------- */
-function sistema(env, canal, extra = "", jose = []) {
+function sistema(env, canal, extra = "", jose = [], especial = []) {
   const hoy = ymdSV(Date.now());
   const ahora = new Date(Date.now() - SV_MS);
   const lineas = [
@@ -196,7 +290,7 @@ function sistema(env, canal, extra = "", jose = []) {
     "- Tarjeta Meraki: tarjeta de fidelización con sellos por visita. Si preguntan por premios o sellos, decí que Jose se los revisa en persona.",
     "- Tarjetas de regalo (no es lo mismo que la Tarjeta Meraki): se puede regalar cualquiera de los servicios, al precio de hoy. Se pide en https://merakibarbershop.com/regalo/ (ahí se escoge el servicio, se escribe para quién es y de parte de quién, y el pedido le llega a Jose por WhatsApp) o escribiéndole a Jose al WhatsApp 6061-8603. Se paga en la barbería (efectivo o tarjeta) o por transferencia; los datos para transferir los da Jose por WhatsApp (vos nunca des números de cuenta). Ya pagada, Jose la activa y la manda por WhatsApp como imagen con su código y su QR. Vale 3 meses desde que se paga, se le respeta el precio pagado aunque después cambien los precios, si quien la recibe prefiere otro servicio se le toma a cuenta lo pagado (si cuesta más, paga la diferencia), se usa una sola vez y no se cambia por dinero. Vos no podés crear, activar ni revisar tarjetas de regalo: si alguien la perdió, pregunta si la suya sigue vigente o tiene un problema con una, usá avisar_a_jose.",
     "- Si alguien tiene una tarjeta de regalo y quiere usarla, le apartás la cita como a cualquiera (con el servicio de su tarjeta) y en la nota de apartar_cita ponés «Trae tarjeta de regalo» y el código si te lo da. Decile que la enseñe al llegar; el servicio ya está pagado con la tarjeta (Jose la revisa en la barbería).",
-    "- Ubicación: " + (env.UBICACION || "1a Calle Poniente, Apopa, cerca del mercado. En Google Maps: https://maps.app.goo.gl/ztvWChtwbf371wTP6"),
+    "- Ubicación: " + (env.UBICACION || "1a Calle Poniente, Apopa, cerca del mercado. En Google Maps: https://maps.app.goo.gl/ztvWChtwbf371wTP6 · En Waze: " + WAZE + " (si piden la ubicación o cómo llegar, pasá los dos enlaces, uno por línea)."),
     "- Página web: https://merakibarbershop.com (fotos de cortes, servicios, precios, horario y ubicación). Ahí también están el escáner de cara «¿Qué corte te queda?», que con la cámara del teléfono (o una selfie) le dice a la persona qué forma de cara tiene y qué cortes le quedan; la imagen no sale de su teléfono (https://merakibarbershop.com/visagismo/), la Academia Meraki de clases de barbería (https://merakibarbershop.com/academia/), las tarjetas de regalo (https://merakibarbershop.com/regalo/) y la Semana Aniversario (https://merakibarbershop.com/aniversario/).",
     "- Pasá esos links solo cuando vengan al caso: si piden la página, fotos o ejemplos de cortes; si no saben qué corte les queda (pasales el escáner); si preguntan por clases de barbería (pasales la Academia, y que para más información le escriban a Jose al WhatsApp 6061-8603); si quieren regalar un corte o preguntan por tarjetas de regalo (pasales la página de regalo); o si preguntan por el aniversario. Las citas las apartás vos aquí en el chat: no mandés a la gente a la página para apartar.",
     "",
@@ -238,6 +332,11 @@ function sistema(env, canal, extra = "", jose = []) {
       ...jose.map((a) => "- " + a.texto + (a.hasta ? " (vale hasta el " + DL[diaSemana(a.hasta)] + " " + a.hasta + ")" : "")),
       "Usalos solo cuando vengan al caso (si preguntan horario, precios, promociones o citas en esas fechas), sin repetirlos en cada mensaje y sin inventar nada que el aviso no diga. Si un aviso dice que Jose no atiende cierto día u hora, no ofrezcás ni apartés citas en ese horario aunque horas_libres las muestre.");
   }
+  // Días que Jose cierra, abre más tarde o cierra más temprano (lo marca en Meraki CRM)
+  if (especial.length) {
+    avisos.push("HORARIO ESPECIAL (lo puso Jose desde su app; vale más que el horario normal de arriba):", ...lineasHorario(especial, hoy),
+      "Si preguntan si están abiertos, a qué hora abren o cierran, o quieren cita en esos días, decilo claro y amable, sin inventar motivos (el aviso no dice por qué). Esas horas ya no se pueden apartar: ofrecé solo las que dé horas_libres.");
+  }
   const hora = lineas.pop() + (avisos.length ? "\n" + avisos.join("\n") : "") + (extra ? "\n" + extra : "");
   return [
     { type: "text", text: lineas.join("\n"), cache_control: { type: "ephemeral" } }, // fijo: se reutiliza entre mensajes
@@ -277,11 +376,12 @@ const HERRAMIENTAS = [
 
 async function llamarClaude(env, mensajes, canal, extra = "") {
   const jose = await avisosDeJose(env).catch(() => []);
+  const especial = await horarioDeJose(env).catch(() => []);
   const r = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: { "content-type": "application/json", "x-api-key": env.LEO_ANTHROPIC_KEY, "anthropic-version": "2023-06-01" },
     body: JSON.stringify({
-      model: env.LEO_MODELO || MODELO, max_tokens: 700, system: sistema(env, canal, extra, jose), tools: HERRAMIENTAS, messages: mensajes,
+      model: env.LEO_MODELO || MODELO, max_tokens: 700, system: sistema(env, canal, extra, jose, especial), tools: HERRAMIENTAS, messages: mensajes,
       ...(env.LEO_PENSAR ? { thinking: { type: env.LEO_PENSAR } } : {}),
       ...(env.LEO_ESFUERZO ? { output_config: { effort: env.LEO_ESFUERZO } } : {}),
     }),
@@ -291,7 +391,7 @@ async function llamarClaude(env, mensajes, canal, extra = "") {
 }
 
 async function ejecutar(env, nombre, input, ctx) {
-  if (nombre === "horas_libres") return horasLibres(input.fecha);
+  if (nombre === "horas_libres") return horasLibres(input.fecha, env);
   if (nombre === "apartar_cita") {
     const r = await apartarCita(input, env, ctx);
     if (r.ok && !r.ya_estaba_apartada) await avisarJose(env, "📅 Nueva cita por Leo (" + ctx.canal + "): " + r.resumen + (ctx.alias ? " · " + ctx.alias : ""));
@@ -1086,6 +1186,14 @@ export default {
       }
     }
 
+    // Horario especial para la página web y la de citas (público, sin datos de clientes). Entra por el enlace interno
+    // desde meraki-web (/api/horario); por internet (workers.dev) no existe.
+    if (url.pathname === "/web/horario") {
+      if (url.hostname !== "interno.leo") return new Response("No encontrado", { status: 404 });
+      const dias = (await horarioDeJose(env).catch(() => [])).map(({ tipo, desde, hasta, hora }) => ({ tipo, desde, hasta, hora }));
+      return new Response(JSON.stringify({ hoy: ymdSV(Date.now()), dias }), { headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" } });
+    }
+
     // Avisos para la app Meraki CRM (citas nuevas, clientes que piden hablar con Jose). Tienen datos de clientes:
     // van protegidos con su propia clave, que solo tiene la app de Jose. Casi siempre cuesta una sola lectura.
     if (url.pathname === "/avisos") {
@@ -1160,6 +1268,27 @@ export default {
       let v = [];
       try { v = JSON.parse((await env.LEO.get("ajustes:avisos")) || "[]"); } catch {}
       return json({ avisos: limpiarAvisos(v, hoy) || [], hoy });
+    }
+
+    // Horario especial desde Meraki CRM (cerrado, abre más tarde, cierra más temprano), con la misma clave de /avisos.
+    // Las pruebas desde GitHub entran con x-diag.
+    if (url.pathname === "/horario") {
+      const okApp = env.AVISOS_HASH && (await huellaClave(request)) === env.AVISOS_HASH;
+      const okDiag = env.META_APP_SECRET && request.headers.get("x-diag") === env.META_APP_SECRET;
+      if (!okApp && !okDiag) return new Response("No autorizado", { status: 403 });
+      const hoy = ymdSV(Date.now());
+      if (request.method === "POST") {
+        let cuerpo = null;
+        try { cuerpo = await request.json(); } catch {}
+        const dias = limpiarHorario(cuerpo && cuerpo.dias, hoy);
+        if (!dias) return json({ error: "Formato inválido" }, 400);
+        await env.LEO.put("ajustes:horario", JSON.stringify(dias));
+        cacheHorario = { t: Date.now(), v: dias };
+        return json({ ok: true, dias, hoy });
+      }
+      let v = [];
+      try { v = JSON.parse((await env.LEO.get("ajustes:horario")) || "[]"); } catch {}
+      return json({ dias: limpiarHorario(v, hoy) || [], hoy });
     }
 
     // Aviso de prueba (sin datos de clientes) para revisar que le llegan a la app de Jose

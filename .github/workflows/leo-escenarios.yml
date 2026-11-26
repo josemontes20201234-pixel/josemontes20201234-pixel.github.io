@@ -1,6 +1,11 @@
 name: Leo — probar conversaciones (herramientas simuladas, datos inventados)
 on:
   workflow_dispatch:
+    inputs:
+      solo:
+        description: "Escenas a correr, separadas por coma (vacío = todas)"
+        required: false
+        default: ""
 jobs:
   probar:
     runs-on: ubuntu-latest
@@ -12,4 +17,5 @@ jobs:
       - name: Escenarios
         env:
           K: ${{ secrets.LEO_ANTHROPIC_KEY }}
+          SOLO: ${{ inputs.solo }}
         run: node .github/scripts/leo-escenarios.mjs

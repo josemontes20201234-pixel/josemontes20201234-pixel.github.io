@@ -315,6 +315,10 @@ public class MainActivity extends Activity {
         @JavascriptInterface
         public void leoWa(final String id, final String metodo, final String cuerpo) { leoPedir(id, metodo, cuerpo, Leo.URL_WA); }
 
+        /** Horario especial (cerrado un día, abro más tarde, cierro más temprano, varios días): GET o POST a /horario. */
+        @JavascriptInterface
+        public void leoHorario(final String id, final String metodo, final String cuerpo) { leoPedir(id, metodo, cuerpo, Leo.URL_HORARIO); }
+
         private void leoPedir(String id, String metodo, String cuerpo, String url) {
             String clave = Leo.prefs(MainActivity.this).getString("clave", "");
             if (clave.isEmpty()) {

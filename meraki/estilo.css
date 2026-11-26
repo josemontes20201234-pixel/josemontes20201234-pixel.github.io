@@ -87,6 +87,8 @@ p{margin:0}
 .estado__punto{flex:none;width:.55rem;height:.55rem;border-radius:50%;background:var(--ceniza)}
 .estado--abierto{color:var(--hueso)}
 .estado--abierto .estado__punto{background:var(--abierto);box-shadow:0 0 0 .25rem rgba(111,191,138,.16)}
+.estado--aviso{color:var(--oro-alto)}
+.estado--aviso .estado__punto{background:var(--oro-alto);box-shadow:0 0 0 .25rem rgba(230,196,109,.16)}
 
 /* Secciones */
 .seccion{max-width:var(--ancho);margin:0 auto;padding:4rem 1.25rem}
@@ -149,6 +151,11 @@ p{margin:0}
 .horario__fila{display:flex;justify-content:space-between;gap:1rem;padding-bottom:.65rem;border-bottom:1px solid var(--linea)}
 .horario dt{font-weight:600}
 .horario dd{margin:0;color:var(--ceniza);text-align:right}
+.horario-aviso{margin-top:1.1rem;padding:.85rem 1rem;border:1px solid rgba(201,162,74,.4);border-left:3px solid var(--oro-alto);border-radius:.7rem;background:rgba(201,162,74,.07)}
+.horario-aviso .horario-aviso__titulo{margin:0;font-weight:700;color:var(--oro-alto)}
+.horario-aviso ul{display:grid;gap:.35rem;margin:.45rem 0 0;padding:0;list-style:none}
+.acciones--mapa{margin-top:1rem}
+.acciones--mapa .boton{flex:1 1 11rem}
 .visita__bloque p{margin-top:.6rem}
 .visita__bloque p + p{margin-top:.35rem}
 

@@ -31,6 +31,7 @@ public class Leo {
     static final String URL_AVISOS = "https://meraki-leo.merakibarbershop.workers.dev/avisos";
     static final String URL_AJUSTES = "https://meraki-leo.merakibarbershop.workers.dev/ajustes";   // avisos de Jose para Leo
     static final String URL_WA = "https://meraki-leo.merakibarbershop.workers.dev/whatsapp-ajustes";   // Leo en WhatsApp
+    static final String URL_HORARIO = "https://meraki-leo.merakibarbershop.workers.dev/horario";   // horario especial (cerrado, abre tarde…)
     static final long CADA = 5 * 60 * 1000L;
 
     static SharedPreferences prefs(Context c) { return c.getSharedPreferences("leo", Context.MODE_PRIVATE); }

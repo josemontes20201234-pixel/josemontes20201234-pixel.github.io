@@ -1,0 +1,45 @@
+name: Horario especial — prueba de ida y vuelta (no deja nada puesto)
+# Pone un aviso de prueba lejano (cierra a las 4:30 p. m. dentro de 44 días), revisa que Leo lo guarde y que
+# merakibarbershop.com/api/horario lo muestre, y al final lo quita (deja los avisos de Jose tal como estaban).
+on:
+  workflow_dispatch:
+jobs:
+  probar:
+    runs-on: ubuntu-latest
+    env:
+      S: ${{ secrets.META_APP_SECRET }}
+      L: https://meraki-leo.merakibarbershop.workers.dev
+    steps:
+      - name: Permisos
+        run: |
+          echo "Sin clave (debe ser 403): $(curl -s -o /dev/null -w '%{http_code}' $L/horario)"
+          echo "Clave equivocada (debe ser 403): $(curl -s -o /dev/null -w '%{http_code}' -H 'x-avisos: no-es' $L/horario)"
+          echo "Interno por internet (debe ser 404): $(curl -s -o /dev/null -w '%{http_code}' $L/web/horario)"
+          echo "Formato malo (debe ser 400): $(curl -s -o /dev/null -w '%{http_code}' -X POST -H "x-diag: $S" -H 'content-type: application/json' -d '{"dias":"x"}' $L/horario)"
+          echo "CORS de la página (OPTIONS, debe ser 204): $(curl -s -o /dev/null -w '%{http_code}' -X OPTIONS -H 'origin: https://josemontes20201234-pixel.github.io' https://merakibarbershop.com/api/horario)"
+      - name: Poner un aviso de prueba
+        run: |
+          curl -s -H "x-diag: $S" $L/horario > /tmp/antes.json
+          echo "Avisos de Jose ahora: $(python3 -c "import json; print(len(json.load(open('/tmp/antes.json')).get('dias', [])))")"
+          F=$(python3 -c "import datetime; print((datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(hours=6) + datetime.timedelta(days=44)).strftime('%Y-%m-%d'))")
+          echo "F=$F" >> "$GITHUB_ENV"
+          python3 -c "import json; a=json.load(open('/tmp/antes.json')); d=a.get('dias', []); d.append({'id':'pruebagh','tipo':'temprano','desde':'$F','hasta':'$F','hora':'16:30'}); json.dump({'dias':d}, open('/tmp/con.json','w'))"
+          curl -s -X POST -H "x-diag: $S" -H 'content-type: application/json' --data @/tmp/con.json $L/horario \
+            | python3 -c "import sys,json; d=json.load(sys.stdin); print('Leo lo guardó:', d.get('ok'), [x for x in d.get('dias', []) if x.get('id') == 'pruebagh'])"
+      - name: ¿Lo muestra merakibarbershop.com?
+        run: |
+          for i in 1 2 3 4 5 6; do
+            sleep 10
+            curl -s -D /tmp/h.txt "https://merakibarbershop.com/api/horario?i=$i" > /tmp/api.json
+            if grep -q "\"$F\"" /tmp/api.json; then echo "Sí, a los $((i*10)) segundos:"; break; fi
+            echo "Todavía no ($((i*10)) s)"
+          done
+          cat /tmp/api.json; echo
+          grep -i '^access-control-allow-origin\|^cache-control\|^content-type' /tmp/h.txt | tr -d '\r'
+      - name: Quitar el aviso de prueba (deja lo de Jose como estaba)
+        if: always()
+        run: |
+          curl -s -H "x-diag: $S" $L/horario > /tmp/ahora.json
+          python3 -c "import json; a=json.load(open('/tmp/ahora.json')); json.dump({'dias':[x for x in a.get('dias', []) if x.get('id') != 'pruebagh']}, open('/tmp/sin.json','w'))"
+          curl -s -X POST -H "x-diag: $S" -H 'content-type: application/json' --data @/tmp/sin.json $L/horario \
+            | python3 -c "import sys,json; d=json.load(sys.stdin); print('Quedó:', d.get('ok'), len(d.get('dias', [])), 'avisos;', 'sin la prueba' if not any(x.get('id') == 'pruebagh' for x in d.get('dias', [])) else 'LA PRUEBA SIGUE')"

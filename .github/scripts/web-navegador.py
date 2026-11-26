@@ -15,6 +15,23 @@ async def main():
         pg.on("pageerror", lambda e: errores.append(str(e)[:200]))
         pg.on("request", lambda r: fuera.add(r.url.split("/")[2]) if not r.url.startswith((URL, "data:", "blob:")) else None)
 
+        # 0) Portada: «¿Abierto ahora?» con el horario especial (/api/horario) y los botones de Google Maps y Waze
+        horario = {}
+        async def ver_horario(r):
+            if r.url.startswith(URL + "/api/horario"):
+                try: horario.update(estado=r.status, cuerpo=await r.text(), cors=r.headers.get("access-control-allow-origin"))
+                except Exception as e: horario.update(error=str(e)[:100])
+        pg.on("response", ver_horario)
+        await pg.goto(URL + "/", wait_until="networkidle")
+        await pg.wait_for_timeout(2000)
+        portada = await pg.evaluate("""() => ({
+            estado: document.getElementById('estado-texto').textContent, clase: document.getElementById('estado').className,
+            aviso: document.getElementById('horario-aviso').hidden ? null : [...document.querySelectorAll('#horario-aviso-lista li')].map(x => x.textContent),
+            mapas: [...document.querySelectorAll('.acciones--mapa a')].map(a => a.textContent + ' -> ' + a.href) })""")
+        print("Portada:", json.dumps(portada, ensure_ascii=False))
+        print("/api/horario:", json.dumps(horario, ensure_ascii=False))
+        await pg.locator("#contacto").screenshot(path="capturas/0-visitanos.png")
+
         # 1) Escáner con una foto
         await pg.goto(URL + "/visagismo/", wait_until="networkidle")
         await pg.set_input_files("#esc-foto", ".github/scripts/leo-prueba.jpg")

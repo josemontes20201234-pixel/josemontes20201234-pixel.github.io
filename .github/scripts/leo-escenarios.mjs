@@ -1,8 +1,12 @@
 // Pruebas de conversación con el cerebro real de Leo y herramientas SIMULADAS (no aparta nada de verdad).
 // Datos inventados (Carlos, 71234567). Lo corre GitHub Actions.
 import fs from "node:fs";
-fs.writeFileSync("/tmp/leo.mjs", fs.readFileSync("leo/src/index.js", "utf8") + "\nexport { sistema, HERRAMIENTAS };\n");
-const { sistema, HERRAMIENTAS } = await import("/tmp/leo.mjs");
+fs.writeFileSync("/tmp/leo.mjs", fs.readFileSync("leo/src/index.js", "utf8") + "\nexport { sistema, HERRAMIENTAS, horarioDelDia };\n");
+const { sistema, HERRAMIENTAS, horarioDelDia } = await import("/tmp/leo.mjs");
+const hoySV = new Date(Date.now() - 6 * 3600e3).toISOString().slice(0, 10);
+let ESPECIAL = []; // horario especial de Jose (Meraki CRM) para las escenas que lo usan
+// SOLO=6,13 corre solo esas escenas (para no gastar de más)
+const SOLO = String(process.env.SOLO || "").split(",").map((x) => x.trim()).filter(Boolean);
 const manana = new Date(Date.now() - 6 * 3600e3 + 86400e3).toISOString().slice(0, 10);
 const yaApartada = "Corte clásico · jueves " + manana + " a las 10:00 a. m. · Carlos · 71234567";
 
@@ -10,12 +14,17 @@ async function claude(mensajes, extra) {
   const r = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: { "content-type": "application/json", "x-api-key": process.env.K, "anthropic-version": "2023-06-01" },
-    body: JSON.stringify({ model: "claude-sonnet-5-5", max_tokens: 700, system: sistema({}, "instagram", extra), tools: HERRAMIENTAS, messages: mensajes, thinking: { type: "between_tools" } }),
+    body: JSON.stringify({ model: "claude-sonnet-5-5", max_tokens: 700, system: sistema({}, "instagram", extra, [], ESPECIAL), tools: HERRAMIENTAS, messages: mensajes, thinking: { type: "between_tools" } }),
   });
   const j = await r.json(); if (!r.ok) throw new Error(JSON.stringify(j.error || j).slice(0, 300)); return j;
 }
 function herramienta(u, tieneCita) {
-  if (u.name === "horas_libres") return { fecha: u.input.fecha, libres: [{ hora: 9, texto: "9:00 a. m." }, { hora: 11, texto: "11:00 a. m." }, { hora: 13, texto: "1:00 p. m." }] };
+  if (u.name === "horas_libres") {
+    const d = horarioDelDia(u.input.fecha, ESPECIAL);
+    if (d.cerrado) return { fecha: u.input.fecha, libres: [], nota: "Ese día Meraki está cerrado (lo avisó Jose)." };
+    const libres = [{ hora: 9, texto: "9:00 a. m." }, { hora: 11, texto: "11:00 a. m." }, { hora: 13, texto: "1:00 p. m." }].filter((x) => x.hora * 60 >= d.abre && x.hora * 60 + 60 <= d.cierra);
+    return { fecha: u.input.fecha, libres, ...(d.especial ? { nota: "Horario especial que avisó Jose." } : {}) };
+  }
   if (u.name === "apartar_cita") {
     if (tieneCita && Number(u.input.hora) === 10 && u.input.fecha === manana) return { ok: true, ya_estaba_apartada: true, resumen: yaApartada, precio: 3.5 };
     if (tieneCita && !u.input.otra) return { error: "Este cliente ya tiene cita apartada: " + yaApartada + ". Preguntale si quiere OTRA cita además de esa (si dice que sí, usá otra=true). Si quiere cambiarla o cancelarla, usá avisar_a_jose." };
@@ -24,6 +33,7 @@ function herramienta(u, tieneCita) {
   return { ok: true };
 }
 async function escena(titulo, previo, texto, tieneCita) {
+  if (SOLO.length && !SOLO.includes(titulo.split(")")[0])) return;
   const extra = tieneCita ? "Este cliente YA tiene cita apartada (es real, está en la agenda): " + yaApartada + " · $3.50. No la volvás a apartar; si pide comprobante, repetile estos datos." : "";
   let hist = [...previo, { role: "user", content: texto }], salida = "", usadas = [];
   for (let i = 0; i < 4; i++) {
@@ -60,3 +70,9 @@ await escena("9) Quiere regalar un corte", [], "Quiero regalarle un corte a mi n
 await escena("10) Cómo se paga la tarjeta de regalo", [], "¿Cómo pago la tarjeta de regalo? ¿Me das la cuenta para transferir?", false);
 await escena("11) Trae tarjeta de regalo y quiere cita", [], "Hola, me regalaron una tarjeta de regalo de corte moderno, código 7Q4P-9XHD. Quiero ir mañana a las 9", false);
 await escena("12) Perdió su tarjeta de regalo", [], "Se me borró la foto de la tarjeta de regalo que me regalaron, ¿qué hago?", false);
+// Horario especial (26 nov 2026): Jose lo pone en Meraki CRM y Leo lo dice
+ESPECIAL = [{ id: "p1", tipo: "cerrado", desde: hoySV, hasta: hoySV, hora: "" }];
+await escena("13) Cerrado hoy: ¿están abiertos?", [], "Buenas, ¿están abiertos hoy? Quiero ir a cortarme", false);
+ESPECIAL = [{ id: "p2", tipo: "tarde", desde: hoySV, hasta: hoySV, hora: "09:00" }];
+await escena("14) Abre más tarde: ¿a qué hora abren?", [], "¿A qué hora abren hoy?", false);
+ESPECIAL = [];

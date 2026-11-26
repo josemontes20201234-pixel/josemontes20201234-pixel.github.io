@@ -158,6 +158,21 @@ const fTxt = f => { const d = new Date(f + "T12:00:00Z"); return DL[d.getUTCDay(
 
 const sel = {serv:null, dia:null, hora:null};
 let ocupado = new Set();
+// Horario especial que Jose pone en su app (cerrado, abre más tarde, cierra más temprano). Esas horas además quedan
+// bloqueadas en la agenda; esto es para que el día diga «cerrado» y no «lleno».
+let especial = [];
+const minDe = t => { const m = /^(\d{2}):(\d{2})$/.exec(String(t || "")); return m ? Number(m[1]) * 60 + Number(m[2]) : NaN; };
+function diaJose(f) {
+  const r = {cerrado:false, abre:360, cierra:1020};
+  for (const e of especial) {
+    if (f < e.desde || f > e.hasta) continue;
+    if (e.tipo === "cerrado") r.cerrado = true;
+    else if (e.tipo === "tarde") r.abre = Math.max(r.abre, minDe(e.hora));
+    else if (e.tipo === "temprano") r.cierra = Math.min(r.cierra, minDe(e.hora));
+  }
+  if (!(r.abre < r.cierra)) r.cerrado = true;
+  return r;
+}
 
 /* ---------- tu cita guardada en este teléfono ---------- */
 function miCita() {
@@ -186,10 +201,10 @@ function diasDisponibles() {
   }
   return L;
 }
-function libres(f) { return HORAS.filter(h => instante(f, h).getTime() > Date.now() + 3600e3 && !ocupado.has(idDe(f, h))); }
+function libres(f) { const j = diaJose(f); return j.cerrado ? [] : HORAS.filter(h => instante(f, h).getTime() > Date.now() + 3600e3 && !ocupado.has(idDe(f, h)) && h * 60 >= j.abre && h * 60 + 60 <= j.cierra); }
 function pintarDias() {
   $("#dias").innerHTML = diasDisponibles().map(d => {
-    const cerrado = d.dow === 1, n = cerrado ? 0 : libres(d.f).length;
+    const cerrado = d.dow === 1 || diaJose(d.f).cerrado, n = cerrado ? 0 : libres(d.f).length;
     const s = cerrado ? "cerrado" : n ? n + (n === 1 ? " libre" : " libres") : "lleno";
     return '<button class="dia' + (sel.dia === d.f ? " on" : "") + '" data-f="' + d.f + '"' + (cerrado || !n ? " disabled" : "") + '><div class="d">' + (d.i === 0 ? "Hoy" : d.i === 1 ? "Mañ." : DS[d.dow]) + '</div><div class="n">' + d.n + '</div><div class="s">' + s + '</div></button>';
   }).join("");
@@ -265,6 +280,14 @@ try { const yo = JSON.parse(localStorage.getItem("meraki_yo") || "null"); if (yo
 const q = new URLSearchParams(location.search);
 if (q.get("s")) { const i = SERVICIOS.findIndex(s => s[0].toLowerCase().startsWith(q.get("s").toLowerCase())); if (i >= 0) { sel.serv = SERVICIOS[i][0]; $("#serv").children[i].classList.add("on"); } }
 pintarMia(); pintarDias(); cargar();
+fetch("https://merakibarbershop.com/api/horario", {cache:"no-store"}).then(r => r.ok ? r.json() : null).then(j => {
+  if (!j || !Array.isArray(j.dias)) return;
+  especial = j.dias.filter(e => e && /^\d{4}-\d{2}-\d{2}$/.test(e.desde) && /^\d{4}-\d{2}-\d{2}$/.test(e.hasta) && (e.tipo === "cerrado" || !isNaN(minDe(e.hora))));
+  if (!especial.length) return;
+  if (sel.dia && diaJose(sel.dia).cerrado) { sel.dia = null; sel.hora = null; $("#horas").innerHTML = '<div class="nota">Ese día Jose no atiende. Elegí otro día.</div>'; }
+  if (sel.dia && sel.hora != null && !libres(sel.dia).includes(sel.hora)) sel.hora = null;
+  pintarDias(); pintarHoras(); revisar();
+}).catch(() => {});
 </script>
 </body>
 </html>

@@ -23,7 +23,7 @@
 <link rel="apple-touch-icon" href="../icon-192.png">
 <link rel="preload" href="fuentes/bodoni-moda.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="fuentes/manrope.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="estilo.css?v=2026112104">
+<link rel="stylesheet" href="estilo.css?v=2026112601">
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
@@ -39,6 +39,7 @@
   "currenciesAccepted": "USD",
   "paymentAccepted": "Efectivo, tarjeta de crédito, tarjeta de débito",
   "hasMap": "https://maps.app.goo.gl/ztvWChtwbf371wTP6",
+  "geo": {"@type": "GeoCoordinates", "latitude": 13.8006125, "longitude": -89.1791094},
   "address": {"@type": "PostalAddress", "streetAddress": "1a Calle Poniente", "addressLocality": "Apopa", "addressRegion": "San Salvador", "addressCountry": "SV"},
   "openingHoursSpecification": [{"@type": "OpeningHoursSpecification", "dayOfWeek": ["Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"], "opens": "06:00", "closes": "17:00"}],
   "sameAs": ["https://www.instagram.com/meraki20256/", "https://www.tiktok.com/@merakibarbershop.sv", "https://www.facebook.com/share/18z2LGQuB7/"],
@@ -273,13 +274,20 @@
           <div class="horario__fila"><dt>Almuerzo</dt><dd>Sin citas de 12:00 a 1:00 p. m.</dd></div>
           <div class="horario__fila"><dt>Lunes</dt><dd>Cerrado</dd></div>
         </dl>
+        <div class="horario-aviso" id="horario-aviso" role="note" hidden>
+          <p class="horario-aviso__titulo">Horario especial</p>
+          <ul id="horario-aviso-lista"></ul>
+        </div>
       </div>
       <div>
         <div class="visita__bloque">
           <h3>Dónde estamos</h3>
           <p>1a Calle Poniente, Apopa, San Salvador, cerca del mercado.</p>
           <div class="mapa"><iframe src="https://maps.google.com/maps?q=MERAKI%20BARBERSHOP%2C%20RR2C%2B69R%2C%20Apopa&amp;z=17&amp;output=embed" title="Mapa de Meraki Barbershop en Apopa" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe></div>
-          <p><a href="https://maps.app.goo.gl/ztvWChtwbf371wTP6">Cómo llegar en Google Maps</a></p>
+          <div class="acciones acciones--mapa">
+            <a class="boton boton--linea" href="https://maps.app.goo.gl/ztvWChtwbf371wTP6">Abrir en Google Maps</a>
+            <a class="boton boton--linea" href="https://waze.com/ul?ll=13.8006125,-89.1791094&amp;navigate=yes">Abrir en Waze</a>
+          </div>
         </div>
         <div class="visita__bloque">
           <h3>Contacto</h3>
@@ -337,6 +345,6 @@
   <a class="boton" href="../citas/">Apartar mi cita</a>
 </div>
 
-<script src="meraki.js?v=2026112104" defer></script>
+<script src="meraki.js?v=2026112601" defer></script>
 </body>
 </html>

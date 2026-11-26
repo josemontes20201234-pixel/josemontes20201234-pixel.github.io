@@ -42,6 +42,7 @@ jobs:
             https://merakibarbershop.com/citas/ \
             https://merakibarbershop.com/estilo.css \
             https://merakibarbershop.com/ig/galeria.json \
+            https://merakibarbershop.com/api/horario \
             https://merakibarbershop.com/robots.txt \
             https://merakibarbershop.com/sitemap.xml \
             https://merakibarbershop.com/no-existe \
@@ -52,10 +53,12 @@ jobs:
             echo "$u -> $r ${t:+| $t}"
           done
           curl -s --max-time 20 https://merakibarbershop.com/ | grep -o '<link rel="canonical"[^>]*>\|<meta name="google-site-verification"[^>]*>' || echo "sin canonical"
-          for f in "" "visagismo/" "regalo/" "estilo.css?v=2026112104" "meraki.js?v=2026112104" "regalo/tarjeta.js?v=2026112104" "regalo/regalo.js?v=2026112104" fuentes/bodoni-moda-italic.woff2 img/tarjeta-regalo.webp visagismo/escaner/vision_bundle.mjs visagismo/escaner/wasm/vision_wasm_internal.js visagismo/escaner/wasm/vision_wasm_internal.wasm visagismo/escaner/face_landmarker.task visagismo/escaner.js visagismo/medidas.js img/leo-avatar.webp; do
+          for f in "" "visagismo/" "regalo/" "estilo.css?v=2026112601" "meraki.js?v=2026112601" "regalo/tarjeta.js?v=2026112601" "regalo/regalo.js?v=2026112601" fuentes/bodoni-moda-italic.woff2 img/tarjeta-regalo.webp visagismo/escaner/vision_bundle.mjs visagismo/escaner/wasm/vision_wasm_internal.js visagismo/escaner/wasm/vision_wasm_internal.wasm visagismo/escaner/face_landmarker.task visagismo/escaner.js visagismo/medidas.js img/leo-avatar.webp; do
             curl -s -o /dev/null -D /tmp/h.txt -H "accept-encoding: gzip, br" -w "%{http_code} bajó=%{size_download}" --max-time 60 "https://merakibarbershop.com/$f" > /tmp/r.txt
             echo "$f -> $(cat /tmp/r.txt) | $(grep -i '^content-type' /tmp/h.txt | tr -d '\r') | $(grep -i '^content-encoding' /tmp/h.txt | tr -d '\r') | $(grep -i '^cache-control' /tmp/h.txt | tr -d '\r')"
           done
+          echo "Horario especial (/api/horario): $(curl -s --max-time 20 https://merakibarbershop.com/api/horario | head -c 400)"
+          echo "  CORS para la página de citas: $(curl -s -D - -o /dev/null --max-time 20 -H 'origin: https://josemontes20201234-pixel.github.io' https://merakibarbershop.com/api/horario | grep -i '^access-control-allow-origin' | tr -d '\r')"
           echo "Leo por internet (debe ser 404): $(curl -s -o /dev/null -w '%{http_code}' -X POST --max-time 20 https://meraki-leo.merakibarbershop.workers.dev/web/chat)"
           echo "chat de otro sitio (debe ser 403): $(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'origin: https://otro.com' -H 'content-type: application/json' -d '{}' --max-time 20 https://merakibarbershop.com/api/leo)"
           printf "chat de Leo -> "

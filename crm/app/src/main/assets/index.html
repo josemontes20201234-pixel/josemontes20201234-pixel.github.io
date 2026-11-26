@@ -137,6 +137,14 @@ code{background:var(--card2);border:1px solid var(--line);border-radius:6px;padd
 .cdia.cerr{opacity:.4}
 .slot{display:flex;gap:12px;padding:12px 0;border-bottom:1px solid var(--line);align-items:flex-start}
 .slot:last-child{border-bottom:0}
+.hgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.hgrid .btn{padding:12px 8px;font-size:14px}
+.hhoras{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.hhoras .chip{padding:9px 2px;font-size:13px;text-align:center}
+.hoy-horario{display:flex;align-items:center;gap:10px;padding-bottom:12px;margin-bottom:10px;border-bottom:1px solid var(--line)}
+.hoy-horario .t{flex:1;min-width:0;font-size:13.5px;line-height:1.4}
+.hoy-horario .t.esp{color:var(--gold2);font-weight:700}
+.chip[disabled]{opacity:.35}
 .slot .h{width:72px;flex:none;white-space:nowrap;font-weight:800;color:var(--gold2);font-variant-numeric:tabular-nums;padding-top:2px}
 .slot .t{flex:1;min-width:0}
 .slot.libre .h{color:var(--mut)}
@@ -1059,9 +1067,9 @@ function pintarAjustes() {
   let h = '<h2 style="margin-top:8px">Avisos para Leo 🦁</h2><div class="card">';
   if (!LEO_APP()) h += '<div class="small mut">Esto se usa desde la app del teléfono.</div>';
   else if (!Android.leoActivo()) h += '<div class="small mut" style="line-height:1.5">Primero activá los avisos de Leo en este teléfono con tu enlace de activación.</div>';
-  else h += '<div class="small mut" style="line-height:1.5">Lo que escribás aquí, Leo lo sabe y se lo dice a los clientes cuando venga al caso: promos, días que cerrás temprano, avisos de la semana. Si cerrás unas horas, bloquealas también en Citas.</div>' +
+  else h += '<div class="small mut" style="line-height:1.5">Lo que escribás aquí, Leo lo sabe y se lo dice a los clientes cuando venga al caso: promos y avisos de la semana. Para cerrar un día o abrir más tarde, usá <b style="color:var(--txt)">Citas → Horario especial</b>: así la página también lo muestra y las horas se bloquean solas.</div>' +
     '<div id="leoLista"></div>' +
-    '<label class="l">Nuevo aviso</label><textarea id="leoTxt" maxlength="400" style="min-height:80px" placeholder="Ej.: El sábado 28 cierro a las 2:00 p. m."></textarea>' +
+    '<label class="l">Nuevo aviso</label><textarea id="leoTxt" maxlength="400" style="min-height:80px" placeholder="Ej.: Esta semana el Combo el patrón lleva tónico de regalo."></textarea>' +
     '<label class="l">Se quita solo el… (opcional)</label><input type="date" id="leoHasta">' +
     '<button class="btn full" style="margin-top:10px" id="leoAdd">Guardar aviso</button>';
   h += '</div>';
@@ -1213,6 +1221,8 @@ async function traerCitas() {
   D.citas.lista = c.docs.map(x => ({id:x.id, nombre:x.nombre || "", tel:x.tel || "", servicio:x.servicio || "", nota:x.nota || "", cuando:x.cuando, creado:x.creado || null, jose:!!x.jose}));
   const conCita = new Set(D.citas.lista.map(x => x.id));
   D.citas.bloq = o.docs ? o.docs.filter(x => !conCita.has(x.id)).map(x => x.id) : [];
+  D.citas.etiq = {};   // bloqueos que puso un aviso de horario especial: id de la hora → id del aviso
+  (o.docs || []).forEach(x => { if (x.h && !conCita.has(x.id)) D.citas.etiq[x.id] = String(x.h); });
   if (D.citas.vistas === null) D.citas.vistas = [...conCita];      // la primera vez no avisamos de las viejas
   const nuevas = citasNuevas();
   D.citas.cuando = Date.now(); guardar();
@@ -1249,6 +1259,7 @@ function pintarHoyCitas() {
   const hoyL = D.citas.lista.filter(c => ymdSV(new Date(c.cuando).getTime()) === h && new Date(c.cuando).getTime() > Date.now() - 3600e3);
   const manL = D.citas.lista.filter(c => ymdSV(new Date(c.cuando).getTime()) === m);
   let x = "";
+  if (H_APP()) { const dh = horarioDia(h, vigentes()); x += '<div class="hoy-horario"><div class="t' + (dh.especial ? " esp" : " mut") + '">🕕 ' + esc(lineaHoy()) + '</div><button class="mini" data-horario>' + (dh.especial ? "Ver" : "Cambiar") + '</button></div>'; }
   if (hoyL.length) x += hoyL.map(c => '<div class="slot"><div class="h">' + hora(c.cuando) + '</div><div class="t"><b>' + esc(c.nombre) + '</b><div class="mut small">' + esc(c.servicio) + (c.nota ? " · " + esc(c.nota) : "") + '</div></div><button class="mini" data-wa="' + c.id + '">WhatsApp</button></div>').join("");
   else x += '<div class="mut small">No tenés citas hoy.</div>';
   const pend = manL.filter(c => !hecho("rec_" + c.id, 2));
@@ -1259,7 +1270,7 @@ function pintarHoyCitas() {
   el.onclick = e => {
     const b = e.target.closest("button"); if (!b) return;
     const c = D.citas.lista.find(z => z.id === (b.dataset.wa || b.dataset.rec));
-    if (b.dataset.ir) ir("citas");
+    if (b.dataset.ir || b.hasAttribute("data-horario")) ir("citas");
     if (b.hasAttribute("data-comp")) compartirCitas();
     if (b.dataset.wa && c) waCita(c, "¡Qué onda " + primerNombre(c.nombre) + "! Te escribimos de Meraki Barbershop 💈 ");
     if (b.dataset.rec && c) { waCita(c, recordatorio(c)); D.hechos["rec_" + c.id] = new Date().toISOString(); guardar(); pintarHoyCitas(); }
@@ -1276,20 +1287,23 @@ function pintarCitas() {
     h += '<div class="card" style="margin-top:12px"><b>Falta un paso en Firebase</b><div class="small mut" style="line-height:1.55;margin-top:6px">Para que tus clientes puedan apartar y vos veás las citas, pegá la regla de citas:<br>1. Tocá <b style="color:var(--txt)">Copiar regla</b>.<br>2. Abrí Firebase → <b style="color:var(--txt)">Firestore Database → Rules</b>.<br>3. Pegala justo debajo de la regla del CRM (<span style="color:var(--txt)">match /crm/{d} {…}</span>), sin borrar nada.<br>4. Tocá <b style="color:var(--txt)">Publish</b> y volvé aquí.</div>' +
       '<div class="acts" style="margin-top:10px"><button class="btn sm" id="cRegla">Copiar regla</button><button class="mini" data-open="https://console.firebase.google.com/project/meraki-barbershop/firestore/rules">Abrir Firebase</button><button class="mini" id="cProbar">Ya la pegué, probar</button></div></div>';
   } else if (D.citas.error) h += '<div class="card warn small" style="margin-top:12px">No se pudieron traer las citas: ' + esc(D.citas.error) + '</div>';
+  h += tarjetaHorario();
   // días
   const hoyF = ymdSV(Date.now());
   if (!diaC) diaC = hoyF;
   h += '<div class="cdias" id="cDias">';
   for (let i = 0; i <= 14; i++) {
     const f = ymdSV(Date.now() + i * DIA), d = new Date(f + "T12:00:00Z"), dow = d.getUTCDay();
-    const n = D.citas.lista.filter(c => c.id.startsWith(f)).length;
-    h += '<button class="cdia' + (f === diaC ? " on" : "") + (dow === 1 ? " cerr" : "") + '" data-f="' + f + '"><div class="d">' + (i === 0 ? "Hoy" : i === 1 ? "Mañ." : DIAS[dow]) + '</div><div class="n">' + d.getUTCDate() + '</div><div class="c">' + (dow === 1 ? "cerrado" : n ? n + (n === 1 ? " cita" : " citas") : "") + '</div></button>';
+    const n = D.citas.lista.filter(c => c.id.startsWith(f)).length, cerr = dow === 1 || horarioDia(f, vigentes()).cerrado;
+    h += '<button class="cdia' + (f === diaC ? " on" : "") + (cerr ? " cerr" : "") + '" data-f="' + f + '"><div class="d">' + (i === 0 ? "Hoy" : i === 1 ? "Mañ." : DIAS[dow]) + '</div><div class="n">' + d.getUTCDate() + '</div><div class="c">' + (n ? n + (n === 1 ? " cita" : " citas") : cerr ? "cerrado" : "") + '</div></button>';
   }
   h += '</div>';
   const dSel = new Date(diaC + "T12:00:00Z");
   h += '<div class="small mut" style="margin:10px 0 6px">' + DIAS_L[dSel.getUTCDay()].replace(/^./, x => x.toUpperCase()) + ' ' + dSel.getUTCDate() + ' de ' + MESES[dSel.getUTCMonth()] + '</div>';
+  const hDia = horarioDia(diaC, vigentes());
   if (dSel.getUTCDay() === 1) h += '<div class="card"><div class="empty">Lunes: descansás. La página no deja apartar este día.</div></div>';
   else {
+    if (hDia.especial) h += '<div class="small" style="color:var(--gold2);font-weight:700;margin:0 2px 8px">' + (hDia.cerrado ? "Este día cerrás (horario especial)." : "Horario especial: de " + hmTxt(hDia.abre) + " a " + hmTxt(hDia.cierra)) + '</div>';
     h += '<div class="card">';
     HORAS_C.forEach(hr => {
       if (hr === 13) h += '<div class="slot"><div class="h" style="color:var(--mut)">12:00 pm</div><div class="t mut small" style="padding-top:2px">Almuerzo</div></div>';
@@ -1300,7 +1314,7 @@ function pintarCitas() {
           '<div class="mut small">' + esc(c.servicio) + (c.tel ? ' · ' + esc(soloNum(c.tel).replace(/^(\d{4})(\d{4})$/, "$1 $2")) : '') + '</div>' + (c.nota ? '<div class="small" style="margin-top:3px">“' + esc(c.nota) + '”</div>' : '') +
           (tj ? '<div style="margin-top:5px"><span class="tag cliente">Tarjeta Meraki · ' + tj.sellos + '/' + D.tm.cfg.meta + ' sellos</span></div>' : '') +
           (pas ? '' : '<div class="acts"><button class="mini" data-rec="' + id + '">Recordar</button><button class="mini" data-wa="' + id + '">WhatsApp</button><button class="mini" style="color:var(--warn)" data-cancel="' + id + '">Cancelar</button></div>') + '</div></div>';
-      } else if (bl) h += '<div class="slot' + (pas ? " pasado" : "") + '"><div class="h">' + hTxtC(hr) + '</div><div class="t mut">Bloqueada</div>' + (pas ? '' : '<button class="mini" data-desb="' + id + '">Desbloquear</button>') + '</div>';
+      } else if (bl) h += '<div class="slot' + (pas ? " pasado" : "") + '"><div class="h">' + hTxtC(hr) + '</div><div class="t mut">' + ((D.citas.etiq || {})[id] ? "Cerrado (horario especial)" : "Bloqueada") + '</div>' + (pas ? '' : '<button class="mini" data-desb="' + id + '">Desbloquear</button>') + '</div>';
       else h += '<div class="slot libre' + (pas ? " pasado" : "") + '"><div class="h">' + hTxtC(hr) + '</div><div class="t mut small" style="padding-top:2px">' + (pas ? "—" : "Libre") + '</div>' + (pas ? '' : '<button class="mini" data-apartar="' + hr + '">Apartar</button><button class="mini" data-bloq="' + id + '">Bloquear</button>') + '</div>';
     });
     h += '</div><div class="acts" style="margin-top:10px"><button class="mini" id="cBloqDia">Bloquear lo libre de este día</button><button class="mini" id="cDesbDia">Desbloquear el día</button></div>';
@@ -1315,6 +1329,9 @@ function pintarCitas() {
     if (b.id === "cRegla") { APP ? Android.copiar(REGLA_CITAS) : navigator.clipboard.writeText(REGLA_CITAS); return toast("Regla copiada"); }
     if (b.id === "cProbar") { await traerCitas(); pintarCitas(); return toast(D.citas.error ? "Todavía no: revisá la regla" : "¡Listo! Las citas ya funcionan ✓"); }
     if (b.dataset.f) { diaC = b.dataset.f; return pintarCitas(); }
+    if (b.dataset.haviso) return hojaAviso(b.dataset.haviso);
+    if (b.dataset.hquitar) return quitarAviso(b.dataset.hquitar, b);
+    if (b.id === "hReint") { D.horario.error = ""; await horarioCargar(); return pintarCitas(); }
     const c = D.citas.lista.find(z => z.id === (b.dataset.rec || b.dataset.wa || b.dataset.cancel));
     if (b.dataset.rec && c) { waCita(c, recordatorio(c)); D.hechos["rec_" + c.id] = new Date().toISOString(); guardar(); return; }
     if (b.dataset.wa && c) return waCita(c, "¡Qué onda " + primerNombre(c.nombre) + "! Te escribimos de Meraki Barbershop 💈 ");
@@ -1361,11 +1378,285 @@ function apartarCita(f, hr) {
   };
 }
 
+/* ================================================================ HORARIO ESPECIAL */
+// Cerrado un día, abro más tarde, cierro más temprano o cerrado varios días. El aviso se guarda en el servidor de Leo
+// (de ahí lo leen la página web, la página de citas y Leo) y las horas libres que quedan fuera se bloquean en la agenda
+// (ocupado, marcadas con «h» = id del aviso): así nadie las aparta. Al quitar el aviso se liberan solo esas horas.
+D.horario = Object.assign({dias:[], cuando:0, error:""}, D.horario || {});
+const H_APP = () => APP && typeof Android.leoHorario === "function";
+const ABRE_C = 360, CIERRA_C = 1020;   // 6:00 a. m. y 5:00 p. m., en minutos
+const minC = t => { const m = /^(\d{2}):(\d{2})$/.exec(String(t || "")); return m ? Number(m[1]) * 60 + Number(m[2]) : NaN; };
+const hmTxt = m => { const h = Math.floor(m / 60), mm = m % 60; return (h % 12 || 12) + ":" + String(mm).padStart(2, "0") + " " + (h < 12 ? "a. m." : "p. m."); };
+const hhmm = m => String(Math.floor(m / 60)).padStart(2, "0") + ":" + String(m % 60).padStart(2, "0");
+const sumarF = (f, n) => ymdSV(instanteC(f, 12).getTime() + n * DIA);
+const dowF = f => new Date(f + "T12:00:00Z").getUTCDay();
+const fechaP = f => { const d = new Date(f + "T12:00:00Z"); return DIAS_L[d.getUTCDay()] + " " + d.getUTCDate() + " de " + MESES[d.getUTCMonth()]; };
+const fechaH = f => { const h = ymdSV(Date.now()); return f === h ? "hoy " + fechaP(f) : f === sumarF(h, 1) ? "mañana " + fechaP(f) : fechaP(f); };
+const mayus = t => t.charAt(0).toUpperCase() + t.slice(1);
+const vigentes = () => { const h = ymdSV(Date.now()); return (D.horario.dias || []).filter(e => e && e.hasta >= h); };
+function horarioDia(f, lista) {
+  const r = {cerrado:dowF(f) === 1, abre:ABRE_C, cierra:CIERRA_C, especial:false};
+  for (const e of lista || []) {
+    if (f < e.desde || f > e.hasta) continue;
+    r.especial = true;
+    if (e.tipo === "cerrado") r.cerrado = true;
+    else if (e.tipo === "tarde") r.abre = Math.max(r.abre, minC(e.hora));
+    else if (e.tipo === "temprano") r.cierra = Math.min(r.cierra, minC(e.hora));
+  }
+  if (!(r.abre < r.cierra)) r.cerrado = true;
+  return r;
+}
+function proximoAbiertoC(f, lista) { for (let i = 1; i <= 60; i++) { const g = sumarF(f, i), d = horarioDia(g, lista); if (!d.cerrado) return {f:g, d}; } return null; }
+function lineaHoy() {   // cómo queda hoy, en una línea
+  const h = ymdSV(Date.now()), L = vigentes(), d = horarioDia(h, L);
+  if (d.cerrado && !d.especial) return "Hoy lunes descansás";
+  if (d.cerrado) { const v = proximoAbiertoC(h, L); return "Hoy no abrís" + (v ? ". Volvés " + (v.f === sumarF(h, 1) ? "mañana" : "el " + fechaP(v.f)) + " a las " + hmTxt(v.d.abre) : ""); }
+  return (d.especial ? "Hoy abrís de " : "Hoy abrís normal, de ") + hmTxt(d.abre) + " a " + hmTxt(d.cierra);
+}
+function textoAviso(e) {
+  const h = ymdSV(Date.now()), ini = e.desde < h ? h : e.desde;
+  const mismoMes = ini.slice(0, 7) === e.hasta.slice(0, 7), sinMes = f => fechaP(f).replace(/ de [a-z]+$/, "");
+  const cuando = ini === e.hasta ? mayus(fechaH(ini)) : ini === h ? "Desde hoy hasta el " + fechaP(e.hasta) : "Del " + (mismoMes ? sinMes(ini) : fechaP(ini)) + " al " + fechaP(e.hasta);
+  return cuando + ": " + (e.tipo === "cerrado" ? "cerrado" : (e.tipo === "tarde" ? "abrís a las " : "cerrás a las ") + hmTxt(minC(e.hora)));
+}
+// Horas de la agenda que el aviso deja fuera (solo las que todavía no pasan)
+function horasDe(e) {
+  const out = [], ahora = Date.now();
+  for (let f = e.desde, i = 0; f <= e.hasta && i < 62; f = sumarF(f, 1), i++) {
+    if (dowF(f) === 1) continue;
+    HORAS_C.forEach(hr => {
+      const ini = hr * 60, fuera = e.tipo === "cerrado" || (e.tipo === "tarde" && ini < minC(e.hora)) || (e.tipo === "temprano" && ini + 60 > minC(e.hora));
+      if (fuera && instanteC(f, hr).getTime() > ahora) out.push(idC(f, hr));
+    });
+  }
+  return out;
+}
+
+/* ----- servidor de Leo (la clave la pone la parte nativa; nunca pasa por aquí) ----- */
+function hPedir(metodo, cuerpo) {
+  return new Promise(ok => { const id = uid(); esperando[id] = ok; Android.leoHorario(id, metodo, cuerpo ? JSON.stringify(cuerpo) : ""); })
+    .then(r => { let j = null; try { j = JSON.parse(r.texto); } catch(e) {} return {estado:r.estado, json:j, texto:r.texto}; });
+}
+const errorLeo = r => r.estado === 403 ? "La clave de Leo no coincide: abrí otra vez tu enlace de activación" : r.estado === 0 ? "Sin conexión" : errorDe(r);
+async function horarioCargar() {
+  if (!H_APP() || !Android.leoActivo()) return;
+  const r = await hPedir("GET");
+  if (r.estado === 200 && r.json && Array.isArray(r.json.dias)) D.horario = {dias:r.json.dias, cuando:Date.now(), error:""};
+  else D.horario.error = errorLeo(r);
+  guardar();
+}
+async function horarioMandar(lista) {
+  const r = await hPedir("POST", {dias:lista});
+  if (r.estado === 200 && r.json && r.json.ok && Array.isArray(r.json.dias)) { D.horario = {dias:r.json.dias, cuando:Date.now(), error:""}; guardar(); return {ok:true}; }
+  return {ok:false, msg:errorLeo(r)};
+}
+
+/* ----- agenda (Firestore) ----- */
+async function commitFS(writes) {   // como escribirFS, sin mensajes, para poder reintentar
+  const t = await token(); if (!t) return {ok:false, msg:"Conectá Tarjeta Meraki primero (Ajustes)"};
+  for (let i = 0; i < writes.length; i += 400) {
+    const r = await http("POST", FS + ":commit", {headers:{Authorization:"Bearer " + t}, body:{writes:writes.slice(i, i + 400)}});
+    if (r.estado !== 200) return {ok:false, estado:r.estado, choque:r.estado === 409 || /exist|precondition/i.test(r.texto || ""), msg:r.estado === 403 ? "Falta la regla de citas en Firebase" : r.estado === 0 ? "Sin conexión" : errorDe(r)};
+  }
+  return {ok:true};
+}
+const bloqueoW = (id, aviso) => ({update:{name:FS_DOC + "ocupado/" + id, fields:campos({cuando:instanteC(id.slice(0, 10), Number(id.slice(11))), b:true, h:aviso})}});
+// Bloquea las horas libres que cierra el aviso. Las que tienen cita o ya estaban bloqueadas se quedan como están.
+async function bloquearAviso(e) {
+  for (let intento = 0; intento < 2; intento++) {
+    await traerCitas();
+    if (D.citas.error) return {ok:false, msg:D.citas.error === "regla" ? "Falta la regla de citas en Firebase" : "No se pudo leer tu agenda: " + D.citas.error};
+    const conCita = new Set(D.citas.lista.map(c => c.id)), bloq = new Set(D.citas.bloq);
+    const W = horasDe(e).filter(id => !conCita.has(id) && !bloq.has(id)).map(id => crear("ocupado", id, {cuando:instanteC(id.slice(0, 10), Number(id.slice(11))), b:true, h:e.id}));
+    if (!W.length) return {ok:true, n:0};
+    const r = await commitFS(W);
+    if (r.ok) { await traerCitas(); return {ok:true, n:W.length}; }
+    if (!r.choque) return r;   // choque: alguien apartó una de esas horas justo ahora; se lee otra vez y se reintenta
+  }
+  return {ok:false, msg:"Alguien apartó justo ahora. Tocá Guardar otra vez."};
+}
+// Libera las horas que bloqueó un aviso. Si otro aviso vigente también cierra esa hora, se queda bloqueada a nombre de ese.
+async function liberarAviso(e, quedan) {
+  await traerCitas();
+  if (D.citas.error) return {ok:false, msg:"No se pudo leer tu agenda: " + D.citas.error};
+  const otros = new Map();
+  quedan.forEach(o => horasDe(o).forEach(id => { if (!otros.has(id)) otros.set(id, o.id); }));
+  const W = [];
+  Object.keys(D.citas.etiq || {}).forEach(id => {
+    if (D.citas.etiq[id] !== e.id || !D.citas.bloq.includes(id)) return;
+    W.push(otros.has(id) ? bloqueoW(id, otros.get(id)) : borrarW("ocupado", id));
+  });
+  if (!W.length) return {ok:true, n:0};
+  const r = await commitFS(W);
+  if (r.ok) await traerCitas();
+  return r.ok ? {ok:true, n:W.length} : r;
+}
+// Citas que ya estaban apartadas en las horas que el aviso cierra
+const afectadas = e => { const ids = new Set(horasDe(e)); return D.citas.lista.filter(c => ids.has(c.id)); };
+function msgAfectada(c, e) {
+  const f = ymdSV(new Date(c.cuando).getTime()), h = ymdSV(Date.now());
+  const cuando = f === h ? "hoy" : f === sumarF(h, 1) ? "mañana" : "el " + fechaP(f);
+  const que = e.tipo === "cerrado" ? cuando + " Meraki va a estar cerrado" : e.tipo === "tarde" ? cuando + " voy a abrir a las " + hmTxt(minC(e.hora)) : cuando + " voy a cerrar a las " + hmTxt(minC(e.hora));
+  return "¡Hola " + (primerNombre(c.nombre) || "") + "! Te escribe Jose de Meraki Barbershop 💈 Te aviso que " + que + ", así que tu cita de las " + hora(c.cuando) + " no la voy a poder atender. Disculpá 🙏 ¿Te la cambio para otra hora? Decime cuál te queda o apartala aquí: " + LINK_CITAS;
+}
+
+/* ----- tarjeta en Citas ----- */
+function tarjetaHorario() {
+  let h = '<div class="card" style="margin-top:12px"><b>Horario especial</b>';
+  if (!H_APP()) return h + '<div class="small mut" style="margin-top:6px">Se cambia desde la app del teléfono.</div></div>';
+  if (!Android.leoActivo()) return h + '<div class="small mut" style="margin-top:6px;line-height:1.5">Primero activá los avisos de Leo en este teléfono con tu enlace de activación: con eso la página y Leo se enteran de tu horario.</div></div>';
+  const L = vigentes(), d = horarioDia(ymdSV(Date.now()), L);
+  h += '<div class="small" style="margin-top:6px;line-height:1.45;' + (d.especial ? 'color:var(--gold2);font-weight:700' : 'color:var(--mut)') + '">🕕 ' + esc(lineaHoy()) + '</div>';
+  if (D.horario.error) h += '<div class="small warn" style="margin-top:8px;line-height:1.4">No pude revisar tu horario: ' + esc(D.horario.error) + ' <button class="mini" id="hReint">Intentar otra vez</button></div>';
+  h += L.map(e => '<div class="row" style="margin-top:10px;align-items:flex-start;gap:10px;flex-wrap:nowrap"><div style="flex:1;min-width:0;line-height:1.4">' + esc(textoAviso(e)) + '</div><button class="mini" data-hquitar="' + esc(e.id) + '">Quitar</button></div>').join("");
+  h += '<div class="small mut" style="margin:12px 0 10px;line-height:1.45">¿Cambió algo? La página, la agenda de citas y Leo lo muestran en menos de un minuto, y las horas que no vas a atender se bloquean solas.</div>';
+  h += '<div class="hgrid"><button class="btn dark" data-haviso="cerrado">Cerrado hoy</button><button class="btn dark" data-haviso="tarde">Abro más tarde</button><button class="btn dark" data-haviso="temprano">Cierro más temprano</button><button class="btn dark" data-haviso="dias">Cerrado varios días</button></div></div>';
+  return h;
+}
+
+/* ----- hoja para poner un aviso ----- */
+function hojaAviso(tipo) {
+  if (!H_APP() || !Android.leoActivo()) return toast("Primero activá los avisos de Leo en este teléfono");
+  if (!D.aj.rt) return toast("Conectá Tarjeta Meraki primero (Ajustes)");
+  const hoyF = ymdSV(Date.now()), manF = sumarF(hoyF, 1);
+  const ahoraMin = (() => { const d = new Date(Date.now() - SVms); return d.getUTCHours() * 60 + d.getUTCMinutes(); })();
+  const st = {tipo, dia: dowF(hoyF) === 1 ? sumarF(hoyF, 1) : hoyF, hora: null, desde: dowF(hoyF) === 1 ? manF : hoyF, hasta: null};
+  if (tipo === "tarde") st.hora = Math.min(16 * 60 + 30, Math.max(7 * 60, Math.ceil((ahoraMin + 1) / 30) * 30));
+  if (tipo === "temprano") st.hora = 15 * 60;
+  st.hasta = sumarF(st.desde, 2);
+  const titulo = {cerrado:"Cerrar un día", tarde:"Abro más tarde", temprano:"Cierro más temprano", dias:"Cerrado varios días"}[tipo];
+  const opcionesHora = [];
+  for (let m = (tipo === "tarde" ? 390 : 420); m <= 990; m += 30) opcionesHora.push(m);   // abrir: 6:30 a 4:30 · cerrar: 7:00 a 4:30
+  const C = hoja(titulo, '<div id="hForm"></div>', "", () => { C.onclick = null; C.onchange = null; avisoListo = null; });
+  const pintarF = () => {
+    let x = "";
+    if (tipo !== "dias") {
+      x += '<label class="l" style="margin-top:0">¿Qué día?</label><div class="chips" id="hDias">' +
+        [[hoyF, "Hoy"], [manF, "Mañana"]].map(([f, n]) => '<button class="chip' + (st.dia === f ? " on" : "") + '" data-hdia="' + f + '"' + (dowF(f) === 1 ? " disabled" : "") + '>' + n + (dowF(f) === 1 ? " (lunes)" : "") + '</button>').join("") +
+        '</div><label class="l">U otro día</label><input type="date" id="hOtro" min="' + hoyF + '" max="' + sumarF(hoyF, 45) + '" value="' + (st.dia !== hoyF && st.dia !== manF ? st.dia : "") + '">';
+      if (tipo !== "cerrado") {
+        x += '<label class="l">' + (tipo === "tarde" ? "Abro a las…" : "Cierro a las…") + '</label><div class="hhoras" id="hHoras">' +
+          opcionesHora.map(m => '<button class="chip' + (st.hora === m ? " on" : "") + '" data-hhora="' + m + '">' + hTxtC(Math.floor(m / 60)).replace(":00", ":" + String(m % 60).padStart(2, "0")) + '</button>').join("") + '</div>';
+      }
+    } else {
+      x += '<label class="l" style="margin-top:0">Cerrado desde</label><input type="date" id="hDesde" min="' + hoyF + '" max="' + sumarF(hoyF, 90) + '" value="' + st.desde + '">' +
+        '<label class="l">Hasta (último día cerrado)</label><input type="date" id="hHasta" min="' + hoyF + '" max="' + sumarF(hoyF, 135) + '" value="' + st.hasta + '">';
+    }
+    const e = avisoDe(st), err = errorAviso(e);
+    x += '<div class="card" style="margin-top:16px"><div class="small mut">Así va a quedar</div><div style="margin-top:4px;line-height:1.45;font-weight:700">' + esc(err || resumenAviso(e)) + '</div>';
+    if (!err) { const af = afectadas(e).length, n = horasDe(e).length; x += '<div class="small mut" style="margin-top:6px;line-height:1.45">' + (n ? "Se bloquean las horas libres de ese horario." : "No queda ninguna hora por bloquear.") + (af ? ' <b style="color:var(--warn)">Tenés ' + af + (af === 1 ? " cita" : " citas") + ' en ese horario</b>: al guardar te las enseño para que les avisés.' : "") + '</div>'; }
+    x += '</div><button class="btn full" style="margin-top:14px" id="hOk"' + (err ? " disabled" : "") + '>Guardar aviso</button>';
+    C.querySelector("#hForm").innerHTML = x;
+  };
+  C.onclick = async ev => {
+    const b = ev.target.closest("button"); if (!b || b.disabled) return;
+    if (b.dataset.hdia) { st.dia = b.dataset.hdia; return pintarF(); }
+    if (b.dataset.hhora) { st.hora = Number(b.dataset.hhora); return pintarF(); }
+    if (b.id === "hOk") return guardarAviso(avisoDe(st), b);
+    if (b.dataset.hwa || b.dataset.hcan || b.id === "hListo") return clicListo(b);
+  };
+  C.onchange = ev => {
+    const t = ev.target;
+    if (t.id === "hOtro" && t.value) st.dia = t.value;
+    if (t.id === "hDesde" && t.value) { st.desde = t.value; if (!st.hasta || st.hasta < st.desde) st.hasta = st.desde; }
+    if (t.id === "hHasta" && t.value) st.hasta = t.value;
+    pintarF();
+  };
+  pintarF();
+}
+function avisoDe(st) {
+  const id = uid().replace(/[^a-z0-9]/gi, "").slice(0, 20);
+  if (st.tipo === "dias") return {id, tipo:"cerrado", desde:st.desde, hasta:st.hasta, hora:""};
+  return {id, tipo:st.tipo, desde:st.dia, hasta:st.dia, hora:st.tipo === "cerrado" ? "" : hhmm(st.hora)};
+}
+function errorAviso(e) {
+  const h = ymdSV(Date.now());
+  if (!e.desde || !e.hasta) return "Escogé las fechas.";
+  if (e.desde < h) return "Esa fecha ya pasó.";
+  if (e.hasta < e.desde) return "La fecha de «hasta» va después de «desde».";
+  if ((instanteC(e.hasta, 12) - instanteC(e.desde, 12)) / DIA > 45) return "Máximo 45 días seguidos.";
+  if (e.tipo !== "cerrado" && isNaN(minC(e.hora))) return "Escogé la hora.";
+  if (e.desde === e.hasta && dowF(e.desde) === 1) return "Ese día es lunes: ya descansás.";
+  if (vigentes().length >= 10) return "Ya tenés 10 avisos: quitá alguno primero.";
+  return "";
+}
+function resumenAviso(e) {   // las horas ya terminan en «a. m.» o «p. m.»: ese punto cierra la frase
+  const t = textoAviso(e);
+  if (e.tipo !== "cerrado") return t;
+  const v = proximoAbiertoC(e.hasta, [...vigentes(), e]);
+  return t + "." + (v ? " Volvés " + (v.f === sumarF(ymdSV(Date.now()), 1) ? "mañana" : "el " + fechaP(v.f)) + " a las " + hmTxt(v.d.abre) : "");
+}
+let avisoListo = null;
+async function guardarAviso(e, b) {
+  const err = errorAviso(e); if (err) return toast(err);
+  b.disabled = true; b.innerHTML = '<span class="cargando"></span> Guardando…';
+  const listo = msg => { b.disabled = false; b.textContent = "Guardar aviso"; if (msg) toast(msg); };
+  // Si ya había un aviso igual ese día (por ejemplo, cambiar la hora de abrir), este lo reemplaza
+  const viejos = vigentes().filter(o => o.tipo === e.tipo && o.desde === e.desde && (e.tipo !== "cerrado" || o.hasta === e.hasta));
+  const quedan = vigentes().filter(o => !viejos.includes(o));
+  // 1) primero se bloquean las horas (así nadie aparta mientras tanto)
+  const r1 = await bloquearAviso(e);
+  if (!r1.ok) return listo(r1.msg);
+  // 2) luego se avisa a Leo, a la página y a la de citas
+  const r2 = await horarioMandar([...quedan, e]);
+  if (!r2.ok) return listo("No se guardó el aviso: " + r2.msg + ". Tocá Guardar otra vez.");
+  if (!D.horario.dias.some(o => o.id === e.id)) return listo("Leo no aceptó ese aviso. Revisá la hora o las fechas.");
+  // 3) el aviso viejo que se reemplazó suelta sus horas (las que este no cierra)
+  for (const v of viejos) await liberarAviso(v, D.horario.dias);
+  avisoListo = e;
+  avisoListo.huboCitas = afectadas(e).length > 0;
+  pintarListo(r1.n || 0);
+}
+function pintarListo(n) {
+  const e = avisoListo, af = afectadas(e);
+  let x = '<div class="card"><div style="font-size:28px">✓</div><b>Listo</b><div style="margin-top:6px;line-height:1.5">' + esc(resumenAviso(e)) + '</div>' +
+    '<div class="small mut" style="margin-top:8px;line-height:1.5">La página web, la agenda de citas y Leo lo muestran en menos de un minuto.' + (n ? " Bloqueé " + n + (n === 1 ? " hora libre" : " horas libres") + " de tu agenda." : "") + '</div></div>';
+  if (af.length) {
+    x += '<h2>Citas en ese horario</h2><div class="card">' + af.map(c => '<div class="slot"><div class="h">' + esc(hora(c.cuando)) + '</div><div class="t"><b>' + esc(c.nombre) + '</b><div class="mut small">' + esc(c.servicio) + ' · ' + esc(fechaCorta(c.cuando)) + '</div>' +
+      '<div class="acts"><button class="btn sm" data-hwa="' + c.id + '">Avisarle por WhatsApp</button><button class="mini" style="color:var(--warn)" data-hcan="' + c.id + '">Cancelar cita</button></div></div></div>').join("") + '</div>' +
+      '<div class="small mut" style="margin:8px 2px 0;line-height:1.5">Esas citas no se quitan solas: avisales y, si no pueden en otra hora, cancelalas (la hora queda cerrada).</div>';
+  } else x += '<div class="small mut" style="margin:12px 2px 0">' + (e.huboCitas ? "Ya no quedan citas en ese horario ✓" : "No tenías citas en ese horario.") + '</div>';
+  x += '<button class="btn dark full" style="margin-top:16px" id="hListo">Cerrar</button>';
+  $("#hojaT").textContent = "Aviso guardado";
+  $("#hojaC").querySelector("#hForm").innerHTML = x;
+  $("#hoja").scrollTop = 0;
+}
+async function clicListo(b) {
+  if (b.id === "hListo") return cerrarHoja();
+  const e = avisoListo, c = D.citas.lista.find(z => z.id === (b.dataset.hwa || b.dataset.hcan));
+  if (!e || !c) return;
+  if (b.dataset.hwa) return waCita(c, msgAfectada(c, e));
+  if (b.dataset.seguro !== "1") { b.dataset.seguro = "1"; b.textContent = "¿Seguro? Tocá otra vez"; setTimeout(() => { if (b.isConnected) { b.dataset.seguro = ""; b.textContent = "Cancelar cita"; } }, 3000); return; }
+  b.disabled = true;
+  // Se borra la cita y su hora queda cerrada por el aviso (no libre)
+  const r = await commitFS([borrarW("citas", c.id), bloqueoW(c.id, e.id)]);
+  if (!r.ok) { b.disabled = false; return toast("No se pudo cancelar: " + r.msg); }
+  await traerCitas(); toast("Cita cancelada"); pintarListo(0);
+}
+
+/* ----- quitar un aviso ----- */
+async function quitarAviso(id, b) {
+  const e = vigentes().find(o => o.id === id); if (!e) return;
+  if (b.dataset.seguro !== "1") { b.dataset.seguro = "1"; b.textContent = "¿Seguro?"; b.style.color = "var(--warn)"; setTimeout(() => { if (b.isConnected) { b.dataset.seguro = ""; b.textContent = "Quitar"; b.style.color = ""; } }, 3000); return; }
+  b.disabled = true; b.innerHTML = '<span class="cargando"></span>';
+  const quedan = vigentes().filter(o => o.id !== id);
+  // 1) primero la página y Leo dejan de decirlo; 2) luego se liberan las horas
+  const r1 = await horarioMandar(quedan);
+  if (!r1.ok) { toast("No se quitó: " + r1.msg); return pintarCitas(); }
+  const r2 = await liberarAviso(e, quedan);
+  toast(r2.ok ? "Aviso quitado ✓ Esas horas quedaron libres otra vez" : "Se quitó el aviso, pero no se liberaron las horas: " + r2.msg + ". Desbloquealas en la agenda.");
+  pintarCitas();
+}
+
 /* ================================================================ arranque */
 $("#btnSync").onclick = async () => { await traerTarjeta(true).catch(() => {}); await traerCitas(); bDatos = {}; pintarTodo(); toast(D.aj.rt ? "Actualizado" : "Conectá Tarjeta Meraki en Ajustes"); };
-window.alVolver = () => { traerTarjeta(false).catch(() => {}).then(traerCitas).then(pintarTodo); };
+window.alVolver = () => {
+  traerTarjeta(false).catch(() => {}).then(traerCitas).then(() => { if (!$("#hoja").classList.contains("on")) pintarTodo(); });
+  if (Date.now() - D.horario.cuando > 60e3) horarioCargar().then(() => { if (!$("#hoja").classList.contains("on")) pintar(); });
+};
 pintarTodo();
 traerTarjeta(false).catch(() => {}).then(traerCitas).then(() => { pintarTodo(); alarmas(); });
+horarioCargar().then(() => { if (!$("#hoja").classList.contains("on") && (vista === "citas" || vista === "hoy")) pintar(); });
 </script>
 </body>
 </html>

@@ -26,6 +26,9 @@ export default {
     if (url.pathname === "/api/leo") {
       return url.hostname === DOMINIO ? chatLeo(req, env) : new Response("No encontrado", { status: 404 });
     }
+    // Horario especial que Jose pone en Meraki CRM (cerrado hoy, abre más tarde, cierra más temprano, varios días).
+    // Lo usan esta página y la de citas (que vive en github.io: por eso lleva CORS). No tiene datos de clientes.
+    if (url.pathname === "/api/horario") return horarioLeo(req, env);
     if (req.method !== "GET" && req.method !== "HEAD") return new Response("Método no permitido", { status: 405 });
 
     const ruta = url.pathname;
@@ -100,6 +103,31 @@ async function chatLeo(req, env) {
   } catch { return salida({ error: "leo" }, 502); }
   const j = await r.json().catch(() => ({ error: "leo" }));
   return salida(j, r.ok ? 200 : 502);
+}
+
+async function horarioLeo(req, env) {
+  const cors = { "access-control-allow-origin": "*", "access-control-allow-methods": "GET, HEAD, OPTIONS", "access-control-max-age": "86400" };
+  if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
+  if (req.method !== "GET" && req.method !== "HEAD") return new Response("Método no permitido", { status: 405, headers: cors });
+  // 15 segundos en la caché de Cloudflare: casi al instante para Jose y pocas lecturas para Leo
+  const cache = caches.default, k = new Request("https://" + DOMINIO + "/__horario");
+  let texto = null;
+  const guardado = await cache.match(k);
+  if (guardado) texto = await guardado.text();
+  else if (env && env.LEO) {
+    try {
+      const r = await env.LEO.fetch("https://interno.leo/web/horario");
+      if (r.ok) {
+        texto = await r.text();
+        await cache.put(k, new Response(texto, { headers: { "content-type": "application/json; charset=utf-8", "cache-control": "public, max-age=15" } }));
+      }
+    } catch {}
+  }
+  // Si Leo no contesta, la página sigue con el horario normal
+  if (!texto) texto = JSON.stringify({ hoy: new Date(Date.now() - 6 * 3600e3).toISOString().slice(0, 10), dias: [], sin_leo: true });
+  return new Response(req.method === "HEAD" ? null : texto, {
+    headers: { ...cors, "content-type": "application/json; charset=utf-8", "cache-control": "no-store", "x-content-type-options": "nosniff" },
+  });
 }
 
 // Contador por día con la caché de Cloudflare (gratis y sin escrituras en KV). Cuenta por centro de datos; para estos topes basta.
