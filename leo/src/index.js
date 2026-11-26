@@ -152,6 +152,8 @@ const fechaLeo = (f, hoy) => {
   return f === hoy ? "hoy " + base : f === sumarDias(hoy, 1) ? "mañana " + base : "el " + base;
 };
 const mayuscula = (t) => t.charAt(0).toUpperCase() + t.slice(1);
+// «30 minutos», «1 hora», «2 horas y media», «3 horas»
+const difTxt = (min) => { const h = Math.floor(min / 60), m = min % 60; return h ? h + (h === 1 ? " hora" : " horas") + (m ? " y media" : "") : m + " minutos"; };
 function lineasHorario(lista, hoy) {
   return lista.map((e) => {
     const inicio = e.desde < hoy ? hoy : e.desde;
@@ -161,8 +163,9 @@ function lineasHorario(lista, hoy) {
       const v = proximoAbierto(e.hasta, lista);
       return "- " + cuando + ": Meraki está cerrado." + (v ? " Vuelve a abrir " + fechaLeo(v.fecha, hoy) + " a las " + horaMinTxt(v.abre) : ""); // «a. m.» ya cierra la frase
     }
-    if (e.tipo === "tarde") return "- " + cuando + ": abre a las " + horaMinTxt(minutosDe(e.hora)) + " (no a las 6:00 a. m.).";
-    return "- " + cuando + ": cierra a las " + horaMinTxt(minutosDe(e.hora)) + " (no a las 5:00 p. m.).";
+    // La diferencia va calculada: Leo no la saca de memoria (una vez dijo «una hora más tarde» cuando eran tres)
+    if (e.tipo === "tarde") return "- " + cuando + ": abre a las " + horaMinTxt(minutosDe(e.hora)) + ", " + difTxt(minutosDe(e.hora) - ABRE_MIN) + " más tarde de lo normal (normalmente abre a las 6:00 a. m.).";
+    return "- " + cuando + ": cierra a las " + horaMinTxt(minutosDe(e.hora)) + ", " + difTxt(CIERRA_MIN - minutosDe(e.hora)) + " más temprano de lo normal (normalmente cierra a las 5:00 p. m.).";
   });
 }
 
