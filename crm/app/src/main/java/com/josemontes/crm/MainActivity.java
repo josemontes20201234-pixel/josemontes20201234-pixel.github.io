@@ -277,6 +277,38 @@ public class MainActivity extends Activity {
             }
         }
 
+        private String fotoWaClave = null; private Uri fotoWaUri = null;
+
+        /** Abre el chat de WhatsApp de ese número con la foto y el texto ya puestos: Jose solo toca enviar.
+         *  La foto se guarda una sola vez por campaña (no llena la galería). */
+        @JavascriptInterface
+        public String whatsapp(final String tel, final String texto, final String foto) {
+            try {
+                Intent i = new Intent(Intent.ACTION_SEND);
+                if (foto != null && foto.startsWith("data:")) {
+                    String clave = foto.length() + ":" + foto.hashCode();
+                    if (!clave.equals(fotoWaClave) || fotoWaUri == null) { fotoWaUri = guardarEnGaleria(foto); fotoWaClave = clave; }
+                    i.setType("image/jpeg");
+                    i.putExtra(Intent.EXTRA_STREAM, fotoWaUri);
+                    i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                } else {
+                    i.setType("text/plain");
+                }
+                i.putExtra(Intent.EXTRA_TEXT, texto);
+                i.putExtra("jid", tel + "@s.whatsapp.net");
+                String paq = null;
+                for (String p : new String[]{"com.whatsapp.w4b", "com.whatsapp"}) {
+                    try { getPackageManager().getPackageInfo(p, 0); paq = p; break; } catch (Exception e) { }
+                }
+                if (paq == null) return "sin-whatsapp";
+                i.setPackage(paq);
+                runOnUiThread(() -> { try { startActivity(i); } catch (Exception e) { Toast.makeText(MainActivity.this, "No se pudo abrir WhatsApp", Toast.LENGTH_SHORT).show(); } });
+                return "ok";
+            } catch (Exception e) {
+                return "error: " + e.getMessage();
+            }
+        }
+
         @JavascriptInterface
         public boolean tiene(String paquete) {
             for (String p : paquete.split(",")) {
