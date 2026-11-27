@@ -189,14 +189,15 @@ code{background:var(--card2);border:1px solid var(--line);border-radius:6px;padd
 
   <!-- ============ CONTENIDO ============ -->
   <section class="view" id="v-cont">
-    <div class="row"><h2 style="margin:8px 0 0">Esta semana</h2><span class="sp"></span><button class="btn sm" id="btnPost">＋ Publicación</button></div>
+    <h2 style="margin:8px 0 0">Tu equipo de marketing</h2>
+    <div id="equipo"></div>
+    <div class="row"><h2 style="margin:18px 0 0">Esta semana</h2><span class="sp"></span><button class="btn sm" id="btnPost">＋ Publicación</button></div>
     <div class="row small mut" style="margin:6px 0 10px"><button class="mini" id="semAnt">‹</button><span id="semTxt" class="sp" style="text-align:center"></span><button class="mini" id="semSig">›</button></div>
     <div class="semana" id="semana"></div>
     <div id="posts"></div>
     <h2>Ideas para publicar</h2>
     <div class="chips" id="pilares"></div>
     <div id="ideas"></div>
-    <div style="margin-top:12px"><button class="btn ghost full" id="btnPlan">✨ Que Claude me arme la semana</button></div>
   </section>
 
   <!-- ============ CITAS ============ -->
@@ -221,6 +222,7 @@ code{background:var(--card2);border:1px solid var(--line);border-radius:6px;padd
 <div class="hoja" id="hoja"><div class="top"><button class="x" id="hojaX">←</button><b id="hojaT"></b><span id="hojaA"></span></div><div class="wrap" id="hojaC"></div></div>
 <div class="toast" id="toast"></div>
 
+<script src="refs.js"></script>
 <script>
 "use strict";
 /* ================================================================ base */
@@ -496,6 +498,38 @@ function achicar(dataUrl, lado = 1024) {
   return new Promise(ok => { const im = new Image(); im.onload = () => { const s = Math.min(1, lado / Math.max(im.width, im.height)); const c = document.createElement("canvas"); c.width = Math.round(im.width * s); c.height = Math.round(im.height * s); c.getContext("2d").drawImage(im, 0, 0, c.width, c.height); ok(c.toDataURL("image/jpeg", .85)); }; im.onerror = () => ok(null); im.src = dataUrl; });
 }
 
+/* ================================================================ Gemini (el diseñador) */
+const MODELOS_IMG = [["gemini-2.5-flash-image","Flash · rápido y barato (unos $0.04 por imagen)"],["gemini-3-pro-image-preview","Pro · mejor calidad y texto (unos $0.13 por imagen)"]];
+async function geminiImagen(instruccion, refs = [], ratio = "4:5") {
+  if (!D.aj.gemini) throw new Error("Poné tu clave de Gemini en Ajustes.");
+  const parts = [];
+  refs.forEach(k => { const r = k === "leo" ? window.REF_LEO : k === "logo" ? window.REF_LOGO : null; if (r) parts.push({inline_data:{mime_type:r.mime, data:r.data}}); });
+  parts.push({text:instruccion});
+  const modelo = D.aj.gemModelo || MODELOS_IMG[0][0];
+  const r = await http("POST", "https://generativelanguage.googleapis.com/v1beta/models/" + modelo + ":generateContent", {headers:{"x-goog-api-key":D.aj.gemini, "content-type":"application/json"},
+    body:{contents:[{role:"user", parts}], generationConfig:{responseModalities:["IMAGE"], imageConfig:{aspectRatio:ratio}}}});
+  if (r.estado !== 200) throw new Error(r.estado === 429 ? "Gemini no tiene cuota para imágenes: activá la facturación en Google AI Studio." : (r.estado === 400 || r.estado === 403) && /api.?key|permission/i.test(r.texto) ? "La clave de Gemini no sirve. Revisala en Ajustes." : r.estado === 404 ? "Ese modelo de Gemini ya no existe: escogé el otro en Ajustes." : "Gemini: " + errorDe(r));
+  const ps = ((((r.json || {}).candidates || [])[0] || {}).content || {}).parts || [];
+  const img = ps.find(x => x.inlineData || x.inline_data);
+  if (!img) { const txt = ps.find(x => x.text); throw new Error("Gemini no devolvió imagen" + (txt ? ": " + txt.text.slice(0, 140) : ". Probá con otra descripción.")); }
+  const d = img.inlineData || img.inline_data;
+  const lista = await achicar("data:" + (d.mimeType || d.mime_type || "image/png") + ";base64," + d.data, 1350);
+  if (!lista) throw new Error("No se pudo abrir la imagen de Gemini.");
+  return lista;
+}
+// El director de arte (Claude) le escribe a Gemini qué dibujar
+async function disenarImagen({tipo, idea, texto, pedido, leo, logo, ratio}) {
+  const ins = await claude("Sos el director de arte de Meraki Barbershop, una barbería premium en Apopa, El Salvador. Le escribís instrucciones a un generador de imágenes.",
+    "Escribí en inglés UNA instrucción clara (máximo 110 palabras) para crear una imagen " + (ratio === "9:16" ? "vertical para historia de Instagram" : "para un post de Instagram") + ".\n" +
+    "Tipo de publicación: " + (tipo || "libre") + "\n" + (idea ? "Idea: " + idea + "\n" : "") + (texto ? "Texto del post: " + texto.slice(0, 300) + "\n" : "") + (pedido ? "Lo que pidió Jose: " + pedido + "\n" : "") +
+    "Estilo obligatorio: negro y dorado, elegante, premium, iluminación cinematográfica, alto contraste, ambiente de barbería moderna.\n" +
+    (leo ? "Tiene que salir Leo, el león mascota de la imagen de referencia: igualito (caricatura, melena dorada, camiseta negra con la M dorada) y con una sola maquinita.\n" : "No pongas personajes de caricatura.\n") +
+    (logo ? "Poné el logo de la imagen de referencia pequeño y nítido en una esquina, sin deformarlo.\n" : "") +
+    "Si lleva texto dentro de la imagen, que sea en español, de máximo 5 palabras, grande y bien escrito. Nunca pongas precios ni fechas. Respondé solo con la instrucción, sin comillas.", 500);
+  let pre = ""; if (leo) pre += "Reference image 1 is Leo, the mascot: keep his exact look. "; if (logo) pre += "Reference image " + (leo ? 2 : 1) + " is the Meraki Barbershop logo. ";
+  return geminiImagen(pre + ins.trim(), [leo && "leo", logo && "logo"].filter(Boolean), ratio || "4:5");
+}
+
 /* ================================================================ Meta (Instagram + Facebook) */
 const G = () => "https://graph.facebook.com/" + (D.aj.graphV || "v23.0") + "/";
 async function graph(ruta, params = {}, metodo = "GET", tipo = "form") {
@@ -739,6 +773,7 @@ function pintarCont() {
   $("#posts").innerHTML = (L.length ? L.map(filaPost).join("") : '<div class="empty">Nada planeado esta semana. Tocá un día o «＋ Publicación».</div>') +
     (() => { const ideas = D.posts.filter(p => !p.borrado && !p.fecha); return ideas.length ? '<h2>Ideas guardadas</h2>' + ideas.map(filaPost).join("") : ""; })();
   pintarIdeas();
+  pintarEquipo();
   fotosLista();
 }
 function filaPost(p) {
@@ -758,11 +793,25 @@ $("#semSig").onclick = () => { semana += 7 * DIA; pintarCont(); };
 $("#semana").onclick = e => { const d = e.target.closest("[data-dia]"); if (!d) return; const t = Number(d.dataset.dia); const ps = postsEntre(t, t + DIA); if (ps.length === 1) return editarPost(ps[0]); const f = new Date(t); f.setHours(f.getDay() === 0 || f.getDay() === 6 ? 11 : 12, 0, 0, 0); editarPost(null, {fecha:f.toISOString()}); };
 $("#posts").onclick = e => { const d = e.target.closest("[data-post]"); if (d) editarPost(D.posts.find(p => p.id === d.dataset.post)); };
 $("#btnPost").onclick = () => editarPost(null);
-$("#btnPlan").onclick = planSemana;
+/* ----- EQUIPO DE MARKETING (5 puestos) ----- */
+const EQUIPO = [
+  ["estratega","🧠","Estratega","Arma tu semana completa: ideas, textos, hashtags e imágenes. Vos solo revisás y publicás.","Armar la semana"],
+  ["redactor","✍️","Redactor","Escribe el texto de cada publicación mirando tu foto, con tu estilo.","Nueva publicación"],
+  ["disenador","🎨","Diseñador","Crea imágenes en negro y dorado, con Leo y tu logo (Gemini).","Crear imagen"],
+  ["promotor","📣","Promotor","Escribe mensajes para tus clientes: los que no vienen, cumpleañeros, premios y promos.","Armar campaña"],
+  ["analista","📊","Analista","Te dice qué te funciona y qué hacer la próxima semana.","Ver informe"]
+];
+function pintarEquipo() {
+  $("#equipo").innerHTML = EQUIPO.map(([k, e, n, d, b]) => '<div class="tarea"><div class="ico">' + e + '</div><div class="t"><div class="n">' + n + '</div><div class="m">' + d + '</div><div class="acts"><button class="btn sm" data-eq="' + k + '">' + b + '</button></div></div></div>').join("");
+}
+$("#equipo").onclick = e => {
+  const b = e.target.closest("[data-eq]"); if (!b) return;
+  ({estratega:semanaCompleta, redactor:() => editarPost(null), disenador:() => editarPost(null, {}, true), promotor:campana, analista:analizarConClaude})[b.dataset.eq]();
+};
 
 const localISO = t => { const d = new Date(t); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 16); };
 let fotoActual = null;
-async function editarPost(p, base) {
+async function editarPost(p, base, disenar) {
   const nuevo = !p;
   p = p || Object.assign({id:uid(), pilar:pilarSugerido(), redes:["instagram","facebook"], texto:"", hashtags:D.aj.hashtags, estado:"programado", fecha:null, recordar:true, creado:Date.now()}, base || {});
   if (nuevo && !p.fecha) { const f = new Date(); f.setDate(f.getDate() + (f.getHours() >= 19 ? 1 : 0)); if (f.getDay() === 1) f.setDate(f.getDate() + 1); f.setHours(f.getHours() >= 12 && f.getHours() < 18 && f.toDateString() === new Date().toDateString() ? 19 : 12, 0, 0, 0); p.fecha = f.toISOString(); }
@@ -774,6 +823,7 @@ async function editarPost(p, base) {
   h += '<label class="l">Cuándo</label><input type="datetime-local" id="xFecha" value="' + (p.fecha ? localISO(p.fecha) : "") + '">';
   h += '<label class="row l" style="margin-top:10px"><input type="checkbox" id="xRec"' + (p.recordar !== false ? " checked" : "") + ' style="width:20px;height:20px;accent-color:#d9b55c"> Avisarme a esa hora</label>';
   h += '<div class="ia" style="margin-top:12px"><div class="row"><b>✨ Escribir con Claude</b><span class="sp"></span></div><div class="small mut" style="margin:4px 0 8px">Mira la foto y escribe el texto con tu estilo. Contale algo si querés (ej.: «fade con diseño, cliente de 10 años»).</div><input type="text" id="xNota" placeholder="Detalle opcional"><div class="acts"><button class="btn sm" id="xIA">Escribir texto</button></div><div id="xIAres"></div></div>';
+  h += '<div class="ia" style="margin-top:12px" id="xDisBox"><b>🎨 Diseñar la imagen con IA</b><div class="small mut" style="margin:4px 0 8px">El diseñador (Gemini) crea la imagen en negro y dorado. Cada imagen cuesta unos centavos.</div><input type="text" id="xDis" placeholder="Qué querés en la imagen (opcional)"><div class="chips" id="xDisOp" style="margin-top:8px"><button class="chip on" data-o="leo">🦁 Con Leo</button><button class="chip on" data-o="logo">Ⓜ️ Con logo</button><button class="chip" data-o="hist">📱 Historia 9:16</button></div><div class="acts"><button class="btn sm" id="xDisOk">Crear imagen</button></div><div id="xDisRes"></div></div>';
   h += '<label class="l">Texto</label><textarea id="xTxt" placeholder="Lo que va en la descripción">' + esc(p.texto || "") + '</textarea>';
   h += '<label class="l">Hashtags</label><textarea id="xHash" style="min-height:60px">' + esc(p.hashtags || "") + '</textarea>';
   h += '<h2>Publicar</h2>';
@@ -784,6 +834,7 @@ async function editarPost(p, base) {
   h += '<div class="row" style="margin-top:20px"><button class="btn dark sp" id="xIdea">Guardar como idea</button><button class="btn sp" id="xOk">Guardar</button></div>';
   if (!nuevo) h += '<button class="btn dark full" style="margin-top:10px;color:var(--warn)" id="xBorrar">Borrar</button>';
   const C = hoja(nuevo ? "Nueva publicación" : (PILARES[p.pilar] ? PILARES[p.pilar].n : "Publicación"), h);
+  if (disenar) setTimeout(() => { const x = $("#xDisBox"); if (x) x.scrollIntoView({behavior:"smooth"}); }, 150);
   const leer = () => {
     p.pilar = (C.querySelector("#xPil .on") || {}).dataset ? C.querySelector("#xPil .on").dataset.k : p.pilar;
     p.redes = [...C.querySelectorAll("#xRed .on")].map(b => b.dataset.k);
@@ -810,6 +861,18 @@ async function editarPost(p, base) {
         if (j.hashtags) $("#xHash").value = j.hashtags;
       } catch(err) { $("#xIAres").innerHTML = '<div class="small warn" style="margin-top:8px">' + esc(err.message) + '</div>'; }
       b.disabled = false; b.textContent = "Escribir otra vez";
+    }
+    if (b.closest("#xDisOp") && b.dataset.o) b.classList.toggle("on");
+    if (b.id === "xDisOk") {
+      const op = k => !!C.querySelector('#xDisOp [data-o="' + k + '"].on');
+      b.disabled = true; b.innerHTML = '<span class="cargando"></span> Diseñando… (unos 20 segundos)'; $("#xDisRes").innerHTML = "";
+      try {
+        leer();
+        const img = await disenarImagen({tipo:PILARES[p.pilar] ? PILARES[p.pilar].n : "", idea:p.idea, texto:$("#xTxt").value, pedido:$("#xDis").value.trim(), leo:op("leo"), logo:op("logo"), ratio:op("hist") ? "9:16" : "4:5"});
+        fotoActual = img; $("#xFoto").innerHTML = '<img src="' + img + '" alt="">'; $("#xFoto").scrollIntoView({behavior:"smooth"});
+        $("#xDisRes").innerHTML = '<div class="small ok" style="margin-top:8px">✓ Lista, ya quedó como la foto del post. Si no te gusta, tocá «Crear otra».</div>';
+      } catch(err) { $("#xDisRes").innerHTML = '<div class="small warn" style="margin-top:8px">' + esc(err.message) + '</div>'; }
+      b.disabled = false; b.textContent = "Crear otra";
     }
     if (b.dataset.usartxt) { $("#xTxt").value = b.closest(".opc").dataset.txt; toast("Listo, ya está en el texto"); }
     if (b.closest("#xComp") && b.dataset.k) {
@@ -853,6 +916,86 @@ async function planSemana() {
     };
   });
 }
+/* El estratega arma la semana completa (y el diseñador hace las imágenes) */
+const sinTilde = s => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
+function semanaCompleta() {
+  const base = inicioSemana(Date.now() + 7 * DIA), bb = new Date(base);
+  const chk = 'style="width:20px;height:20px;accent-color:#d9b55c"';
+  let h = '<div class="small mut" style="line-height:1.5">Armo ' + D.aj.meta + ' publicaciones para la semana del ' + bb.getDate() + ' de ' + MESES[bb.getMonth()] + ' (martes a domingo): idea, texto, hashtags y la imagen. Quedan en tu calendario y vos revisás y publicás cada una.</div>';
+  h += '<label class="l">¿Algo especial esa semana? (opcional)</label><textarea id="sqNota" placeholder="Ej.: Semana Aniversario del 8 al 13, rifa de un Servicio full detalle" style="min-height:70px"></textarea>';
+  h += '<label class="row l" style="margin-top:10px"><input type="checkbox" id="sqImg" checked ' + chk + '> Que el diseñador haga las imágenes</label>';
+  h += '<label class="row l"><input type="checkbox" id="sqLeo" checked ' + chk + '> Que salga Leo en algunas</label>';
+  h += '<div class="small mut" style="margin-top:6px;line-height:1.45">Los «Antes y después» y «Cliente feliz» no llevan imagen inventada: esos van con tu foto real.</div>';
+  h += '<button class="btn full" style="margin-top:14px" id="sqOk">Armar la semana</button><div id="sqRes"></div>';
+  const C = hoja("Estratega · tu semana", h);
+  C.querySelector("#sqOk").onclick = async ev => {
+    const b = ev.target, R = C.querySelector("#sqRes"); if (b.disabled) return; b.disabled = true; R.innerHTML = "";
+    const paso = t => { R.innerHTML += '<div class="small" style="margin-top:8px;line-height:1.4">' + t + '</div>'; };
+    let conImg = C.querySelector("#sqImg").checked; const conLeo = C.querySelector("#sqLeo").checked, nota = C.querySelector("#sqNota").value.trim();
+    try {
+      b.innerHTML = '<span class="cargando"></span> Pensando la semana…';
+      const a = analisis(), ult = D.posts.filter(p => !p.borrado && p.estado === "publicado").slice(-10).map(p => (PILARES[p.pilar] ? PILARES[p.pilar].n : "otro") + ": " + (p.texto || "").slice(0, 80));
+      const t = await claude(SIS(), "Armame un plan de " + D.aj.meta + " publicaciones para la semana que viene (martes a domingo; el lunes descanso). Tipos posibles: " + Object.entries(PILARES).map(([k, v]) => k + " = " + v.n).join(", ") + ".\n" +
+        (nota ? "Esa semana hay algo especial: " + nota + "\n" : "") + (a ? "Lo que mejor me funciona: " + (a.pilar && PILARES[a.pilar.k] ? PILARES[a.pilar.k].n : "") + ", día " + (a.dia ? DIAS_L[a.dia.k] : "") + ", " + (a.franja ? a.franja.k : "") + ".\n" : "") + (ult.length ? "Mis últimas publicaciones:\n" + ult.join("\n") + "\n" : "") +
+        "Variá los tipos y poné la mejor hora para El Salvador. Para cada una: la idea, el texto final listo para publicar (corto, que enganche en la primera línea y cierre invitando a escribir o apartar cita), 8 a 12 hashtags, y en «imagen» una descripción corta de una imagen de diseño para acompañarla. En los tipos «antes» y «cliente» dejá «imagen» vacía (esos llevan foto real). En «leo» poné true si a esa imagen le queda bien Leo, el león mascota.\n" +
+        "Respondé SOLO con JSON: {\"plan\":[{\"dia\":\"martes\",\"hora\":\"12:00\",\"tipo\":\"promo\",\"idea\":\"...\",\"texto\":\"...\",\"hashtags\":\"#... #...\",\"imagen\":\"...\",\"leo\":true}]}", 3500);
+      const plan = (sacarJSON(t).plan || []).slice(0, 7);
+      if (!plan.length) throw new Error("No salió el plan. Probá otra vez.");
+      paso("✓ Plan listo: " + plan.length + " publicaciones");
+      let n = 0;
+      for (const x of plan) {
+        const i = DIAS_L.map(sinTilde).indexOf(sinTilde(x.dia)); if (i < 0 || i === 1) continue;
+        const f = new Date(base + ((i + 6) % 7) * DIA); const [hh, mm] = String(x.hora || "12:00").split(":").map(Number); f.setHours(hh || 12, mm || 0, 0, 0);
+        const post = {id:uid(), pilar:PILARES[x.tipo] ? x.tipo : "promo", idea:x.idea || "", texto:x.texto || "", hashtags:x.hashtags || D.aj.hashtags, redes:["instagram","facebook"], estado:"programado", fecha:f.toISOString(), recordar:true, creado:Date.now()};
+        if (conImg && x.imagen && post.pilar !== "antes" && post.pilar !== "cliente") {
+          b.innerHTML = '<span class="cargando"></span> Diseñando imagen para el ' + DIAS_L[i] + '…';
+          try { const img = await disenarImagen({tipo:PILARES[post.pilar].n, idea:x.imagen, texto:post.texto, leo:conLeo && !!x.leo, logo:true, ratio:"4:5"}); await fotos.poner(post.id, img); paso("🎨 " + DIAS_L[i] + ": imagen lista"); }
+          catch(err) { paso('<span class="warn">' + DIAS_L[i] + ': quedó sin imagen. ' + esc(err.message) + '</span>'); if (/clave|cuota|facturaci|modelo/i.test(err.message)) conImg = false; }
+        }
+        guardarPost(post); n++;
+      }
+      paso("✓ " + n + " publicaciones en tu calendario");
+      b.disabled = false; b.textContent = "Ver mi semana"; b.onclick = () => { semana = base; hoja.alCerrar = null; cerrarHoja(); ir("cont"); };
+    } catch(err) { paso('<span class="warn">' + esc(err.message) + '</span>'); b.disabled = false; b.textContent = "Intentar otra vez"; }
+  };
+}
+
+/* El promotor: mensajes para grupos de clientes */
+const SEGS = [["inactivos","😴 No vienen"],["cumple","🎂 Cumplen este mes"],["premio","🏆 Premio listo"],["clientes","💈 Todos los clientes"],["nuevos","🆕 Sin cita todavía"]];
+function segmento(k) {
+  const G2 = gente(), mes = new Date().getMonth() + 1;
+  if (k === "inactivos") return G2.filter(p => p.tm && dias(p.tm.ultimaVisita) >= D.tm.cfg.diasInactivo);
+  if (k === "cumple") return G2.filter(p => p.tm && p.tm.cumple && Number(p.tm.cumple.split("-")[0]) === mes);
+  if (k === "premio") return G2.filter(p => premioListo(p.tm));
+  if (k === "clientes") return G2.filter(p => p.tm || p.estado === "cliente");
+  return G2.filter(p => p.estado === "nuevo" || p.estado === "conversando");
+}
+function campana() {
+  let seg = "inactivos";
+  const C = hoja("Promotor · campaña", '<div class="small mut" style="line-height:1.5">Escojo a quién le escribimos y te armo el mensaje. Después lo mandás a cada uno con un toque (por WhatsApp, o copiado si no tiene teléfono).</div>' +
+    '<label class="l">¿A quiénes?</label><div class="chips" id="cSeg">' + SEGS.map(([k, n]) => '<button class="chip' + (k === seg ? " on" : "") + '" data-s="' + k + '">' + n + ' (' + segmento(k).length + ')</button>').join("") + '</div>' +
+    '<label class="l">¿Qué querés lograr? (opcional)</label><input type="text" id="cObj" placeholder="Ej.: que vengan en la Semana Aniversario"><button class="btn full" style="margin-top:12px" id="cIA">✨ Escribir el mensaje</button><div id="cRes"></div>');
+  const lista = () => {
+    const L = segmento(seg).slice(0, 80), txt = ($("#cMsg") || {}).value || "";
+    $("#cLista").innerHTML = L.length ? L.map((p, i) => '<div class="persona"><div class="t"><div class="n">' + esc(p.nombre || p.usuario || "Sin nombre") + '</div><div class="m">' + esc(p.tel || (p.usuario ? "@" + p.usuario.replace(/^@/, "") : "")) + '</div></div><button class="btn sm" data-m="' + i + '">Mandar</button></div>').join("") : '<div class="empty">Nadie en este grupo.</div>';
+    $("#cLista").onclick = e => { const b = e.target.closest("[data-m]"); if (!b) return; const p = L[b.dataset.m], t = $("#cMsg").value.replace(/\{nombre\}/g, primerNombre(p.nombre || String(p.usuario || "").replace(/^@/, ""))).trim(); escribir(p, t); const q = real(p); q.historial = q.historial || []; q.historial.push({t:Date.now(), x:"Campaña: «" + t.slice(0, 80) + "»"}); guardarPersona(q); b.textContent = "✓ Enviado"; b.className = "mini"; };
+  };
+  C.onclick = async e => {
+    const b = e.target.closest("button"); if (!b) return;
+    if (b.dataset.s) { seg = b.dataset.s; C.querySelectorAll("#cSeg .chip").forEach(x => x.classList.toggle("on", x === b)); if ($("#cLista")) lista(); }
+    if (b.id === "cIA") {
+      b.disabled = true; b.innerHTML = '<span class="cargando"></span> Escribiendo…';
+      try {
+        const n = SEGS.find(x => x[0] === seg)[1];
+        const j = sacarJSON(await claude(SIS(), "Escribí un mensaje de WhatsApp para un grupo de mis clientes: «" + n + "»." + ($("#cObj").value.trim() ? " Lo que quiero lograr: " + $("#cObj").value.trim() + "." : "") + " Corto (máximo 4 líneas), cálido y personal, que no parezca masivo, con 1 o 2 emojis. Empezá con «{nombre}» donde va el nombre del cliente. Cerrá invitando a apartar su cita en " + LINK_CITAS + " o a responder el mensaje. Respondé SOLO con JSON: {\"mensaje\":\"...\"}", 600));
+        $("#cRes").innerHTML = '<label class="l">Mensaje (podés cambiarlo; {nombre} se cambia solo por el nombre)</label><textarea id="cMsg" style="min-height:120px">' + esc(j.mensaje || "") + '</textarea><h2>Mandar a cada uno</h2><div id="cLista"></div>';
+        lista();
+      } catch(err) { $("#cRes").innerHTML = '<div class="small warn" style="margin-top:8px">' + esc(err.message) + '</div>'; }
+      b.disabled = false; b.textContent = "✨ Escribir otro";
+    }
+  };
+}
+
 function hojaIA(titulo, fn, extra, alListo) {
   const C = hoja(titulo, '<div class="ia"><div id="iaT"><span class="cargando"></span> Claude está pensando…</div></div><div id="iaX"></div>');
   fn().then(t => { C.querySelector("#iaT").style.whiteSpace = "pre-wrap"; C.querySelector("#iaT").style.lineHeight = "1.55"; C.querySelector("#iaT").textContent = t; if (extra) { C.querySelector("#iaX").innerHTML = extra; alListo && alListo(C); } })
@@ -1081,6 +1224,7 @@ function pintarAjustes() {
   else h += '<div class="small mut" style="line-height:1.5">Entrá con tu cuenta de Google de la barbería para ver tus clientes, sellos, cumpleaños y quién no viene.</div><button class="btn full" style="margin-top:10px" data-entrar>Conectar Tarjeta Meraki</button>';
   h += '</div>';
   h += '<h2>Claude (inteligencia artificial)</h2><div class="card"><div class="small mut" style="line-height:1.5">Escribe tus textos, mira tus fotos, sugiere respuestas y arma tu semana. Sacá tu clave en <b>console.anthropic.com</b> → API Keys (necesita saldo; cada texto cuesta centavos).</div><label class="l">Clave</label><input type="password" id="aClave" value="' + esc(aj.claude || "") + '" placeholder="sk-ant-…" autocomplete="off"><label class="l">Modelo</label><select id="aModelo">' + [["claude-sonnet-5-5","Sonnet 5.5 · el mejor balance"],["claude-haiku-5-5","Haiku 5.5 · el más barato"],["claude-opus-5-5","Opus 5.5 · el más inteligente"]].map(([k, n]) => '<option value="' + k + '"' + (aj.modelo === k ? " selected" : "") + '>' + n + '</option>').join("") + '</select><div class="row" style="margin-top:10px"><button class="btn sm" id="aClOk">Guardar y probar</button><button class="mini" id="aClX">Borrar clave</button><button class="mini" data-open="https://platform.claude.com/settings/keys">Abrir consola</button></div><div id="aClRes"></div></div>';
+  h += '<h2>Gemini (el diseñador de imágenes)</h2><div class="card"><div class="small mut" style="line-height:1.5">Crea las imágenes de tus publicaciones con Leo y tu logo. Sacá tu clave en <b>aistudio.google.com</b> → Get API key. Para imágenes, Google pide activar la facturación en ese proyecto (se paga por imagen).</div><label class="l">Clave</label><input type="password" id="aGmClave" value="' + esc(aj.gemini || "") + '" placeholder="AIza…" autocomplete="off"><label class="l">Modelo</label><select id="aGmModelo">' + MODELOS_IMG.map(([k, n]) => '<option value="' + k + '"' + ((aj.gemModelo || MODELOS_IMG[0][0]) === k ? " selected" : "") + '>' + n + '</option>').join("") + '</select><div class="row" style="margin-top:10px"><button class="btn sm" id="aGmOk">Guardar y probar</button><button class="mini" id="aGmX">Borrar clave</button><button class="mini" data-open="https://aistudio.google.com/apikey">Abrir AI Studio</button></div><div id="aGmRes"></div></div>';
   h += '<h2>Instagram y Facebook</h2><div class="card">' + (metaListo() ? '<div class="row"><b class="ok">✓ ' + esc(D.meta.igUser ? "@" + D.meta.igUser : "") + (D.meta.pageName ? " · " + esc(D.meta.pageName) : "") + '</b></div>' + (D.meta.paginas && D.meta.paginas.length > 1 ? '<label class="l">Página</label><select id="aPag">' + D.meta.paginas.map(p => '<option value="' + p.id + '"' + (p.id === D.meta.page ? " selected" : "") + '>' + esc(p.name) + '</option>').join("") + '</select><div class="small mut" style="margin-top:4px">Para cambiar de página pegá el token otra vez en Bandeja.</div>' : '') + '<button class="btn dark sm" style="margin-top:10px" id="aMetaX">Desconectar</button>' : '<div class="small mut">No conectado.</div><button class="btn dark sm" style="margin-top:10px" id="aMetaIr">Ver cómo conectar</button>') + '</div>';
   h += '<h2>Tu negocio</h2><div class="card"><label class="l" style="margin-top:0">Publicaciones por semana (meta)</label><div class="chips" id="aMeta">' + [2,3,4,5,7].map(n => '<button class="chip' + (aj.meta === n ? " on" : "") + '" data-n="' + n + '">' + n + '</button>').join("") + '</div>' +
     '<label class="l">Tu Instagram</label><input type="text" id="aIg" value="' + esc(aj.ig) + '" placeholder="@merakibarbershop" autocapitalize="off">' +
@@ -1155,6 +1299,14 @@ function pintarAjustes() {
       $("#aClRes").innerHTML = '<div class="small mut" style="margin-top:8px"><span class="cargando"></span> Probando…</div>';
       try { const t = await claude(SIS(), "Saludame en una línea como el community manager de Meraki.", 80); $("#aClRes").innerHTML = '<div class="small ok" style="margin-top:8px">✓ ' + esc(t) + '</div>'; }
       catch(err) { $("#aClRes").innerHTML = '<div class="small warn" style="margin-top:8px">' + esc(err.message) + '</div>'; }
+    }
+    if (b.id === "aGmX") { D.aj.gemini = ""; guardar(); $("#aGmClave").value = ""; $("#aGmRes").innerHTML = '<div class="small mut" style="margin-top:8px">Clave borrada.</div>'; }
+    if (b.id === "aGmOk") {
+      D.aj.gemini = $("#aGmClave").value.trim(); D.aj.gemModelo = $("#aGmModelo").value; guardar();
+      if (!D.aj.gemini) return toast("Pegá tu clave de Gemini");
+      $("#aGmRes").innerHTML = '<div class="small mut" style="margin-top:8px"><span class="cargando"></span> Probando…</div>';
+      const r = await http("GET", "https://generativelanguage.googleapis.com/v1beta/models/" + D.aj.gemModelo, {headers:{"x-goog-api-key":D.aj.gemini}});
+      $("#aGmRes").innerHTML = r.estado === 200 ? '<div class="small ok" style="margin-top:8px">✓ La clave sirve. Si al crear una imagen dice «sin cuota», falta activar la facturación en Google AI Studio.</div>' : '<div class="small warn" style="margin-top:8px">' + esc(r.estado === 404 ? "Ese modelo no existe: escogé el otro." : "La clave no sirve: " + errorDe(r)) + '</div>';
     }
     if (b.id === "aMetaX") { D.meta = {}; guardar(); pintarAjustes(); }
     if (b.id === "aMetaIr") ir("bandeja");
