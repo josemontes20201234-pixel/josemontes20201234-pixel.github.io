@@ -423,6 +423,7 @@ const cumpleEn = c => { if (!c || !c.cumple) return null; const [m, d] = c.cumpl
 const PLANT = {
   respuesta:{n:"Responder", t:"¡Qué onda{, nombre}! Gracias por escribirnos a Meraki Barbershop 💈 ¿En qué te ayudamos?"},
   precios:{n:"Precios", t:"¡Hola{, nombre}! Estos son nuestros precios 💈\n\n✂️ Corte clásico $3.50\n✂️ Corte moderno $4.00\n🔥 Combo el patrón $5.00\n⭐ Servicio full detalle $6.00\n🧔 Diseño de barba el patrón $3.50\n🪒 Perfilado express $2.00\n🧖 Ritual Meraki Spa $5.00\n\nAceptamos efectivo, transferencia y tarjeta por acercamiento. ¿Te apartamos tu espacio?"},
+  resenaG:{n:"Pedir reseña Google", t:"¡Gracias por venir a Meraki{, nombre}! 💈 Si te gustó tu corte, ¿nos regalás 1 minutito y nos dejás tus estrellas en Google? Nos ayuda un montón 🙌\nhttps://search.google.com/local/writereview?placeid=ChIJdTGddwA7Y48RHQGqJej-ANE"},
   agendar:{n:"Agendar", t:"¡Claro{, nombre}! Apartá tu hora aquí, elegís el día y la hora que te quede 💈\nhttps://josemontes20201234-pixel.github.io/citas/"},
   seguimiento:{n:"Seguimiento", t:"¡Qué onda{, nombre}! ¿Siempre te apartamos tu espacio esta semana? Decime qué día te queda 💈"},
   extranamos:{n:"Te extrañamos", t:"¡{nombre}! Hace rato no te vemos por Meraki 👀 Tu tarjeta va en {sellos} sellos. Esta semana te esperamos, ¿te apartamos un espacio?"},
@@ -987,17 +988,18 @@ function semanaCompleta() {
 }
 
 /* El promotor: mensajes para grupos de clientes */
-const SEGS = [["inactivos","😴 No vienen"],["cumple","🎂 Cumplen este mes"],["premio","🏆 Premio listo"],["clientes","💈 Todos los clientes"],["nuevos","🆕 Sin cita todavía"]];
+const SEGS = [["toca","✂️ Les toca su corte"],["inactivos","😴 No vienen"],["cumple","🎂 Cumplen este mes"],["premio","🏆 Premio listo"],["clientes","💈 Todos los clientes"],["nuevos","🆕 Sin cita todavía"]];
 function segmento(k) {
   const G2 = gente(), mes = new Date().getMonth() + 1;
+  if (k === "toca") return G2.filter(p => { const u = p.tm && p.tm.ultimaVisita ? new Date(p.tm.ultimaVisita).getTime() : (!p.virtual ? ultimoCobro(p.id) : null); if (!u) return false; const dv = dias(u); return dv >= frecDe(p) && dv < D.tm.cfg.diasInactivo; });
   if (k === "inactivos") return G2.filter(p => p.tm && dias(p.tm.ultimaVisita) >= D.tm.cfg.diasInactivo);
   if (k === "cumple") return G2.filter(p => p.tm && p.tm.cumple && Number(p.tm.cumple.split("-")[0]) === mes);
   if (k === "premio") return G2.filter(p => premioListo(p.tm));
   if (k === "clientes") return G2.filter(p => p.tm || p.estado === "cliente");
   return G2.filter(p => p.estado === "nuevo" || p.estado === "conversando");
 }
-function campana() {
-  let seg = "inactivos";
+function campana(op) {
+  op = op || {}; let seg = op.seg || "inactivos";
   const C = hoja("Promotor · campaña", '<div class="small mut" style="line-height:1.5">Escojo a quién le escribimos y te armo el mensaje. Después lo mandás a cada uno con un toque (por WhatsApp, o copiado si no tiene teléfono).</div>' +
     '<label class="l">¿A quiénes?</label><div class="chips" id="cSeg">' + SEGS.map(([k, n]) => '<button class="chip' + (k === seg ? " on" : "") + '" data-s="' + k + '">' + n + ' (' + segmento(k).length + ')</button>').join("") + '</div>' +
     '<label class="l">¿Qué querés lograr? (opcional)</label><input type="text" id="cObj" placeholder="Ej.: que vengan en la Semana Aniversario"><button class="btn full" style="margin-top:12px" id="cIA">✨ Que Claude escriba el mensaje</button><div id="cRes" class="small warn" style="margin-top:8px"></div>' +
@@ -1011,7 +1013,7 @@ function campana() {
     $("#cLista").innerHTML = L.length ? L.map((p, i) => '<div class="persona"><div class="t"><div class="n">' + esc(p.nombre || p.usuario || "Sin nombre") + '</div><div class="m">' + esc(p.tel || (p.usuario ? "@" + p.usuario.replace(/^@/, "") : "")) + '</div></div><button class="btn sm" data-m="' + i + '">Mandar</button></div>').join("") : '<div class="empty">Nadie en este grupo.</div>';
     $("#cLista").onclick = e => { const b = e.target.closest("[data-m]"); if (!b) return; if (!$("#cMsg").value.trim()) { toast("Primero escribí o pegá el mensaje"); $("#cMsg").focus(); return; } const p = L[b.dataset.m], t = $("#cMsg").value.replace(/\{nombre\}/g, primerNombre(p.nombre || String(p.usuario || "").replace(/^@/, ""))).trim(); const n = telSV(p.tel); if (fotoCamp && n && conFoto()) { const r = Android.whatsapp(n, t, fotoCamp); if (r !== "ok") { toast(r === "sin-whatsapp" ? "No encontré WhatsApp" : "No se pudo con la imagen: va solo el texto"); escribir(p, t); } } else { if (fotoCamp && n && !conFoto()) toast("Actualizá el CRM para mandar con imagen"); escribir(p, t); } const q = real(p); q.historial = q.historial || []; q.historial.push({t:Date.now(), x:"Campaña: «" + t.slice(0, 80) + "»" + (fotoCamp ? " + imagen" : "")}); guardarPersona(q); b.textContent = "✓ Enviado"; b.className = "mini"; };
   };
-  lista();
+  lista(); if (op.msg) $("#cMsg").value = op.msg;
   C.onclick = async e => {
     const b = e.target.closest("button"); if (!b) return;
     if (b.id === "cFoto") { window.onFoto = f => { if (!f) return; fotoCamp = f; $("#cFotoV").innerHTML = '<img src="' + f + '" alt="" style="max-width:140px;border-radius:12px;display:block">'; $("#cFotoX").style.display = ""; }; if (APP) Android.elegirFoto(); else { const i = document.createElement("input"); i.type = "file"; i.accept = "image/*"; i.onchange = () => { const r = new FileReader(); r.onload = () => window.onFoto(r.result); r.readAsDataURL(i.files[0]); }; i.click(); } return; }
@@ -1460,6 +1462,8 @@ function pintarHoyCitas() {
   if (H_APP()) { const dh = horarioDia(h, vigentes()); x += '<div class="hoy-horario"><div class="t' + (dh.especial ? " esp" : " mut") + '">🕕 ' + esc(lineaHoy()) + '</div><button class="mini" data-horario>' + (dh.especial ? "Ver" : "Cambiar") + '</button></div>'; }
   if (hoyL.length) x += hoyL.map(c => '<div class="slot"><div class="h">' + hora(c.cuando) + '</div><div class="t"><b>' + esc(c.nombre) + '</b><div class="mut small">' + esc(c.servicio) + (c.nota ? " · " + esc(c.nota) : "") + '</div></div><button class="mini" data-wa="' + c.id + '">WhatsApp</button></div>').join("");
   else x += '<div class="mut small">No tenés citas hoy.</div>';
+  const dm = horarioDia(m, vigentes()), libres = dm.cerrado ? [] : HORAS_C.filter(hr => hr * 60 >= dm.abre && hr * 60 < dm.cierra && !D.citas.lista.some(c => c.id === idC(m, hr)) && !D.citas.bloq.includes(idC(m, hr)));
+  if (libres.length) x += '<div class="small" style="margin-top:12px;line-height:1.5"><b>Mañana tenés ' + libres.length + (libres.length === 1 ? " espacio libre" : " espacios libres") + '</b> <span class="mut">(' + libres.map(hr => (hr > 12 ? hr - 12 : hr) + (hr < 12 ? " am" : " pm")).join(", ") + ')</span></div><button class="btn sm" style="margin-top:6px" data-huecos>Ofrecerlos a los que les toca su corte</button>';
   const pend = manL.filter(c => !hecho("rec_" + c.id, 2));
   if (pend.length) x += '<div class="small" style="margin-top:12px;font-weight:800">Mañana: recordales su cita</div>' + pend.map(c => '<div class="slot"><div class="h">' + hora(c.cuando) + '</div><div class="t"><b>' + esc(c.nombre) + '</b><div class="mut small">' + esc(c.servicio) + '</div></div><button class="btn sm" data-rec="' + c.id + '">Recordar</button></div>').join("");
   else if (manL.length) x += '<div class="mut small" style="margin-top:10px">Mañana: ' + manL.length + (manL.length === 1 ? " cita" : " citas") + ' ✓ ya les recordaste</div>';
@@ -1470,6 +1474,7 @@ function pintarHoyCitas() {
     const c = D.citas.lista.find(z => z.id === (b.dataset.wa || b.dataset.rec));
     if (b.dataset.ir || b.hasAttribute("data-horario")) ir("citas");
     if (b.hasAttribute("data-comp")) compartirCitas();
+    if (b.hasAttribute("data-huecos")) { const dm = horarioDia(m, vigentes()), L = HORAS_C.filter(hr => hr * 60 >= dm.abre && hr * 60 < dm.cierra && !D.citas.lista.some(c => c.id === idC(m, hr)) && !D.citas.bloq.includes(idC(m, hr))).map(hr => (hr > 12 ? hr - 12 : hr) + (hr < 12 ? " am" : " pm")); campana({seg:"toca", msg:"¡Qué onda {nombre}! 💈 Ya te va tocando tu corte. Mañana tengo espacio a las " + L.join(", ") + ". ¿Te aparto uno? Respondeme o elegí tu hora aquí: https://josemontes20201234-pixel.github.io/citas/"}); return; }
     if (b.dataset.wa && c) waCita(c, "¡Qué onda " + primerNombre(c.nombre) + "! Te escribimos de Meraki Barbershop 💈 ");
     if (b.dataset.rec && c) { waCita(c, recordatorio(c)); D.hechos["rec_" + c.id] = new Date().toISOString(); guardar(); pintarHoyCitas(); }
   };
@@ -1921,6 +1926,11 @@ function cobrar(pre) {
       if (pago === "fiado") { const f = {id:uid(), t:Date.now(), pid, nombre:nom, tel:quien ? quien.tel || "" : "", monto:v.total, desc:items.map(i => i.n).join(", "), abonos:[], venta:v.id, u:Date.now()}; D.fiados.push(f); subirDoc("f_" + f.id, f); }
       guardar(); subirDoc("v_" + v.id, v);
       toast("Cobrado " + plata(v.total) + (pago === "regalo" ? " (tarjeta de regalo)" : "") + " ✓");
+      if (quien && telSV(quien.tel) && !(D.hechos && D.hechos["resena_" + pid])) {
+        $("#hojaC").innerHTML = '<div class="card" style="text-align:center;margin-top:20px"><div style="font-size:40px">⭐</div><div style="font-size:20px;font-weight:800;margin-top:6px">¡Cobrado ' + plata(v.total) + '!</div><div class="small mut" style="margin-top:8px;line-height:1.5">¿Le pedís a ' + esc(primerNombre(quien.nombre)) + ' que te deje sus estrellas en Google? Más reseñas = más clientes nuevos en Maps.</div><button class="btn full" style="margin-top:14px" id="cbRes">Pedir reseña por WhatsApp</button><button class="mini" style="margin-top:10px" id="cbNo">Ahora no</button></div>';
+        $("#hojaC").onclick = e => { const t = e.target.closest("button"); if (!t) return; if (t.id === "cbRes") { escribir(quien, llenar("resenaG", quien)); D.hechos = D.hechos || {}; D.hechos["resena_" + pid] = new Date().toISOString(); guardar(); } cerrarHoja(); };
+        return;
+      }
       cerrarHoja(); return;
     } else return;
     pintarL();
