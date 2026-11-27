@@ -168,6 +168,8 @@ code{background:var(--card2);border:1px solid var(--line);border-radius:6px;padd
       <div class="stat"><b id="sNuevos">0</b><span>nuevos de redes</span></div>
       <div class="stat"><b id="sSemana">0/3</b><span>posts esta semana</span></div>
     </div>
+    <h2>Caja de hoy</h2>
+    <div class="card" id="hoyCaja"></div>
     <h2>Citas</h2>
     <div class="card" id="hoyCitas"></div>
     <h2>A quién escribirle hoy</h2>
@@ -278,6 +280,9 @@ D.hechos = D.hechos || {};           // tareas que ya hiciste: clave → fecha
 D.aj = Object.assign({meta:3, modelo:"claude-sonnet-5-5", contexto:CONTEXTO, hashtags:HASHTAGS, ig:"", ubicacion:"", graphV:"v23.0", horario:"Martes a domingo"}, D.aj || {});
 D.tm = D.tm || {clientes:[], cfg:{meta:8, diasInactivo:30, premio:"corte gratis"}, cuando:0};
 D.meta = D.meta || {};
+D.ventas = D.ventas || [];          // la caja: lo que cobrás cada día
+D.aj.frecCorte = D.aj.frecCorte || 21; // cada cuántos días vuelve un cliente
+D.aj.metaMes = D.aj.metaMes || 800;
 function guardar(){ try { localStorage.setItem("crm", JSON.stringify(D)); } catch(e) { toast("No se pudo guardar: memoria llena"); } }
 
 /* fotos en IndexedDB (no caben en localStorage) */
@@ -351,6 +356,9 @@ async function traerTarjeta(forzar) {
       D.tm.clientes = c.docs.map(x => ({id:x.id, nombre:x.nombre || "", telefono:x.telefono || "", cumple:x.cumple || "", sellos:x.sellos || 0, visitas:x.visitasTotales || 0, ultimaVisita:x.ultimaVisita || null, creado:x.creado || null}));
       D.tm.cuando = Date.now(); D.tm.error = "";
     } else D.tm.error = errorDe(c.error);
+    const rg = await listar("regalos", t);
+    if (rg.docs) { D.tm.regalos = rg.docs.map(x => ({id:x.id, servicio:x.servicio || "", precio:Number(x.precio) || 0, para:x.para || "", de:x.de || "", creado:x.creado || null, vence:x.vence || "", usada:x.usada || null, pago:x.pago || ""})); D.tm.regError = ""; }
+    else D.tm.regError = rg.error && rg.error.estado === 403 ? "permiso" : errorDe(rg.error);
     const g = await http("GET", FS + "/config/programa", {headers:{Authorization:"Bearer " + t}});
     if (g.estado === 200) { const o = docA(g.json); D.tm.cfg = {meta:o.meta || 8, diasInactivo:o.diasInactivo || 30, premio:o.premio || "corte gratis"}; }
     await bajarCrm(t);
@@ -372,12 +380,12 @@ async function bajarCrm(t) {
   D.aj.crmNube = true;
   for (const doc of r.docs) {
     let o; try { o = JSON.parse(doc.d); } catch(e) { continue; }
-    const lista = doc.id.startsWith("p_") ? D.personas : doc.id.startsWith("x_") ? D.posts : null; if (!lista) continue;
+    const lista = doc.id.startsWith("p_") ? D.personas : doc.id.startsWith("x_") ? D.posts : doc.id.startsWith("v_") ? D.ventas : null; if (!lista) continue;
     const i = lista.findIndex(x => x.id === o.id);
     if (i < 0) lista.push(o); else if ((o.u || 0) > (lista[i].u || 0)) lista[i] = Object.assign(lista[i], o);
   }
 }
-function subirTodo() { D.personas.forEach(p => subirDoc("p_" + p.id, p)); D.posts.forEach(p => subirDoc("x_" + p.id, sinFoto(p))); }
+function subirTodo() { D.personas.forEach(p => subirDoc("p_" + p.id, p)); D.posts.forEach(p => subirDoc("x_" + p.id, sinFoto(p))); D.ventas.forEach(v => subirDoc("v_" + v.id, v)); }
 function guardarPersona(p) { p.u = Date.now(); if (!D.personas.includes(p)) D.personas.push(p); guardar(); subirDoc("p_" + p.id, p); }
 function guardarPost(p) { p.u = Date.now(); if (!D.posts.includes(p)) D.posts.push(p); guardar(); subirDoc("x_" + p.id, sinFoto(p)); alarmas(); }
 
@@ -415,10 +423,12 @@ const PLANT = {
   premio:{n:"Premio listo", t:"{nombre}, ¡completaste tu Tarjeta Meraki! 🏆 En tu próxima visita tenés {premio}. Escribime para apartarte tu espacio."},
   cumple:{n:"Cumpleaños", t:"¡Feliz cumpleaños, {nombre}! 🎂 De parte de Meraki Barbershop: venite esta semana y celebramos con tu corte."},
   resena:{n:"Pedir etiqueta", t:"¡{nombre}, gracias por venir a Meraki! 🙌 Si te gustó tu corte, subí tu foto a historias y etiquetanos{ ig}. ¡Nos ayudás un montón!"},
+  tocacorte:{n:"Le toca su corte", t:"¡Qué onda{, nombre}! 💈 Ya va tocando tu corte. ¿Te aparto tu espacio esta semana? Elegí tu hora aquí: https://josemontes20201234-pixel.github.io/citas/ o decime qué día te queda."},
   bienvenida:{n:"Bienvenida", t:"¡Bienvenido a Meraki{, nombre}! 💈 Ya tenés tu Tarjeta Meraki: con cada visita sumás un sello y al completar {meta} el corte va por la casa."}
 };
 function llenar(k, p) {
   const n = primerNombre(p && p.nombre);
+  if (k === "precios") return "¡Hola" + (n ? ", " + n : "") + "! Estos son nuestros precios 💈\n\n" + SERVICIOS().map(s => "✂️ " + s[0] + " " + plata(s[1])).join("\n") + "\n\nAceptamos efectivo, transferencia y tarjeta por acercamiento. ¿Te apartamos tu espacio?";
   return PLANT[k].t
     .replace("{, nombre}", n ? ", " + n : "").replace(/\{nombre\}/g, n || "")
     .replace("{sellos}", p && p.tm ? p.tm.sellos + "/" + D.tm.cfg.meta : "tus")
@@ -448,18 +458,24 @@ function tareasHoy() {
       T.push({p, k:"nuevo_" + p.id, e:"✨", pr:0, n:"Respondele", m:"Llegó por " + REDES[p.red || "otro"].n + " " + haceTxt(p.creado) + ". Responder rápido es lo que más convierte.", pl:"respuesta"});
     if (p.estado === "conversando" && silencio >= 3 && !hecho("conv_" + p.id, 4))
       T.push({p, k:"conv_" + p.id, e:"💬", pr:2, n:"Preguntale si agenda", m:"Están conversando y no le escribís hace " + silencio + " días.", pl:"seguimiento"});
+    if (!c && !p.virtual) {
+      const uv = ultimoCobro(p.id), dv = dias(uv), fr = frecDe(p);
+      if (uv && dv >= fr && dv < 60 && !hecho("toca_" + p.id + "_" + uv, 999)) T.push({p, k:"toca_" + p.id + "_" + uv, e:"✂️", pr:2, n:"Le toca su corte", m:"Su último cobro fue hace " + dv + " días (viene cada " + fr + ").", pl:"tocacorte", orden:-dv});
+    }
     if (c) {
       if (premioListo(c) && !hecho("premio_" + p.tmId, 7)) T.push({p, k:"premio_" + p.tmId, e:"🏆", pr:2, n:"Tiene su premio listo", m:"Completó " + sellosTxt(c) + ". Invitalo a reclamarlo.", pl:"premio"});
       const cu = cumpleEn(c);
       if (cu !== null && cu <= 2 && !hecho("cumple_" + p.tmId + h.getFullYear(), 300)) T.push({p, k:"cumple_" + p.tmId + h.getFullYear(), e:"🎂", pr:1, n:cu === 0 ? "Cumple hoy" : "Cumple en " + cu + (cu === 1 ? " día" : " días"), m:"Mandale saludos de Meraki.", pl:"cumple"});
       const dv = dias(c.ultimaVisita);
+      const fr = frecDe(p);
+      if (dv !== null && dv >= fr && dv < D.tm.cfg.diasInactivo && !premioListo(c) && !hecho("toca_" + p.tmId + "_" + c.ultimaVisita, 999)) T.push({p, k:"toca_" + p.tmId + "_" + c.ultimaVisita, e:"✂️", pr:2, n:"Le toca su corte", m:"Vino hace " + dv + " días (viene cada " + fr + "). Un mensajito y vuelve.", pl:"tocacorte", orden:-dv});
       if (dv !== null && dv >= D.tm.cfg.diasInactivo && !premioListo(c) && !hecho("inact_" + p.tmId, 21)) T.push({p, k:"inact_" + p.tmId, e:"⏰", pr:3, n:"No viene hace " + dv + " días", m:"Lleva " + sellosTxt(c) + ". Un mensaje lo hace volver.", pl:"extranamos", orden:-dv});
       if (dv !== null && dv <= 1 && c.visitas >= 3 && !hecho("resena_" + p.tmId, 90)) T.push({p, k:"resena_" + p.tmId, e:"📸", pr:4, n:"Pedile que te etiquete", m:"Vino " + (dv === 0 ? "hoy" : "ayer") + " y es cliente fiel (" + c.visitas + " visitas).", pl:"resena"});
     }
   }
   T.sort((a, b) => a.pr - b.pr || (a.orden || 0) - (b.orden || 0));
   // no abrumar: máximo 4 inactivos por día
-  let inact = 0; return T.filter(t => t.pl !== "extranamos" || ++inact <= 4);
+  let inact = 0, toca = 0; return T.filter(t => (t.pl !== "extranamos" || ++inact <= 4) && (t.pl !== "tocacorte" || ++toca <= 6));
 }
 
 /* ===== contenido: semana, metas y lo que funciona ===== */
@@ -600,6 +616,7 @@ function pintarHoy() {
   if (T.length > 12) html += '<div class="empty">Y ' + (T.length - 12) + ' más. Terminá estos primero.</div>';
   $("#tareas").innerHTML = html;
   pintarHoyCitas();
+  pintarCaja();
   $("#tareas").onclick = e => {
     const b = e.target.closest("button"); if (!b) return;
     if (b.hasAttribute("data-entrar")) return entrarTarjeta();
@@ -703,6 +720,7 @@ function verPersona(p0) {
   let h = '<div class="row" style="gap:14px"><div class="av" style="width:58px;height:58px;font-size:24px">' + esc((p.nombre || p.usuario || "?").replace(/^@/, "").charAt(0).toUpperCase()) + '<i style="background:' + r.c + '">' + r.i + '</i></div><div class="sp"><h3>' + esc(p.nombre || "Sin nombre") + '</h3><div class="mut small">' + esc([r.n, p.usuario ? "@" + p.usuario.replace(/^@/, "") : "", p.tel].filter(Boolean).join(" · ")) + '</div></div></div>';
   h += '<label class="l">En qué va</label><div class="chips" id="pEst">' + ESTADOS.map(([k, n]) => '<button class="chip' + (p.estado === k ? " on" : "") + '" data-e="' + k + '">' + n + '</button>').join("") + '</div>';
   if (c) h += '<div class="card" style="margin-top:14px"><div class="row"><b>💳 Tarjeta Meraki</b><span class="sp"></span>' + (premioListo(c) ? '<span class="tag nuevo">🏆 Premio listo</span>' : "") + '</div><div class="small mut" style="margin-top:6px;line-height:1.6">' + sellosTxt(c) + ' · ' + c.visitas + ' visitas' + (c.ultimaVisita ? ' · última ' + haceTxt(c.ultimaVisita) : '') + (c.cumple ? ' · cumple ' + Number(c.cumple.split("-")[1]) + ' de ' + MESES[Number(c.cumple.split("-")[0]) - 1] : '') + '</div></div>';
+  h += '<label class="l">Viene a cortarse cada</label><div class="chips" id="pFrec">' + [14, 21, 28, 35].map(d => '<button class="chip' + (frecDe(p) === d ? " on" : "") + '" data-fr="' + d + '">' + (d / 7) + ' semanas</button>').join("") + '</div>' + (ultimoCobro(p.id) ? '<div class="small mut" style="margin-top:6px">Último cobro en la caja: ' + haceTxt(ultimoCobro(p.id)) + '</div>' : '');
   h += '<label class="l">Mandarle mensaje</label><div class="chips" id="pPl">' + Object.keys(PLANT).filter(k => (k !== "premio" || premioListo(c)) && (k !== "extranamos" || c) && (k !== "cumple" || (c && c.cumple)) && (k !== "bienvenida" || c)).map(k => '<button class="chip" data-p="' + k + '">' + PLANT[k].n + '</button>').join("") + '</div>';
   h += '<div class="ia" style="margin-top:12px"><b>✨ Respuesta con Claude</b><div class="small mut" style="margin:4px 0 8px">Pegá lo que te escribió y te sugiero qué contestar.</div><textarea id="pMsg" placeholder="Ej.: ¿cuánto el corte con barba? ¿tienen espacio el sábado?" style="min-height:70px"></textarea><div class="acts"><button class="btn sm" id="pIA">Sugerir respuesta</button></div><div id="pIAres"></div></div>';
   h += '<label class="l">Volver a escribirle el</label><div class="row"><input type="date" id="pProx" value="' + esc(p.proximo || "") + '" style="flex:1"><button class="mini" data-d="1">Mañana</button><button class="mini" data-d="3">3 días</button><button class="mini" data-d="7">1 semana</button></div>';
@@ -715,6 +733,7 @@ function verPersona(p0) {
   hoja.re = mostrar;
   C.onclick = async e => {
     const b = e.target.closest("button"); if (!b) return;
+    if (b.dataset.fr) { const q = R(); q.frec = p.frec = Number(b.dataset.fr); guardarPersona(q); C.querySelectorAll("#pFrec .chip").forEach(x => x.classList.toggle("on", x === b)); toast("Listo: te aviso cada " + (q.frec / 7) + " semanas"); return; }
     if (b.dataset.e) { const q = R(); if (q.estado !== b.dataset.e) { q.historial = q.historial || []; q.historial.push({t:Date.now(), x:"Pasó a «" + estadoTxt(b.dataset.e) + "»"}); } q.estado = b.dataset.e; guardarPersona(q); p.estado = q.estado; C.querySelectorAll("#pEst .chip").forEach(x => x.classList.toggle("on", x === b)); }
     if (b.dataset.p) { const q = R(); escribir(p, llenar(b.dataset.p, p)); q.historial = q.historial || []; q.historial.push({t:Date.now(), x:"Le escribiste: " + PLANT[b.dataset.p].n}); if (q.estado === "nuevo") q.estado = "conversando"; guardarPersona(q); }
     if (b.dataset.d) { const f = new Date(Date.now() + Number(b.dataset.d) * DIA); $("#pProx").value = f.toISOString().slice(0, 10); toast("Te lo recuerdo el " + fechaLarga(f)); }
@@ -1815,9 +1834,133 @@ window.alVolver = () => {
   traerTarjeta(false).catch(() => {}).then(traerCitas).then(() => { if (!$("#hoja").classList.contains("on")) pintarTodo(); });
   if (Date.now() - D.horario.cuando > 60e3) horarioCargar().then(() => { if (!$("#hoja").classList.contains("on")) pintar(); });
 };
+/* ================================================================ caja: cobros, resumen y tarjetas de regalo */
+const SERV_ANTES = [["Corte clásico",3.5],["Corte moderno",4],["Combo el patrón",5],["Servicio full detalle",6],["Diseño de barba el patrón",3.5],["Perfilado express",2],["Ritual Meraki Spa",5]];
+const SERV_NUEVOS = [["Corte clásico",4],["Corte moderno",5],["Combo el patrón",6.5],["Servicio full detalle",8],["Diseño de barba Meraki",4.5],["Perfilado express",2.5],["Ritual Meraki Spa",6.5]];
+const SERVICIOS = () => ymdSV(Date.now()) >= "2026-12-15" ? SERV_NUEVOS : SERV_ANTES; // el 15 de diciembre suben solos
+const BEBIDAS = [["Café",0.3],["Gaseosa",0.7],["Jugo",0.6],["Energizante",0.65]];
+const PAGO_N = {efectivo:"Efectivo", tarjeta:"Tarjeta", transferencia:"Transferencia", regalo:"Tarjeta de regalo"};
+const plata = n => "$" + (Math.round((Number(n) || 0) * 100) / 100).toFixed(2);
+const frecDe = p => Number(p && p.frec) || D.aj.frecCorte || 21;
+const vivas = () => D.ventas.filter(v => !v.borrado);
+const ultimoCobro = pid => { let u = null; for (const v of D.ventas) if (!v.borrado && v.pid === pid && (!u || v.t > u)) u = v.t; return u; };
+const dineroDe = v => v.pago === "regalo" ? 0 : (Number(v.total) || 0);   // lo pagado con tarjeta de regalo ya entró cuando la vendiste
+const esServicio = n => SERV_ANTES.concat(SERV_NUEVOS).some(s => s[0] === n);
+const sumaEntre = (a, b) => vivas().filter(v => v.t >= a && v.t < b).reduce((s, v) => s + dineroDe(v), 0);
+const cortesEntre = (a, b) => vivas().filter(v => v.t >= a && v.t < b).reduce((s, v) => s + (v.items || []).filter(i => esServicio(i.n)).length, 0);
+const inicioMes = (t = Date.now()) => { const d = new Date(t); return new Date(d.getFullYear(), d.getMonth(), 1).getTime(); };
+const regalosDe = () => (D.tm.regalos || []);
+const estadoRg = r => r.usada ? "usada" : (r.vence && ymdSV(Date.now()) > r.vence ? "vencida" : "activa");
+const diasPara = ymd => Math.round((new Date(ymd + "T12:00:00").getTime() - new Date(ymdSV(Date.now()) + "T12:00:00").getTime()) / DIA);
+
+function pintarCaja() {
+  const el = $("#hoyCaja"); if (!el) return;
+  const h0 = hoy0(), hoyV = vivas().filter(v => v.t >= h0);
+  const tot = hoyV.reduce((s, v) => s + dineroDe(v), 0), cortes = cortesEntre(h0, h0 + DIA);
+  const ef = hoyV.filter(v => v.pago === "efectivo").reduce((s, v) => s + dineroDe(v), 0);
+  const mes = sumaEntre(inicioMes(), Date.now() + DIA), meta = D.aj.metaMes;
+  let x = '<div class="row"><div><div style="font-size:30px;font-weight:800;color:var(--gold2)">' + plata(tot) + '</div><div class="mut small">' + cortes + (cortes === 1 ? " servicio" : " servicios") + ' hoy' + (tot ? ' · ' + plata(ef) + ' en efectivo' : '') + '</div></div><span class="sp"></span><button class="btn" id="cjCobrar">＋ Cobrar</button></div>';
+  x += '<div class="row small" style="margin-top:14px"><b>' + plata(mes) + '</b><span class="mut">este mes · meta ' + plata(meta) + '</span><span class="sp"></span><span class="tag">' + Math.round(mes / meta * 100) + '%</span></div><div class="prog"><i style="width:' + Math.min(100, mes / meta * 100) + '%"></i></div>';
+  const R = regalosDe(), act = R.filter(r => estadoRg(r) === "activa"), pronto = act.filter(r => r.vence && diasPara(r.vence) <= 14);
+  if (R.length || D.tm.regError) x += '<div class="row small" style="margin-top:12px">🎁 <span>' + (D.tm.regError ? '<span class="warn">Tarjetas de regalo: ' + (D.tm.regError === "permiso" ? "falta permiso" : esc(D.tm.regError)) + '</span>' : act.length + (act.length === 1 ? ' tarjeta de regalo por usar' : ' tarjetas de regalo por usar') + (pronto.length ? ' · <b class="warn">' + pronto.length + (pronto.length === 1 ? ' vence pronto</b>' : ' vencen pronto</b>') : '')) + '</span></div>';
+  x += '<div class="acts" style="margin-top:12px"><button class="mini" id="cjResumen">📊 Resumen</button><button class="mini" id="cjRegalos">🎁 Tarjetas de regalo</button></div>';
+  el.innerHTML = x;
+  el.onclick = e => { const b = e.target.closest("button"); if (!b) return; if (b.id === "cjCobrar") cobrar(); if (b.id === "cjResumen") resumenCaja(); if (b.id === "cjRegalos") verRegalos(); };
+}
+
+function cobrar(pre) {
+  const items = [], it = pre && pre.items ? pre.items.slice() : []; items.push(...it);
+  let pago = "efectivo", persona = pre && pre.p ? pre.p : null;
+  const G = gente().filter(p => p.nombre);
+  const C = hoja("Cobrar", '<label class="l">Servicios</label><div class="chips" id="cbS" style="flex-wrap:wrap">' + SERVICIOS().map((s, i) => '<button class="chip" data-s="' + i + '">' + esc(s[0]) + ' · ' + plata(s[1]) + '</button>').join("") + '</div>' +
+    '<label class="l">Bebidas</label><div class="chips" id="cbB" style="flex-wrap:wrap">' + BEBIDAS.map((s, i) => '<button class="chip" data-b="' + i + '">' + esc(s[0]) + ' · ' + plata(s[1]) + '</button>').join("") + '</div>' +
+    '<label class="l">Otro (opcional)</label><div class="row" style="gap:8px"><input type="text" id="cbON" placeholder="Ej.: domicilio, producto" style="flex:2"><input type="number" id="cbOM" inputmode="decimal" step="0.05" min="0" placeholder="$" style="flex:1"><button class="mini" id="cbOA">Agregar</button></div>' +
+    '<div class="card" style="margin-top:14px" id="cbL"></div>' +
+    '<label class="l">Cómo pagó</label><div class="chips" id="cbP" style="flex-wrap:wrap">' + Object.keys(PAGO_N).map(k => '<button class="chip' + (k === pago ? " on" : "") + '" data-pg="' + k + '">' + PAGO_N[k] + '</button>').join("") + '</div>' +
+    '<label class="l">Cliente (opcional: así te aviso cuándo le toca volver)</label><input type="text" id="cbC" list="cbCL" placeholder="Escribí el nombre" value="' + esc(persona ? persona.nombre || "" : "") + '"><datalist id="cbCL">' + G.slice(0, 400).map(p => '<option value="' + esc(p.nombre) + '">').join("") + '</datalist>' +
+    '<button class="btn full" style="margin-top:16px" id="cbOk">Guardar cobro</button>');
+  const pintarL = () => {
+    const t = items.reduce((s, i) => s + i.m, 0);
+    $("#cbL").innerHTML = items.length ? items.map((i, k) => '<div class="row small" style="padding:4px 0"><span>' + esc(i.n) + '</span><span class="sp"></span><b>' + plata(i.m) + '</b><button class="mini" data-q="' + k + '" style="margin-left:8px">✕</button></div>').join("") + '<div class="row" style="margin-top:8px;border-top:1px solid var(--line);padding-top:8px"><b>Total</b><span class="sp"></span><b style="font-size:22px;color:var(--gold2)">' + plata(t) + '</b></div>' + (pago === "regalo" ? '<div class="small mut" style="margin-top:6px">Con tarjeta de regalo no suma a la caja: esa plata ya entró cuando la vendiste.</div>' : '') : '<div class="mut small">Tocá lo que hizo y se va sumando.</div>';
+  };
+  pintarL();
+  C.onclick = e => {
+    const b = e.target.closest("button"); if (!b) return;
+    if (b.dataset.s) { const s = SERVICIOS()[b.dataset.s]; items.push({n:s[0], m:s[1]}); }
+    else if (b.dataset.b) { const s = BEBIDAS[b.dataset.b]; items.push({n:s[0], m:s[1]}); }
+    else if (b.dataset.q) items.splice(Number(b.dataset.q), 1);
+    else if (b.id === "cbOA") { const n = $("#cbON").value.trim() || "Otro", m = parseFloat($("#cbOM").value); if (!(m > 0)) { toast("Poné cuánto cobraste"); return; } items.push({n, m:Math.round(m * 100) / 100}); $("#cbON").value = ""; $("#cbOM").value = ""; }
+    else if (b.dataset.pg) { pago = b.dataset.pg; C.querySelectorAll("#cbP .chip").forEach(x => x.classList.toggle("on", x === b)); }
+    else if (b.id === "cbOk") {
+      if (!items.length) { toast("Tocá al menos un servicio"); return; }
+      const nom = $("#cbC").value.trim(), quien = nom ? (persona && persona.nombre === nom ? persona : G.find(p => p.nombre.toLowerCase() === nom.toLowerCase())) : null;
+      let pid = null; if (quien) { const q = real(quien); pid = q.id; q.historial = q.historial || []; q.historial.push({t:Date.now(), x:"Cobro: " + items.map(i => i.n).join(", ") + " · " + plata(items.reduce((s, i) => s + i.m, 0))}); guardarPersona(q); }
+      const v = {id:uid(), t:Date.now(), items:items.slice(), total:Math.round(items.reduce((s, i) => s + i.m, 0) * 100) / 100, pago, pid, nombre:nom || "", u:Date.now()};
+      D.ventas.push(v); guardar(); subirDoc("v_" + v.id, v);
+      toast("Cobrado " + plata(v.total) + (pago === "regalo" ? " (tarjeta de regalo)" : "") + " ✓");
+      cerrarHoja(); return;
+    } else return;
+    pintarL();
+  };
+}
+
+function resumenCaja() {
+  const h0 = hoy0(), sem = inicioSemana(), semAnt = sem - 7 * DIA, mes = inicioMes(), mesAnt = inicioMes(mes - DIA);
+  const hoyT = sumaEntre(h0, h0 + DIA), semT = sumaEntre(sem, sem + 7 * DIA), semAntT = sumaEntre(semAnt, sem), mesT = sumaEntre(mes, Date.now() + DIA), mesAntT = sumaEntre(mesAnt, mes);
+  const diasTrab = new Set(vivas().filter(v => v.t >= mes).map(v => ymdSV(v.t))).size;
+  const card = (n, v, sub) => '<div class="stat"><b style="font-size:20px">' + plata(v) + '</b><span>' + n + (sub ? '<br>' + sub : '') + '</span></div>';
+  const comp = (a, b) => b > 0 ? (a >= b ? '<span class="ok">▲ ' + Math.round((a - b) / b * 100) + '%</span>' : '<span class="warn">▼ ' + Math.round((b - a) / b * 100) + '%</span>') : "";
+  let x = '<div class="stats">' + card("Hoy", hoyT) + card("Esta semana", semT, comp(semT, semAntT)) + card("Este mes", mesT, comp(mesT, mesAntT)) + '</div>';
+  x += '<div class="row small" style="margin-top:14px"><span class="mut">Meta del mes</span><span class="sp"></span><b>' + plata(mesT) + ' de ' + plata(D.aj.metaMes) + '</b></div><div class="prog"><i style="width:' + Math.min(100, mesT / D.aj.metaMes * 100) + '%"></i></div>';
+  if (diasTrab) { const prom = mesT / diasTrab, falta = Math.max(0, D.aj.metaMes - mesT); x += '<div class="small mut" style="margin-top:8px;line-height:1.5">Promedio: <b style="color:var(--txt)">' + plata(prom) + '</b> por día trabajado (' + diasTrab + ' días).' + (falta ? ' Te faltan <b style="color:var(--txt)">' + plata(falta) + '</b> para la meta.' : ' <b class="ok">¡Meta cumplida!</b>') + '</div>'; }
+  // últimos 7 días
+  const D7 = []; for (let i = 6; i >= 0; i--) { const a = h0 - i * DIA; D7.push({d:new Date(a), v:sumaEntre(a, a + DIA)}); }
+  const mx = Math.max(1, ...D7.map(d => d.v));
+  x += '<h2>Últimos 7 días</h2><div style="display:flex;gap:6px;align-items:flex-end;height:130px">' + D7.map(d => '<div style="flex:1;text-align:center;display:flex;flex-direction:column;justify-content:flex-end;height:100%"><div class="small" style="font-size:10.5px;font-weight:700">' + (d.v ? "$" + Math.round(d.v) : "") + '</div><div style="background:linear-gradient(var(--gold2),var(--gold));border-radius:6px 6px 0 0;height:' + Math.max(2, d.v / mx * 90) + 'px"></div><div class="mut" style="font-size:11px;margin-top:4px">' + ["Do","Lu","Ma","Mi","Ju","Vi","Sá"][d.d.getDay()] + '</div></div>').join("") + '</div>';
+  // por servicio y por pago (este mes)
+  const porS = {}, porP = {}; vivas().filter(v => v.t >= mes).forEach(v => { (v.items || []).forEach(i => { const k = i.n; porS[k] = porS[k] || {n:0, m:0}; porS[k].n++; porS[k].m += v.pago === "regalo" ? 0 : i.m; }); porP[v.pago] = (porP[v.pago] || 0) + (Number(v.total) || 0); });
+  const S = Object.entries(porS).sort((a, b) => b[1].m - a[1].m);
+  x += '<h2>Lo que más vendés este mes</h2>' + (S.length ? S.map(([k, o]) => '<div class="row small" style="padding:5px 0"><span>' + esc(k) + ' <span class="mut">× ' + o.n + '</span></span><span class="sp"></span><b>' + plata(o.m) + '</b></div>').join("") : '<div class="empty">Cuando cobrés, aquí te digo qué te deja más.</div>');
+  if (Object.keys(porP).length) x += '<h2>Cómo te pagan</h2>' + Object.entries(porP).map(([k, m]) => '<div class="row small" style="padding:5px 0"><span>' + (PAGO_N[k] || k) + '</span><span class="sp"></span><b>' + plata(m) + '</b></div>').join("");
+  // regalos vendidos este mes
+  const rgMes = regalosDe().filter(r => r.creado && new Date(r.creado).getTime() >= mes);
+  if (rgMes.length) x += '<div class="small" style="margin-top:12px">🎁 Además vendiste <b>' + rgMes.length + '</b> ' + (rgMes.length === 1 ? 'tarjeta' : 'tarjetas') + ' de regalo este mes por <b>' + plata(rgMes.reduce((s, r) => s + r.precio, 0)) + '</b> (se cobran en la app de la Tarjeta Meraki).</div>';
+  // cobros de hoy
+  const hoyV = vivas().filter(v => v.t >= h0).sort((a, b) => b.t - a.t);
+  x += '<h2>Cobros de hoy</h2>' + (hoyV.length ? hoyV.map(v => '<div class="slot"><div class="h">' + hora(v.t) + '</div><div class="t"><b>' + plata(v.total) + '</b> <span class="mut small">· ' + (PAGO_N[v.pago] || v.pago) + '</span><div class="mut small">' + esc((v.items || []).map(i => i.n).join(", ")) + (v.nombre ? " · " + esc(v.nombre) : "") + '</div></div><button class="mini" data-del="' + v.id + '">Borrar</button></div>').join("") : '<div class="empty">Todavía no cobrás nada hoy.</div>');
+  x += '<label class="l">Tu meta del mes ($)</label><div class="row" style="gap:8px"><input type="number" id="rsMeta" inputmode="decimal" value="' + D.aj.metaMes + '" style="flex:1"><button class="mini" id="rsMetaOk">Guardar</button></div>';
+  const C = hoja("Resumen de la caja", x);
+  hoja.re = resumenCaja;
+  C.onclick = e => {
+    const b = e.target.closest("button"); if (!b) return;
+    if (b.dataset.del) { const v = D.ventas.find(x => x.id === b.dataset.del); if (!v || !confirm("¿Borrar este cobro de " + plata(v.total) + "?")) return; v.borrado = true; v.u = Date.now(); guardar(); subirDoc("v_" + v.id, v); toast("Cobro borrado"); resumenCaja(); }
+    if (b.id === "rsMetaOk") { const m = parseFloat($("#rsMeta").value); if (m > 0) { D.aj.metaMes = m; guardar(); toast("Meta guardada"); resumenCaja(); } }
+  };
+}
+
+function verRegalos() {
+  const R = regalosDe().slice().sort((a, b) => String(b.creado || "").localeCompare(String(a.creado || "")));
+  let x = "";
+  if (!D.aj.rt) x += '<div class="mut small">Conectá Tarjeta Meraki en Ajustes para ver tus tarjetas de regalo.</div>';
+  else if (D.tm.regError) x += '<div class="small warn" style="line-height:1.5">' + (D.tm.regError === "permiso" ? "El CRM no tiene permiso para leer las tarjetas de regalo. Revisá que entraste con la misma cuenta de Google que usás en la app de la Tarjeta Meraki." : esc(D.tm.regError)) + '</div>';
+  const act = R.filter(r => estadoRg(r) === "activa"), us = R.filter(r => estadoRg(r) === "usada"), ven = R.filter(r => estadoRg(r) === "vencida");
+  const mes = inicioMes(), vMes = R.filter(r => r.creado && new Date(r.creado).getTime() >= mes);
+  x += '<div class="stats"><div class="stat"><b>' + act.length + '</b><span>por usar</span></div><div class="stat"><b>' + us.length + '</b><span>ya usadas</span></div><div class="stat"><b>' + plata(vMes.reduce((s, r) => s + r.precio, 0)) + '</b><span>vendido este mes</span></div></div>';
+  const fila = r => { const e = estadoRg(r), dv = r.vence ? diasPara(r.vence) : null; return '<div class="slot"><div class="h" style="font-family:monospace;font-size:12px">' + esc(r.id.slice(0, 4) + "-" + r.id.slice(4)) + '</div><div class="t"><b>' + esc(r.para || "—") + '</b> <span class="mut small">de ' + esc(r.de || "—") + '</span><div class="mut small">' + esc(r.servicio) + ' · ' + plata(r.precio) + (e === "activa" && dv !== null ? ' · ' + (dv <= 14 ? '<b class="warn">vence en ' + dv + (dv === 1 ? " día" : " días") + '</b>' : 'vence el ' + fechaLarga(new Date(r.vence + "T12:00:00"))) : e === "usada" ? ' · usada ' + haceTxt(r.usada) : ' · venció') + '</div></div></div>'; };
+  x += '<h2>Por usar</h2>' + (act.length ? act.sort((a, b) => String(a.vence).localeCompare(String(b.vence))).map(fila).join("") : '<div class="empty">No hay tarjetas pendientes.</div>');
+  if (us.length) x += '<h2>Usadas</h2>' + us.slice(0, 20).map(fila).join("");
+  if (ven.length) x += '<h2>Vencidas</h2>' + ven.slice(0, 20).map(fila).join("");
+  x += '<div class="small mut" style="margin-top:16px;line-height:1.5">Las tarjetas se crean y se marcan como usadas en la app de la Tarjeta Meraki (pestaña Regalos). Aquí solo las ves. Cuando alguien venga con la suya, cobrale con «Tarjeta de regalo» para que no se sume dos veces a la caja.</div>';
+  x += '<button class="btn dark full" style="margin-top:14px" id="rgSync">↻ Actualizar</button>';
+  const C = hoja("Tarjetas de regalo", x);
+  hoja.re = verRegalos;
+  C.onclick = async e => { const b = e.target.closest("button"); if (b && b.id === "rgSync") { b.innerHTML = '<span class="cargando"></span>'; await traerTarjeta(true); verRegalos(); } };
+}
+
 pintarTodo();
 traerTarjeta(false).catch(() => {}).then(traerCitas).then(() => { pintarTodo(); alarmas(); });
 horarioCargar().then(() => { if (!$("#hoja").classList.contains("on") && (vista === "citas" || vista === "hoy")) pintar(); });
+
 </script>
 </body>
 </html>
