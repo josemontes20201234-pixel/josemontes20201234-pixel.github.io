@@ -157,6 +157,7 @@ code{background:var(--card2);border:1px solid var(--line);border-radius:6px;padd
     <div class="logo">M</div>
     <div class="brand"><b>MERAKI CRM</b><small id="subt">Clientes · Redes · Contenido</small></div>
     <button class="mini" id="btnSync" title="Actualizar">↻</button>
+    <button class="mini" id="btnAj" title="Ajustes" style="padding:6px 8px;line-height:0"><span style="display:inline-block;width:20px;height:20px"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></span></button>
   </header>
 
   <!-- ============ HOY ============ -->
@@ -210,6 +211,7 @@ code{background:var(--card2);border:1px solid var(--line);border-radius:6px;padd
 
   <!-- ============ AJUSTES ============ -->
   <section class="view" id="v-ajustes"><div id="ajustes"></div></section>
+  <section class="view" id="v-caja"><div id="caja"></div></section>
 </div>
 
 <nav><div class="in">
@@ -218,7 +220,7 @@ code{background:var(--card2);border:1px solid var(--line);border-radius:6px;padd
   <button data-v="cont"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="18" height="18" rx="4"/><circle cx="9" cy="9" r="2"/><path d="M21 15l-5-5L5 21"/></svg>Contenido</button>
   <button data-v="citas"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/><path d="M8 14h3v3H8z"/></svg>Citas<span class="dot" id="dotCit"></span></button>
   <button data-v="bandeja"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg>Bandeja<span class="dot" id="dotBand"></span></button>
-  <button data-v="ajustes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>Ajustes</button>
+  <button data-v="caja"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="2.5" y="6" width="19" height="13" rx="3"/><path d="M2.5 10.5h19"/><circle cx="16.5" cy="15" r="1.3"/><path d="M6 3.5h12"/></svg>Caja</button>
 </div></nav>
 
 <div class="hoja" id="hoja"><div class="top"><button class="x" id="hojaX">←</button><b id="hojaT"></b><span id="hojaA"></span></div><div class="wrap" id="hojaC"></div></div>
@@ -280,7 +282,11 @@ D.hechos = D.hechos || {};           // tareas que ya hiciste: clave → fecha
 D.aj = Object.assign({meta:3, modelo:"claude-sonnet-5-5", contexto:CONTEXTO, hashtags:HASHTAGS, ig:"", ubicacion:"", graphV:"v23.0", horario:"Martes a domingo"}, D.aj || {});
 D.tm = D.tm || {clientes:[], cfg:{meta:8, diasInactivo:30, premio:"corte gratis"}, cuando:0};
 D.meta = D.meta || {};
-D.ventas = D.ventas || [];          // la caja: lo que cobrás cada día
+D.ventas = D.ventas || [];
+D.gastos = D.gastos || [];
+D.fiados = D.fiados || [];
+D.cierres = D.cierres || [];
+D.inv = D.inv || [{id:"cafe",n:"Café",p:0.3,stock:0,min:5},{id:"gaseosa",n:"Gaseosa",p:0.7,stock:0,min:6},{id:"jugo",n:"Jugo",p:0.6,stock:0,min:6},{id:"energy",n:"Energizante",p:0.65,stock:0,min:4}];          // la caja: lo que cobrás cada día
 D.aj.frecCorte = D.aj.frecCorte || 21; // cada cuántos días vuelve un cliente
 D.aj.metaMes = D.aj.metaMes || 800;
 function guardar(){ try { localStorage.setItem("crm", JSON.stringify(D)); } catch(e) { toast("No se pudo guardar: memoria llena"); } }
@@ -380,12 +386,12 @@ async function bajarCrm(t) {
   D.aj.crmNube = true;
   for (const doc of r.docs) {
     let o; try { o = JSON.parse(doc.d); } catch(e) { continue; }
-    const lista = doc.id.startsWith("p_") ? D.personas : doc.id.startsWith("x_") ? D.posts : doc.id.startsWith("v_") ? D.ventas : null; if (!lista) continue;
+    const lista = doc.id.startsWith("p_") ? D.personas : doc.id.startsWith("x_") ? D.posts : doc.id.startsWith("v_") ? D.ventas : doc.id.startsWith("g_") ? D.gastos : doc.id.startsWith("f_") ? D.fiados : doc.id.startsWith("z_") ? D.cierres : doc.id.startsWith("i_") ? D.inv : null; if (!lista) continue;
     const i = lista.findIndex(x => x.id === o.id);
     if (i < 0) lista.push(o); else if ((o.u || 0) > (lista[i].u || 0)) lista[i] = Object.assign(lista[i], o);
   }
 }
-function subirTodo() { D.personas.forEach(p => subirDoc("p_" + p.id, p)); D.posts.forEach(p => subirDoc("x_" + p.id, sinFoto(p))); D.ventas.forEach(v => subirDoc("v_" + v.id, v)); }
+function subirTodo() { D.personas.forEach(p => subirDoc("p_" + p.id, p)); D.posts.forEach(p => subirDoc("x_" + p.id, sinFoto(p))); D.ventas.forEach(v => subirDoc("v_" + v.id, v)); D.gastos.forEach(v => subirDoc("g_" + v.id, v)); D.fiados.forEach(v => subirDoc("f_" + v.id, v)); D.cierres.forEach(v => subirDoc("z_" + v.id, v)); D.inv.forEach(v => subirDoc("i_" + v.id, v)); }
 function guardarPersona(p) { p.u = Date.now(); if (!D.personas.includes(p)) D.personas.push(p); guardar(); subirDoc("p_" + p.id, p); }
 function guardarPost(p) { p.u = Date.now(); if (!D.posts.includes(p)) D.posts.push(p); guardar(); subirDoc("x_" + p.id, sinFoto(p)); alarmas(); }
 
@@ -591,9 +597,10 @@ async function publicarMeta(post, donde, textoFinal, foto) {
 
 /* ================================================================ pantallas */
 let vista = "hoy";
-function ir(v) { vista = v; document.querySelectorAll(".view").forEach(e => e.classList.toggle("on", e.id === "v-" + v)); document.querySelectorAll("nav button").forEach(b => b.classList.toggle("on", b.dataset.v === v)); pintar(); scrollTo(0, 0); }
+function ir(v) { vista = v; document.querySelectorAll(".view").forEach(e => e.classList.toggle("on", e.id === "v-" + v)); document.querySelectorAll("nav button").forEach(b => b.classList.toggle("on", b.dataset.v === v)); const g = $("#btnAj"); if (g) g.style.color = v === "ajustes" ? "var(--gold2)" : ""; pintar(); scrollTo(0, 0); }
+$("#btnAj").onclick = () => ir(vista === "ajustes" ? "hoy" : "ajustes");
 document.querySelectorAll("nav button").forEach(b => b.onclick = () => ir(b.dataset.v));
-function pintar() { ({hoy:pintarHoy, gente:pintarGente, cont:pintarCont, citas:pintarCitas, bandeja:pintarBandeja, ajustes:pintarAjustes})[vista](); }
+function pintar() { ({hoy:pintarHoy, gente:pintarGente, cont:pintarCont, citas:pintarCitas, bandeja:pintarBandeja, ajustes:pintarAjustes, caja:pintarCajaTab})[vista](); }
 function pintarTodo() { pintar(); puntitos(); }
 function puntitos() { const nc = citasNuevas().length, dc = $("#dotCit"); dc.textContent = nc; dc.style.display = nc && vista !== "citas" ? "flex" : "none"; const n = tareasHoy().length; const d = $("#dotHoy"); d.textContent = n; d.style.display = n && vista !== "hoy" ? "flex" : "none"; }
 
@@ -1838,13 +1845,14 @@ window.alVolver = () => {
 const SERV_ANTES = [["Corte clásico",3.5],["Corte moderno",4],["Combo el patrón",5],["Servicio full detalle",6],["Diseño de barba el patrón",3.5],["Perfilado express",2],["Ritual Meraki Spa",5]];
 const SERV_NUEVOS = [["Corte clásico",4],["Corte moderno",5],["Combo el patrón",6.5],["Servicio full detalle",8],["Diseño de barba Meraki",4.5],["Perfilado express",2.5],["Ritual Meraki Spa",6.5]];
 const SERVICIOS = () => ymdSV(Date.now()) >= "2026-12-15" ? SERV_NUEVOS : SERV_ANTES; // el 15 de diciembre suben solos
-const BEBIDAS = [["Café",0.3],["Gaseosa",0.7],["Jugo",0.6],["Energizante",0.65]];
-const PAGO_N = {efectivo:"Efectivo", tarjeta:"Tarjeta", transferencia:"Transferencia", regalo:"Tarjeta de regalo"};
-const plata = n => "$" + (Math.round((Number(n) || 0) * 100) / 100).toFixed(2);
+const BEBIDAS_X = () => D.inv.filter(x => !x.borrado);
+const PAGO_N = {efectivo:"Efectivo", tarjeta:"Tarjeta", transferencia:"Transferencia", regalo:"Tarjeta de regalo", fiado:"Fiado"};
+const PAGOS_COBRO = ["efectivo","tarjeta","transferencia","regalo","fiado"];
+const plata = n => { const v = Math.round((Number(n) || 0) * 100) / 100; return (v < 0 ? "−$" : "$") + Math.abs(v).toFixed(2); };
 const frecDe = p => Number(p && p.frec) || D.aj.frecCorte || 21;
 const vivas = () => D.ventas.filter(v => !v.borrado);
 const ultimoCobro = pid => { let u = null; for (const v of D.ventas) if (!v.borrado && v.pid === pid && (!u || v.t > u)) u = v.t; return u; };
-const dineroDe = v => v.pago === "regalo" ? 0 : (Number(v.total) || 0);   // lo pagado con tarjeta de regalo ya entró cuando la vendiste
+const dineroDe = v => v.pago === "regalo" || v.pago === "fiado" ? 0 : (Number(v.total) || 0);   // lo pagado con tarjeta de regalo ya entró cuando la vendiste
 const esServicio = n => SERV_ANTES.concat(SERV_NUEVOS).some(s => s[0] === n);
 const sumaEntre = (a, b) => vivas().filter(v => v.t >= a && v.t < b).reduce((s, v) => s + dineroDe(v), 0);
 const cortesEntre = (a, b) => vivas().filter(v => v.t >= a && v.t < b).reduce((s, v) => s + (v.items || []).filter(i => esServicio(i.n)).length, 0);
@@ -1863,9 +1871,9 @@ function pintarCaja() {
   x += '<div class="row small" style="margin-top:14px"><b>' + plata(mes) + '</b><span class="mut">este mes · meta ' + plata(meta) + '</span><span class="sp"></span><span class="tag">' + Math.round(mes / meta * 100) + '%</span></div><div class="prog"><i style="width:' + Math.min(100, mes / meta * 100) + '%"></i></div>';
   const R = regalosDe(), act = R.filter(r => estadoRg(r) === "activa"), pronto = act.filter(r => r.vence && diasPara(r.vence) <= 14);
   if (R.length || D.tm.regError) x += '<div class="row small" style="margin-top:12px">🎁 <span>' + (D.tm.regError ? '<span class="warn">Tarjetas de regalo: ' + (D.tm.regError === "permiso" ? "falta permiso" : esc(D.tm.regError)) + '</span>' : act.length + (act.length === 1 ? ' tarjeta de regalo por usar' : ' tarjetas de regalo por usar') + (pronto.length ? ' · <b class="warn">' + pronto.length + (pronto.length === 1 ? ' vence pronto</b>' : ' vencen pronto</b>') : '')) + '</span></div>';
-  x += '<div class="acts" style="margin-top:12px"><button class="mini" id="cjResumen">📊 Resumen</button><button class="mini" id="cjRegalos">🎁 Tarjetas de regalo</button></div>';
+  x += '<div class="acts" style="margin-top:12px"><button class="mini" id="cjCaja">💵 Abrir caja</button><button class="mini" id="cjResumen">📊 Resumen</button><button class="mini" id="cjRegalos">🎁 Tarjetas de regalo</button></div>';
   el.innerHTML = x;
-  el.onclick = e => { const b = e.target.closest("button"); if (!b) return; if (b.id === "cjCobrar") cobrar(); if (b.id === "cjResumen") resumenCaja(); if (b.id === "cjRegalos") verRegalos(); };
+  el.onclick = e => { const b = e.target.closest("button"); if (!b) return; if (b.id === "cjCobrar") cobrar(); if (b.id === "cjResumen") resumenCaja(); if (b.id === "cjCaja") ir("caja"); if (b.id === "cjRegalos") verRegalos(); };
 }
 
 function cobrar(pre) {
@@ -1873,30 +1881,34 @@ function cobrar(pre) {
   let pago = "efectivo", persona = pre && pre.p ? pre.p : null;
   const G = gente().filter(p => p.nombre);
   const C = hoja("Cobrar", '<label class="l">Servicios</label><div class="chips" id="cbS" style="flex-wrap:wrap">' + SERVICIOS().map((s, i) => '<button class="chip" data-s="' + i + '">' + esc(s[0]) + ' · ' + plata(s[1]) + '</button>').join("") + '</div>' +
-    '<label class="l">Bebidas</label><div class="chips" id="cbB" style="flex-wrap:wrap">' + BEBIDAS.map((s, i) => '<button class="chip" data-b="' + i + '">' + esc(s[0]) + ' · ' + plata(s[1]) + '</button>').join("") + '</div>' +
+    '<label class="l">Bebidas y productos</label><div class="chips" id="cbB" style="flex-wrap:wrap">' + BEBIDAS_X().map((s, i) => '<button class="chip" data-b="' + i + '">' + esc(s.n) + ' · ' + plata(s.p) + (s.stock <= 0 ? ' <span class="warn">(0)</span>' : '') + '</button>').join("") + '</div>' +
     '<label class="l">Otro (opcional)</label><div class="row" style="gap:8px"><input type="text" id="cbON" placeholder="Ej.: domicilio, producto" style="flex:2"><input type="number" id="cbOM" inputmode="decimal" step="0.05" min="0" placeholder="$" style="flex:1"><button class="mini" id="cbOA">Agregar</button></div>' +
     '<div class="card" style="margin-top:14px" id="cbL"></div>' +
-    '<label class="l">Cómo pagó</label><div class="chips" id="cbP" style="flex-wrap:wrap">' + Object.keys(PAGO_N).map(k => '<button class="chip' + (k === pago ? " on" : "") + '" data-pg="' + k + '">' + PAGO_N[k] + '</button>').join("") + '</div>' +
+    '<label class="l">Cómo pagó</label><div class="chips" id="cbP" style="flex-wrap:wrap">' + PAGOS_COBRO.map(k => '<button class="chip' + (k === pago ? " on" : "") + '" data-pg="' + k + '">' + PAGO_N[k] + '</button>').join("") + '</div>' +
     '<label class="l">Cliente (opcional: así te aviso cuándo le toca volver)</label><input type="text" id="cbC" list="cbCL" placeholder="Escribí el nombre" value="' + esc(persona ? persona.nombre || "" : "") + '"><datalist id="cbCL">' + G.slice(0, 400).map(p => '<option value="' + esc(p.nombre) + '">').join("") + '</datalist>' +
     '<button class="btn full" style="margin-top:16px" id="cbOk">Guardar cobro</button>');
   const pintarL = () => {
     const t = items.reduce((s, i) => s + i.m, 0);
-    $("#cbL").innerHTML = items.length ? items.map((i, k) => '<div class="row small" style="padding:4px 0"><span>' + esc(i.n) + '</span><span class="sp"></span><b>' + plata(i.m) + '</b><button class="mini" data-q="' + k + '" style="margin-left:8px">✕</button></div>').join("") + '<div class="row" style="margin-top:8px;border-top:1px solid var(--line);padding-top:8px"><b>Total</b><span class="sp"></span><b style="font-size:22px;color:var(--gold2)">' + plata(t) + '</b></div>' + (pago === "regalo" ? '<div class="small mut" style="margin-top:6px">Con tarjeta de regalo no suma a la caja: esa plata ya entró cuando la vendiste.</div>' : '') : '<div class="mut small">Tocá lo que hizo y se va sumando.</div>';
+    $("#cbL").innerHTML = items.length ? items.map((i, k) => '<div class="row small" style="padding:4px 0"><span>' + esc(i.n) + '</span><span class="sp"></span><b>' + plata(i.m) + '</b><button class="mini" data-q="' + k + '" style="margin-left:8px">✕</button></div>').join("") + '<div class="row" style="margin-top:8px;border-top:1px solid var(--line);padding-top:8px"><b>Total</b><span class="sp"></span><b style="font-size:22px;color:var(--gold2)">' + plata(t) + '</b></div>' + (pago === "regalo" ? '<div class="small mut" style="margin-top:6px">Con tarjeta de regalo no suma a la caja: esa plata ya entró cuando la vendiste.</div>' : pago === "fiado" ? '<div class="small warn" style="margin-top:6px">Queda en Fiados. Escribí el nombre del cliente abajo. Suma a la caja cuando te pague.</div>' : '') : '<div class="mut small">Tocá lo que hizo y se va sumando.</div>';
   };
   pintarL();
   C.onclick = e => {
     const b = e.target.closest("button"); if (!b) return;
     if (b.dataset.s) { const s = SERVICIOS()[b.dataset.s]; items.push({n:s[0], m:s[1]}); }
-    else if (b.dataset.b) { const s = BEBIDAS[b.dataset.b]; items.push({n:s[0], m:s[1]}); }
+    else if (b.dataset.b) { const s = BEBIDAS_X()[b.dataset.b]; items.push({n:s.n, m:s.p, inv:s.id}); }
     else if (b.dataset.q) items.splice(Number(b.dataset.q), 1);
     else if (b.id === "cbOA") { const n = $("#cbON").value.trim() || "Otro", m = parseFloat($("#cbOM").value); if (!(m > 0)) { toast("Poné cuánto cobraste"); return; } items.push({n, m:Math.round(m * 100) / 100}); $("#cbON").value = ""; $("#cbOM").value = ""; }
     else if (b.dataset.pg) { pago = b.dataset.pg; C.querySelectorAll("#cbP .chip").forEach(x => x.classList.toggle("on", x === b)); }
     else if (b.id === "cbOk") {
       if (!items.length) { toast("Tocá al menos un servicio"); return; }
+      if (pago === "fiado" && !$("#cbC").value.trim()) { toast("¿A quién le fiás? Escribí su nombre"); $("#cbC").focus(); return; }
       const nom = $("#cbC").value.trim(), quien = nom ? (persona && persona.nombre === nom ? persona : G.find(p => p.nombre.toLowerCase() === nom.toLowerCase())) : null;
       let pid = null; if (quien) { const q = real(quien); pid = q.id; q.historial = q.historial || []; q.historial.push({t:Date.now(), x:"Cobro: " + items.map(i => i.n).join(", ") + " · " + plata(items.reduce((s, i) => s + i.m, 0))}); guardarPersona(q); }
       const v = {id:uid(), t:Date.now(), items:items.slice(), total:Math.round(items.reduce((s, i) => s + i.m, 0) * 100) / 100, pago, pid, nombre:nom || "", u:Date.now()};
-      D.ventas.push(v); guardar(); subirDoc("v_" + v.id, v);
+      D.ventas.push(v);
+      items.forEach(i => { if (i.inv) { const x = D.inv.find(y => y.id === i.inv); if (x) { x.stock = (Number(x.stock) || 0) - 1; x.u = Date.now(); subirDoc("i_" + x.id, x); } } });
+      if (pago === "fiado") { const f = {id:uid(), t:Date.now(), pid, nombre:nom, tel:quien ? quien.tel || "" : "", monto:v.total, desc:items.map(i => i.n).join(", "), abonos:[], venta:v.id, u:Date.now()}; D.fiados.push(f); subirDoc("f_" + f.id, f); }
+      guardar(); subirDoc("v_" + v.id, v);
       toast("Cobrado " + plata(v.total) + (pago === "regalo" ? " (tarjeta de regalo)" : "") + " ✓");
       cerrarHoja(); return;
     } else return;
@@ -1956,6 +1968,137 @@ function verRegalos() {
   hoja.re = verRegalos;
   C.onclick = async e => { const b = e.target.closest("button"); if (b && b.id === "rgSync") { b.innerHTML = '<span class="cargando"></span>'; await traerTarjeta(true); verRegalos(); } };
 }
+
+/* ================================================================ CAJA (pestaña): como Treinta, pero nuestro */
+const CAT_G = [["renta","🏠","Renta"],["bebidas","🥤","Bebidas y productos"],["insumos","✂️","Insumos de barbería"],["servicios","💡","Luz, agua, internet"],["apps","📱","Apps y publicidad"],["tarjeta","💳","Pago de tarjeta"],["otro","📦","Otro"]];
+const catG = k => CAT_G.find(c => c[0] === k) || CAT_G[CAT_G.length - 1];
+let cjTab = "balance", cjPer = "hoy";
+const gVivos = () => D.gastos.filter(g => !g.borrado);
+const rango = p => { const h = hoy0(); return p === "hoy" ? [h, h + DIA] : p === "semana" ? [inicioSemana(), inicioSemana() + 7 * DIA] : [inicioMes(), Date.now() + DIA]; };
+const gastoEntre = (a, b) => gVivos().filter(g => g.t >= a && g.t < b).reduce((s, g) => s + (Number(g.monto) || 0), 0);
+const saldoF = f => Math.round(((Number(f.monto) || 0) - (f.abonos || []).reduce((s, a) => s + (Number(a.m) || 0), 0)) * 100) / 100;
+const fPend = () => D.fiados.filter(f => !f.borrado && saldoF(f) > 0.001);
+const invBajo = () => D.inv.filter(x => !x.borrado && (Number(x.stock) || 0) <= (Number(x.min) || 0));
+
+function pintarCajaTab() {
+  const el = $("#caja"); const [a, b] = rango(cjPer);
+  const ing = sumaEntre(a, b), gas = gastoEntre(a, b), gan = ing - gas;
+  const debe = fPend().reduce((s, f) => s + saldoF(f), 0), bajo = invBajo().length;
+  let x = '<div class="row" style="margin-top:8px"><h2 style="margin:0">Caja</h2><span class="sp"></span><button class="mini" id="cjGraf">📊 Gráficas</button></div>';
+  x += '<div class="chips" style="margin-top:10px" id="cjPer">' + [["hoy","Hoy"],["semana","Esta semana"],["mes","Este mes"]].map(([k, n]) => '<button class="chip' + (cjPer === k ? " on" : "") + '" data-per="' + k + '">' + n + '</button>').join("") + '</div>';
+  x += '<div class="card" style="margin-top:12px"><div class="row"><div><div class="mut small">Ganancia</div><div style="font-size:32px;font-weight:800;color:' + (gan >= 0 ? "var(--gold2)" : "var(--warn)") + '">' + (gan < 0 ? "-" : "") + plata(Math.abs(gan)) + '</div></div></div>' +
+    '<div class="row small" style="margin-top:10px;gap:14px"><span>Ventas <b class="ok">' + plata(ing) + '</b></span><span>Gastos <b class="warn">' + plata(gas) + '</b></span></div>' +
+    '<div class="row" style="gap:10px;margin-top:14px"><button class="btn" style="flex:1" id="cjV">＋ Venta</button><button class="btn dark" style="flex:1;color:var(--warn)" id="cjG">－ Gasto</button></div></div>';
+  x += '<div class="chips" style="margin-top:14px" id="cjTabs">' + [["balance","Movimientos"],["fiados","Fiados" + (fPend().length ? " (" + fPend().length + ")" : "")],["inv","Inventario" + (bajo ? " ⚠️" : "")],["cierre","Cierre"]].map(([k, n]) => '<button class="chip' + (cjTab === k ? " on" : "") + '" data-tab="' + k + '">' + n + '</button>').join("") + '</div><div id="cjC" style="margin-top:12px"></div>';
+  el.innerHTML = x;
+  ({balance:cjMovs, fiados:cjFiados, inv:cjInv, cierre:cjCierre})[cjTab](a, b, debe);
+  el.onclick = e => {
+    const t = e.target.closest("button"); if (!t) return;
+    if (t.dataset.per) { cjPer = t.dataset.per; pintarCajaTab(); }
+    else if (t.dataset.tab) { cjTab = t.dataset.tab; pintarCajaTab(); }
+    else if (t.id === "cjV") cobrar();
+    else if (t.id === "cjG") nuevoGasto();
+    else if (t.id === "cjGraf") resumenCaja();
+    else if (cjAcciones[t.dataset.ac]) cjAcciones[t.dataset.ac](t);
+  };
+}
+
+function cjMovs(a, b) {
+  const M = vivas().filter(v => v.t >= a && v.t < b).map(v => ({t:v.t, tipo:"v", o:v})).concat(gVivos().filter(g => g.t >= a && g.t < b).map(g => ({t:g.t, tipo:"g", o:g}))).sort((x, y) => y.t - x.t);
+  const fecha = t => cjPer === "hoy" ? hora(t) : new Date(t).getDate() + "/" + (new Date(t).getMonth() + 1);
+  $("#cjC").innerHTML = '<div class="card">' + (M.length ? M.map(m => m.tipo === "v"
+    ? '<div class="slot"><div class="h">' + fecha(m.t) + '</div><div class="t"><b class="' + (m.o.pago === "fiado" || m.o.pago === "regalo" ? "mut" : "ok") + '">+' + plata(m.o.total) + '</b> <span class="mut small">· ' + (PAGO_N[m.o.pago] || m.o.pago) + '</span><div class="mut small">' + esc((m.o.items || []).map(i => i.n).join(", ")) + (m.o.nombre ? " · " + esc(m.o.nombre) : "") + '</div></div><button class="mini" data-ac="borrarV" data-id="' + m.o.id + '">✕</button></div>'
+    : '<div class="slot"><div class="h">' + fecha(m.t) + '</div><div class="t"><b class="warn">−' + plata(m.o.monto) + '</b> <span class="mut small">· ' + catG(m.o.cat)[1] + ' ' + catG(m.o.cat)[2] + '</span><div class="mut small">' + esc(m.o.desc || "") + '</div></div><button class="mini" data-ac="borrarG" data-id="' + m.o.id + '">✕</button></div>').join("")
+    : '<div class="empty">Sin movimientos ' + (cjPer === "hoy" ? "hoy" : cjPer === "semana" ? "esta semana" : "este mes") + '. Tocá «＋ Venta» o «－ Gasto».</div>') + '</div>';
+  // gastos por categoría
+  const porC = {}; gVivos().filter(g => g.t >= a && g.t < b).forEach(g => porC[g.cat] = (porC[g.cat] || 0) + (Number(g.monto) || 0));
+  if (Object.keys(porC).length) $("#cjC").innerHTML += '<h2>En qué se va la plata</h2><div class="card">' + Object.entries(porC).sort((x, y) => y[1] - x[1]).map(([k, m]) => '<div class="row small" style="padding:5px 0"><span>' + catG(k)[1] + ' ' + catG(k)[2] + '</span><span class="sp"></span><b>' + plata(m) + '</b></div>').join("") + '</div>';
+}
+
+function nuevoGasto(g0) {
+  let cat = g0 ? g0.cat : "insumos", pago = g0 ? g0.pago || "efectivo" : "efectivo";
+  const C = hoja("Nuevo gasto", '<label class="l">¿En qué?</label><div class="chips" id="ngC" style="flex-wrap:wrap">' + CAT_G.map(c => '<button class="chip' + (c[0] === cat ? " on" : "") + '" data-c="' + c[0] + '">' + c[1] + ' ' + c[2] + '</button>').join("") + '</div>' +
+    '<label class="l">¿Cuánto?</label><input type="number" id="ngM" inputmode="decimal" step="0.05" min="0" placeholder="$0.00" value="' + (g0 ? g0.monto : "") + '">' +
+    '<label class="l">Detalle (opcional)</label><input type="text" id="ngD" placeholder="Ej.: 2 fardos de gaseosa, cuchillas" value="' + esc(g0 ? g0.desc || "" : "") + '">' +
+    '<label class="l">¿Con qué pagaste?</label><div class="chips" id="ngP">' + ["efectivo","tarjeta","transferencia"].map(k => '<button class="chip' + (k === pago ? " on" : "") + '" data-p="' + k + '">' + PAGO_N[k] + '</button>').join("") + '</div>' +
+    '<div class="small mut" style="margin-top:8px">Si compraste bebidas, después sumalas en <b>Inventario → Recibí producto</b>.</div>' +
+    '<button class="btn full" style="margin-top:16px" id="ngOk">Guardar gasto</button>');
+  C.onclick = e => {
+    const b = e.target.closest("button"); if (!b) return;
+    if (b.dataset.c) { cat = b.dataset.c; C.querySelectorAll("#ngC .chip").forEach(x => x.classList.toggle("on", x === b)); }
+    if (b.dataset.p) { pago = b.dataset.p; C.querySelectorAll("#ngP .chip").forEach(x => x.classList.toggle("on", x === b)); }
+    if (b.id === "ngOk") {
+      const m = parseFloat($("#ngM").value); if (!(m > 0)) { toast("Poné cuánto gastaste"); return; }
+      const g = {id:uid(), t:Date.now(), cat, monto:Math.round(m * 100) / 100, desc:$("#ngD").value.trim(), pago, u:Date.now()};
+      D.gastos.push(g); guardar(); subirDoc("g_" + g.id, g); toast("Gasto de " + plata(g.monto) + " guardado"); cerrarHoja();
+    }
+  };
+}
+
+function cjFiados(a, b, debe) {
+  const P = fPend().sort((x, y) => x.t - y.t), pag = D.fiados.filter(f => !f.borrado && saldoF(f) <= 0.001).sort((x, y) => (y.pagado || 0) - (x.pagado || 0)).slice(0, 10);
+  let x = '<div class="card"><div class="row"><div><div class="mut small">Te deben</div><div style="font-size:26px;font-weight:800;color:var(--gold2)">' + plata(debe) + '</div></div><span class="sp"></span><button class="btn sm" data-ac="nuevoF">＋ Fiado</button></div></div>';
+  x += '<div class="card" style="margin-top:12px">' + (P.length ? P.map(f => '<div class="slot"><div class="h" style="font-size:12px">' + haceTxt(f.t) + '</div><div class="t"><b>' + esc(f.nombre) + '</b> <span class="warn small">debe ' + plata(saldoF(f)) + '</span><div class="mut small">' + esc(f.desc || "") + ((f.abonos || []).length ? ' · abonó ' + plata(f.monto - saldoF(f)) : '') + '</div><div class="acts"><button class="btn sm" data-ac="abonar" data-id="' + f.id + '">Me pagó</button><button class="mini" data-ac="cobrarF" data-id="' + f.id + '">Recordarle</button></div></div></div>').join("") : '<div class="empty">Nadie te debe. 👌</div>') + '</div>';
+  if (pag.length) x += '<h2>Ya pagaron</h2><div class="card">' + pag.map(f => '<div class="row small" style="padding:5px 0"><span>' + esc(f.nombre) + '</span><span class="sp"></span><span class="ok">' + plata(f.monto) + ' ✓</span></div>').join("") + '</div>';
+  $("#cjC").innerHTML = x;
+}
+
+function cjInv() {
+  const L = D.inv.filter(x => !x.borrado);
+  let x = '<div class="card">' + L.map(i => { const st = Number(i.stock) || 0, bajo = st <= (Number(i.min) || 0); return '<div class="slot"><div class="t"><b>' + esc(i.n) + '</b> <span class="mut small">· ' + plata(i.p) + '</span><div class="small ' + (bajo ? "warn" : "mut") + '">' + (st <= 0 ? "Se acabó" : "Quedan " + st) + (bajo && st > 0 ? " · ¡comprá más!" : "") + '</div></div><div class="row" style="gap:6px"><button class="mini" data-ac="invMenos" data-id="' + i.id + '">−</button><b style="min-width:26px;text-align:center">' + st + '</b><button class="mini" data-ac="invMas" data-id="' + i.id + '">＋</button></div></div>'; }).join("") + '</div>';
+  x += '<div class="row" style="gap:10px;margin-top:12px"><button class="btn" style="flex:1" data-ac="recibi">📦 Recibí producto</button><button class="btn dark" style="flex:1" data-ac="nuevoProd">＋ Producto nuevo</button></div>';
+  x += '<div class="small mut" style="margin-top:10px;line-height:1.5">Cada vez que cobrás una bebida en «＋ Venta», se descuenta sola. Te aviso cuando quedan pocas.</div>';
+  $("#cjC").innerHTML = x;
+}
+
+function cjCierre() {
+  const h0 = hoy0(), hoyV = vivas().filter(v => v.t >= h0);
+  const efV = hoyV.filter(v => v.pago === "efectivo").reduce((s, v) => s + (Number(v.total) || 0), 0);
+  const efG = gVivos().filter(g => g.t >= h0 && g.pago === "efectivo").reduce((s, g) => s + (Number(g.monto) || 0), 0);
+  const hoyStr = ymdSV(Date.now()), ya = D.cierres.find(c => c.fecha === hoyStr && !c.borrado);
+  const fondo = ya ? ya.fondo : (D.aj.fondo || 0);
+  let x = '<div class="card"><div class="mut small" style="line-height:1.5">Al final del día contá el efectivo de la gaveta y te digo si cuadra.</div>' +
+    '<label class="l">Con cuánto abriste (fondo / sencillo)</label><input type="number" id="ciF" inputmode="decimal" step="0.05" value="' + fondo + '">' +
+    '<div class="row small" style="margin-top:12px"><span>＋ Ventas en efectivo</span><span class="sp"></span><b class="ok">' + plata(efV) + '</b></div>' +
+    '<div class="row small" style="margin-top:4px"><span>− Gastos en efectivo</span><span class="sp"></span><b class="warn">' + plata(efG) + '</b></div>' +
+    '<div class="row" style="margin-top:8px;border-top:1px solid var(--line);padding-top:8px"><b>Debería haber</b><span class="sp"></span><b id="ciE" style="font-size:20px;color:var(--gold2)"></b></div>' +
+    '<label class="l">¿Cuánto contaste?</label><input type="number" id="ciC" inputmode="decimal" step="0.05" placeholder="$0.00" value="' + (ya ? ya.contado : "") + '">' +
+    '<div id="ciR" style="margin-top:10px"></div><button class="btn full" style="margin-top:12px" data-ac="cerrar">' + (ya ? "Actualizar cierre" : "Cerrar caja de hoy") + '</button></div>';
+  const H = D.cierres.filter(c => !c.borrado).sort((p, q) => q.fecha.localeCompare(p.fecha)).slice(0, 10);
+  if (H.length) x += '<h2>Cierres anteriores</h2><div class="card">' + H.map(c => '<div class="row small" style="padding:5px 0"><span>' + fechaLarga(new Date(c.fecha + "T12:00:00")) + '</span><span class="sp"></span><span>' + plata(c.contado) + '</span><b style="margin-left:10px" class="' + (Math.abs(c.dif) < 0.01 ? "ok" : "warn") + '">' + (Math.abs(c.dif) < 0.01 ? "✓ cuadró" : (c.dif > 0 ? "+" : "−") + plata(Math.abs(c.dif))) + '</b></div>').join("") + '</div>';
+  $("#cjC").innerHTML = x;
+  const calc = () => { const f = parseFloat($("#ciF").value) || 0, esp = f + efV - efG, c = parseFloat($("#ciC").value); $("#ciE").textContent = plata(esp); if (isNaN(c)) { $("#ciR").innerHTML = ""; return; } const d = Math.round((c - esp) * 100) / 100; $("#ciR").innerHTML = Math.abs(d) < 0.01 ? '<b class="ok">✓ Cuadra exacto</b>' : d > 0 ? '<b class="warn">Sobran ' + plata(d) + '</b> <span class="mut small">¿un cobro sin anotar?</span>' : '<b class="warn">Faltan ' + plata(-d) + '</b> <span class="mut small">¿un gasto o vuelto sin anotar?</span>'; return {f, esp, c, d}; };
+  calc(); $("#ciF").oninput = calc; $("#ciC").oninput = calc;
+  cjAcciones._cierre = () => { const r = calc(); if (!r || isNaN(r.c)) { toast("Escribí cuánto contaste"); return; } const z = ya || {id:uid(), fecha:hoyStr}; Object.assign(z, {fondo:r.f, esperado:r.esp, contado:r.c, dif:r.d, u:Date.now()}); if (!ya) D.cierres.push(z); D.aj.fondo = r.f; guardar(); subirDoc("z_" + z.id, z); toast("Caja cerrada ✓"); pintarCajaTab(); };
+}
+
+const cjAcciones = {
+  borrarV(t) { const v = D.ventas.find(x => x.id === t.dataset.id); if (!v || !confirm("¿Borrar esta venta de " + plata(v.total) + "?")) return; v.borrado = true; v.u = Date.now(); (v.items || []).forEach(i => { if (i.inv) { const x = D.inv.find(y => y.id === i.inv); if (x) { x.stock = (Number(x.stock) || 0) + 1; x.u = Date.now(); subirDoc("i_" + x.id, x); } } }); const f = D.fiados.find(f => f.venta === v.id); if (f) { f.borrado = true; f.u = Date.now(); subirDoc("f_" + f.id, f); } guardar(); subirDoc("v_" + v.id, v); pintarCajaTab(); },
+  borrarG(t) { const g = D.gastos.find(x => x.id === t.dataset.id); if (!g || !confirm("¿Borrar este gasto de " + plata(g.monto) + "?")) return; g.borrado = true; g.u = Date.now(); guardar(); subirDoc("g_" + g.id, g); pintarCajaTab(); },
+  nuevoF() {
+    const G = gente().filter(p => p.nombre);
+    const C = hoja("Nuevo fiado", '<div class="small mut">Para deudas que ya tenías anotadas en otro lado. Para fiar un corte nuevo usá «＋ Venta» y escogé «Fiado».</div><label class="l">¿Quién te debe?</label><input type="text" id="nfN" list="nfL" placeholder="Nombre"><datalist id="nfL">' + G.slice(0, 400).map(p => '<option value="' + esc(p.nombre) + '">').join("") + '</datalist><label class="l">¿Cuánto?</label><input type="number" id="nfM" inputmode="decimal" step="0.05"><label class="l">¿De qué?</label><input type="text" id="nfD" placeholder="Ej.: corte del sábado"><button class="btn full" style="margin-top:16px" id="nfOk">Guardar</button>');
+    C.onclick = e => { const b = e.target.closest("button"); if (!b || b.id !== "nfOk") return; const n = $("#nfN").value.trim(), m = parseFloat($("#nfM").value); if (!n || !(m > 0)) { toast("Poné nombre y cuánto"); return; } const q = G.find(p => p.nombre.toLowerCase() === n.toLowerCase()); const f = {id:uid(), t:Date.now(), pid:q ? real(q).id : null, nombre:n, tel:q ? q.tel || "" : "", monto:Math.round(m * 100) / 100, desc:$("#nfD").value.trim(), abonos:[], u:Date.now()}; D.fiados.push(f); guardar(); subirDoc("f_" + f.id, f); toast("Fiado guardado"); cerrarHoja(); };
+  },
+  abonar(t) {
+    const f = D.fiados.find(x => x.id === t.dataset.id); if (!f) return; let pago = "efectivo";
+    const C = hoja("Pago de " + f.nombre, '<div class="small mut">Debe ' + plata(saldoF(f)) + '</div><label class="l">¿Cuánto te pagó?</label><input type="number" id="abM" inputmode="decimal" step="0.05" value="' + saldoF(f) + '"><label class="l">¿Cómo?</label><div class="chips" id="abP">' + ["efectivo","tarjeta","transferencia"].map(k => '<button class="chip' + (k === pago ? " on" : "") + '" data-p="' + k + '">' + PAGO_N[k] + '</button>').join("") + '</div><button class="btn full" style="margin-top:16px" id="abOk">Guardar pago</button>');
+    C.onclick = e => { const b = e.target.closest("button"); if (!b) return; if (b.dataset.p) { pago = b.dataset.p; C.querySelectorAll("#abP .chip").forEach(x => x.classList.toggle("on", x === b)); return; } if (b.id !== "abOk") return; const m = Math.min(saldoF(f), parseFloat($("#abM").value) || 0); if (!(m > 0)) { toast("Poné cuánto te pagó"); return; } f.abonos = f.abonos || []; f.abonos.push({t:Date.now(), m:Math.round(m * 100) / 100, pago}); if (saldoF(f) <= 0.001) f.pagado = Date.now(); f.u = Date.now(); const v = {id:uid(), t:Date.now(), items:[{n:"Pago de fiado: " + f.nombre, m}], total:Math.round(m * 100) / 100, pago, pid:f.pid, nombre:f.nombre, abono:f.id, u:Date.now()}; D.ventas.push(v); guardar(); subirDoc("f_" + f.id, f); subirDoc("v_" + v.id, v); toast(saldoF(f) <= 0.001 ? "¡" + f.nombre + " ya está al día! ✓" : "Abono guardado · debe " + plata(saldoF(f))); cerrarHoja(); };
+  },
+  cobrarF(t) { const f = D.fiados.find(x => x.id === t.dataset.id); if (!f) return; const p = (f.pid && D.personas.find(x => x.id === f.pid)) || {nombre:f.nombre, tel:f.tel, red:"whatsapp"}; escribir(p, "¡Qué onda " + (primerNombre(f.nombre) || "") + "! 💈 Te escribo de Meraki para recordarte que quedó pendiente " + plata(saldoF(f)) + (f.desc ? " (" + f.desc + ")" : "") + ". Cuando podás me lo pasás, sin pena. ¡Gracias!"); },
+  invMas(t) { const i = D.inv.find(x => x.id === t.dataset.id); if (!i) return; i.stock = (Number(i.stock) || 0) + 1; i.u = Date.now(); guardar(); subirDoc("i_" + i.id, i); pintarCajaTab(); },
+  invMenos(t) { const i = D.inv.find(x => x.id === t.dataset.id); if (!i) return; i.stock = (Number(i.stock) || 0) - 1; i.u = Date.now(); guardar(); subirDoc("i_" + i.id, i); pintarCajaTab(); },
+  recibi() {
+    const L = D.inv.filter(x => !x.borrado); let sel = L[0] && L[0].id;
+    const C = hoja("Recibí producto", '<label class="l">¿Qué recibiste?</label><div class="chips" id="rcP" style="flex-wrap:wrap">' + L.map(i => '<button class="chip' + (i.id === sel ? " on" : "") + '" data-i="' + i.id + '">' + esc(i.n) + '</button>').join("") + '</div><label class="l">¿Cuántas unidades?</label><input type="number" id="rcN" inputmode="numeric" min="1" placeholder="Ej.: 24"><label class="l">¿Cuánto pagaste en total? (opcional: se anota como gasto)</label><input type="number" id="rcM" inputmode="decimal" step="0.05" placeholder="$0.00"><button class="btn full" style="margin-top:16px" id="rcOk">Guardar</button>');
+    C.onclick = e => { const b = e.target.closest("button"); if (!b) return; if (b.dataset.i) { sel = b.dataset.i; C.querySelectorAll("#rcP .chip").forEach(x => x.classList.toggle("on", x === b)); return; } if (b.id !== "rcOk") return; const n = parseInt($("#rcN").value, 10), m = parseFloat($("#rcM").value), i = D.inv.find(x => x.id === sel); if (!i || !(n > 0)) { toast("Poné cuántas unidades"); return; } i.stock = (Number(i.stock) || 0) + n; i.u = Date.now(); subirDoc("i_" + i.id, i); if (m > 0) { const g = {id:uid(), t:Date.now(), cat:"bebidas", monto:Math.round(m * 100) / 100, desc:n + " " + i.n, pago:"efectivo", u:Date.now()}; D.gastos.push(g); subirDoc("g_" + g.id, g); } guardar(); toast("+" + n + " " + i.n + (m > 0 ? " · gasto anotado" : "")); cerrarHoja(); };
+  },
+  nuevoProd() {
+    const C = hoja("Producto nuevo", '<label class="l">Nombre</label><input type="text" id="npN" placeholder="Ej.: Pomada, Agua"><label class="l">Precio de venta</label><input type="number" id="npP" inputmode="decimal" step="0.05"><label class="l">Cuántas tenés ahorita</label><input type="number" id="npS" inputmode="numeric" value="0"><label class="l">Avisarme cuando queden</label><input type="number" id="npM" inputmode="numeric" value="3"><button class="btn full" style="margin-top:16px" id="npOk">Guardar</button>');
+    C.onclick = e => { const b = e.target.closest("button"); if (!b || b.id !== "npOk") return; const n = $("#npN").value.trim(), p = parseFloat($("#npP").value); if (!n || !(p >= 0)) { toast("Poné nombre y precio"); return; } const i = {id:uid(), n, p:Math.round(p * 100) / 100, stock:parseInt($("#npS").value, 10) || 0, min:parseInt($("#npM").value, 10) || 0, u:Date.now()}; D.inv.push(i); guardar(); subirDoc("i_" + i.id, i); toast(n + " agregado"); cerrarHoja(); };
+  },
+  cerrar() { cjAcciones._cierre && cjAcciones._cierre(); }
+};
 
 pintarTodo();
 traerTarjeta(false).catch(() => {}).then(traerCitas).then(() => { pintarTodo(); alarmas(); });
