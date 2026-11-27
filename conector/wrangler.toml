@@ -1,0 +1,6 @@
+name = "meraki-conector"
+main = "src/index.js"
+compatibility_date = "2025-01-01"
+workers_dev = true
+# El conector de Claude para Meraki CRM: lee y anota en la caja (Firebase, colección «crm»).
+# La sesión de Jose (refresh token) y la llave secreta de la dirección viven en el KV, nunca aquí.

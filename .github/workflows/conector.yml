@@ -1,0 +1,32 @@
+name: Conector de Claude (Cloudflare Worker)
+on:
+  push:
+    branches: [main]
+    paths: ['conector/**', '.github/workflows/conector.yml']
+  workflow_dispatch:
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Memoria del conector (KV)
+        env:
+          CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          A=bcefe39d21eb6d4d1db006a3f7db17a9
+          H="Authorization: Bearer $CF_TOKEN"
+          B=https://api.cloudflare.com/client/v4/accounts/$A/storage/kv/namespaces
+          id=$(curl -s -H "$H" "$B?per_page=100" | python3 -c "import sys,json; d=json.load(sys.stdin); print(next((n['id'] for n in (d.get('result') or []) if n['title']=='meraki-conector'),''))")
+          if [ -z "$id" ]; then
+            id=$(curl -s -X POST -H "$H" -H "Content-Type: application/json" --data '{"title":"meraki-conector"}' "$B" | python3 -c "import sys,json; d=json.load(sys.stdin); print((d.get('result') or {}).get('id',''))")
+          fi
+          if [ -z "$id" ]; then echo "::error::No se pudo crear el KV"; exit 1; fi
+          printf '\n[[kv_namespaces]]\nbinding = "KV"\nid = "%s"\n' "$id" >> conector/wrangler.toml
+      - name: Publicar
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: bcefe39d21eb6d4d1db006a3f7db17a9
+          workingDirectory: conector
+      - name: Probar
+        run: sleep 8; curl -s https://meraki-conector.merakibarbershop.workers.dev/
