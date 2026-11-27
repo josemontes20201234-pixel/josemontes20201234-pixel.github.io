@@ -493,7 +493,7 @@ async function claude(sistema, contenido, max = 1200) {
   return (r.json.content || []).filter(b => b.type === "text").map(b => b.text).join("\n").trim();
 }
 const SIS = () => "Sos el community manager de Meraki Barbershop. Escribís en español salvadoreño con voseo (vos, tenés, vení), cálido, seguro y con estilo premium, sin exagerar con los emojis (2 a 4 máximo). Nunca inventés precios, horarios ni promociones que no estén aquí.\n\nDatos del negocio:\n" + D.aj.contexto + (D.aj.ubicacion ? "\nUbicación: " + D.aj.ubicacion : "") + (D.aj.horario ? "\nHorario: " + D.aj.horario : "") + (D.aj.ig ? "\nInstagram: @" + D.aj.ig.replace(/^@/, "") : "") + "\nCitas: el cliente aparta su hora en " + LINK_CITAS + " (citas de una hora, de 6 a.m. a 5 p.m., almuerzo de 12 a 1; lunes cerrado).";
-const sacarJSON = t => { const m = t.match(/\{[\s\S]*\}|\[[\s\S]*\]/); return JSON.parse(m ? m[0] : t); };
+const sacarJSON = t => { const m = t.match(/\{[\s\S]*\}|\[[\s\S]*\]/); const x = m ? m[0] : t; try { return JSON.parse(x); } catch(e) { let o = "", dentro = false, esc2 = false; for (const ch of x) { if (dentro && !esc2 && ch === "\n") { o += "\\n"; continue; } if (dentro && !esc2 && ch === "\r") continue; if (dentro && !esc2 && ch === "\t") { o += "\\t"; continue; } if (ch === "\\" && !esc2) { esc2 = true; o += ch; continue; } if (ch === '"' && !esc2) dentro = !dentro; esc2 = false; o += ch; } return JSON.parse(o); } };
 function achicar(dataUrl, lado = 1024) {
   return new Promise(ok => { const im = new Image(); im.onload = () => { const s = Math.min(1, lado / Math.max(im.width, im.height)); const c = document.createElement("canvas"); c.width = Math.round(im.width * s); c.height = Math.round(im.height * s); c.getContext("2d").drawImage(im, 0, 0, c.width, c.height); ok(c.toDataURL("image/jpeg", .85)); }; im.onerror = () => ok(null); im.src = dataUrl; });
 }
@@ -974,12 +974,14 @@ function campana() {
   let seg = "inactivos";
   const C = hoja("Promotor · campaña", '<div class="small mut" style="line-height:1.5">Escojo a quién le escribimos y te armo el mensaje. Después lo mandás a cada uno con un toque (por WhatsApp, o copiado si no tiene teléfono).</div>' +
     '<label class="l">¿A quiénes?</label><div class="chips" id="cSeg">' + SEGS.map(([k, n]) => '<button class="chip' + (k === seg ? " on" : "") + '" data-s="' + k + '">' + n + ' (' + segmento(k).length + ')</button>').join("") + '</div>' +
-    '<label class="l">¿Qué querés lograr? (opcional)</label><input type="text" id="cObj" placeholder="Ej.: que vengan en la Semana Aniversario"><button class="btn full" style="margin-top:12px" id="cIA">✨ Escribir el mensaje</button><div id="cRes"></div>');
+    '<label class="l">¿Qué querés lograr? (opcional)</label><input type="text" id="cObj" placeholder="Ej.: que vengan en la Semana Aniversario"><button class="btn full" style="margin-top:12px" id="cIA">✨ Que Claude escriba el mensaje</button><div id="cRes" class="small warn" style="margin-top:8px"></div>' +
+    '<label class="l">Mensaje (escribilo o pegalo vos, o dejá que Claude lo escriba; {nombre} se cambia solo por el nombre)</label><textarea id="cMsg" style="min-height:140px" placeholder="¡Hola {nombre}! …"></textarea><h2>Mandar a cada uno</h2><div id="cLista"></div>');
   const lista = () => {
     const L = segmento(seg).slice(0, 80), txt = ($("#cMsg") || {}).value || "";
     $("#cLista").innerHTML = L.length ? L.map((p, i) => '<div class="persona"><div class="t"><div class="n">' + esc(p.nombre || p.usuario || "Sin nombre") + '</div><div class="m">' + esc(p.tel || (p.usuario ? "@" + p.usuario.replace(/^@/, "") : "")) + '</div></div><button class="btn sm" data-m="' + i + '">Mandar</button></div>').join("") : '<div class="empty">Nadie en este grupo.</div>';
-    $("#cLista").onclick = e => { const b = e.target.closest("[data-m]"); if (!b) return; const p = L[b.dataset.m], t = $("#cMsg").value.replace(/\{nombre\}/g, primerNombre(p.nombre || String(p.usuario || "").replace(/^@/, ""))).trim(); escribir(p, t); const q = real(p); q.historial = q.historial || []; q.historial.push({t:Date.now(), x:"Campaña: «" + t.slice(0, 80) + "»"}); guardarPersona(q); b.textContent = "✓ Enviado"; b.className = "mini"; };
+    $("#cLista").onclick = e => { const b = e.target.closest("[data-m]"); if (!b) return; if (!$("#cMsg").value.trim()) { toast("Primero escribí o pegá el mensaje"); $("#cMsg").focus(); return; } const p = L[b.dataset.m], t = $("#cMsg").value.replace(/\{nombre\}/g, primerNombre(p.nombre || String(p.usuario || "").replace(/^@/, ""))).trim(); escribir(p, t); const q = real(p); q.historial = q.historial || []; q.historial.push({t:Date.now(), x:"Campaña: «" + t.slice(0, 80) + "»"}); guardarPersona(q); b.textContent = "✓ Enviado"; b.className = "mini"; };
   };
+  lista();
   C.onclick = async e => {
     const b = e.target.closest("button"); if (!b) return;
     if (b.dataset.s) { seg = b.dataset.s; C.querySelectorAll("#cSeg .chip").forEach(x => x.classList.toggle("on", x === b)); if ($("#cLista")) lista(); }
@@ -987,10 +989,11 @@ function campana() {
       b.disabled = true; b.innerHTML = '<span class="cargando"></span> Escribiendo…';
       try {
         const n = SEGS.find(x => x[0] === seg)[1];
-        const j = sacarJSON(await claude(SIS(), "Escribí un mensaje de WhatsApp para un grupo de mis clientes: «" + n + "»." + ($("#cObj").value.trim() ? " Lo que quiero lograr: " + $("#cObj").value.trim() + "." : "") + " Corto (máximo 4 líneas), cálido y personal, que no parezca masivo, con 1 o 2 emojis. Empezá con «{nombre}» donde va el nombre del cliente. Cerrá invitando a apartar su cita en " + LINK_CITAS + " o a responder el mensaje. Respondé SOLO con JSON: {\"mensaje\":\"...\"}", 600));
-        $("#cRes").innerHTML = '<label class="l">Mensaje (podés cambiarlo; {nombre} se cambia solo por el nombre)</label><textarea id="cMsg" style="min-height:120px">' + esc(j.mensaje || "") + '</textarea><h2>Mandar a cada uno</h2><div id="cLista"></div>';
-        lista();
-      } catch(err) { $("#cRes").innerHTML = '<div class="small warn" style="margin-top:8px">' + esc(err.message) + '</div>'; }
+        $("#cRes").textContent = "";
+        let t = await claude(SIS(), "Escribí un mensaje de WhatsApp para un grupo de mis clientes: «" + n + "»." + ($("#cObj").value.trim() ? " Lo que quiero lograr: " + $("#cObj").value.trim() + "." : "") + " Corto (máximo 4 líneas), cálido y personal, que no parezca masivo, con 1 o 2 emojis. Empezá con «{nombre}» donde va el nombre del cliente. Cerrá invitando a apartar su cita en " + LINK_CITAS + " o a responder el mensaje. Respondé SOLO con el mensaje, sin comillas ni explicaciones.", 600);
+        t = t.replace(/^```[a-z]*\n?|```$/g, "").trim(); if (/^\{[\s\S]*\}$/.test(t)) { try { t = sacarJSON(t).mensaje || t; } catch(e) {} }
+        $("#cMsg").value = t.replace(/^["«]|["»]$/g, "");
+      } catch(err) { $("#cRes").textContent = err.message + " — Podés escribir o pegar el mensaje vos abajo."; }
       b.disabled = false; b.textContent = "✨ Escribir otro";
     }
   };
