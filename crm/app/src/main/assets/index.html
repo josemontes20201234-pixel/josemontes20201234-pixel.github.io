@@ -1265,6 +1265,7 @@ function pintarAjustes() {
   h += '</div>';
   h += '<h2>Claude (inteligencia artificial)</h2><div class="card"><div class="small mut" style="line-height:1.5">Escribe tus textos, mira tus fotos, sugiere respuestas y arma tu semana. Sacá tu clave en <b>console.anthropic.com</b> → API Keys (necesita saldo; cada texto cuesta centavos).</div><label class="l">Clave</label><input type="password" id="aClave" value="' + esc(aj.claude || "") + '" placeholder="sk-ant-…" autocomplete="off"><label class="l">Modelo</label><select id="aModelo">' + [["claude-sonnet-5-5","Sonnet 5.5 · el mejor balance"],["claude-haiku-5-5","Haiku 5.5 · el más barato"],["claude-opus-5-5","Opus 5.5 · el más inteligente"]].map(([k, n]) => '<option value="' + k + '"' + (aj.modelo === k ? " selected" : "") + '>' + n + '</option>').join("") + '</select><div class="row" style="margin-top:10px"><button class="btn sm" id="aClOk">Guardar y probar</button><button class="mini" id="aClX">Borrar clave</button><button class="mini" data-open="https://platform.claude.com/settings/keys">Abrir consola</button></div><div id="aClRes"></div></div>';
   h += '<h2>Gemini (el diseñador de imágenes)</h2><div class="card"><div class="small mut" style="line-height:1.5">Crea las imágenes de tus publicaciones con Leo y tu logo. Sacá tu clave en <b>aistudio.google.com</b> → Get API key. Para imágenes, Google pide activar la facturación en ese proyecto (se paga por imagen).</div><label class="l">Clave</label><input type="password" id="aGmClave" value="' + esc(aj.gemini || "") + '" placeholder="AIza…" autocomplete="off"><label class="l">Modelo</label><select id="aGmModelo">' + MODELOS_IMG.map(([k, n]) => '<option value="' + k + '"' + ((aj.gemModelo || MODELOS_IMG[0][0]) === k ? " selected" : "") + '>' + n + '</option>').join("") + '</select><div class="row" style="margin-top:10px"><button class="btn sm" id="aGmOk">Guardar y probar</button><button class="mini" id="aGmX">Borrar clave</button><button class="mini" data-open="https://aistudio.google.com/apikey">Abrir AI Studio</button></div><div id="aGmRes"></div></div>';
+  h += '<h2>Micrófono flotante</h2><div class="card"><div class="small mut" style="line-height:1.5">Una burbuja dorada 🎙 encima de cualquier app (música, videos, WhatsApp). La tocás, dictás el cobro y volvés a lo que estabas viendo. La podés arrastrar a donde quieras.</div>' + (APP && typeof Android.burbuja === "function" ? '<button class="btn full" style="margin-top:10px" id="aBur">' + (Android.burbujaActiva() ? "Apagar el micrófono flotante" : "Encender el micrófono flotante") + '</button>' : '<div class="small warn" style="margin-top:8px">Solo en la app del teléfono.</div>') + '</div>';
   h += '<h2>Claude (tu asistente)</h2><div class="card"><div class="small mut" style="line-height:1.5">Conecta tu Caja con Claude: desde el chat o por voz le decís «anotá un Combo en efectivo», «¿cuánto llevo hoy?», «¿quién me debe?» o «¿a quién le toca su corte?».</div>' + (!aj.rt ? '<div class="small warn" style="margin-top:8px">Primero conectá Tarjeta Meraki (arriba).</div>' : '<button class="btn full" style="margin-top:10px" id="aCn">' + (aj.claudeUrl ? "Ver dirección del conector" : "Conectar con Claude") + '</button>') + '<div id="aCnRes"></div></div>';
   h += '<h2>Instagram y Facebook</h2><div class="card">' + (metaListo() ? '<div class="row"><b class="ok">✓ ' + esc(D.meta.igUser ? "@" + D.meta.igUser : "") + (D.meta.pageName ? " · " + esc(D.meta.pageName) : "") + '</b></div>' + (D.meta.paginas && D.meta.paginas.length > 1 ? '<label class="l">Página</label><select id="aPag">' + D.meta.paginas.map(p => '<option value="' + p.id + '"' + (p.id === D.meta.page ? " selected" : "") + '>' + esc(p.name) + '</option>').join("") + '</select><div class="small mut" style="margin-top:4px">Para cambiar de página pegá el token otra vez en Bandeja.</div>' : '') + '<button class="btn dark sm" style="margin-top:10px" id="aMetaX">Desconectar</button>' : '<div class="small mut">No conectado.</div><button class="btn dark sm" style="margin-top:10px" id="aMetaIr">Ver cómo conectar</button>') + '</div>';
   h += '<h2>Tu negocio</h2><div class="card"><label class="l" style="margin-top:0">Publicaciones por semana (meta)</label><div class="chips" id="aMeta">' + [2,3,4,5,7].map(n => '<button class="chip' + (aj.meta === n ? " on" : "") + '" data-n="' + n + '">' + n + '</button>').join("") + '</div>' +
@@ -1342,6 +1343,7 @@ function pintarAjustes() {
       catch(err) { $("#aClRes").innerHTML = '<div class="small warn" style="margin-top:8px">' + esc(err.message) + '</div>'; }
     }
     if (b.id === "aGmX") { D.aj.gemini = ""; guardar(); $("#aGmClave").value = ""; $("#aGmRes").innerHTML = '<div class="small mut" style="margin-top:8px">Clave borrada.</div>'; }
+    if (b.id === "aBur") { const on = !Android.burbujaActiva(), r = Android.burbuja(on); if (r === "permiso") toast("Activá «Mostrar sobre otras apps» para Meraki CRM y volvé"); else toast(on ? "Micrófono flotante encendido 🎙" : "Micrófono flotante apagado"); b.textContent = on ? "Apagar el micrófono flotante" : "Encender el micrófono flotante"; return; }
     if (b.id === "aCn" || b.id === "aCnNueva") {
       b.disabled = true; b.innerHTML = '<span class="cargando"></span>';
       const r = await http("POST", "https://meraki-conector.merakibarbershop.workers.dev/vincular", {body:{rt:D.aj.rt, nueva:b.id === "aCnNueva"}});
@@ -1929,6 +1931,7 @@ function cobrar(pre) {
       if (pago === "fiado") { const f = {id:uid(), t:Date.now(), pid, nombre:nom, tel:quien ? quien.tel || "" : "", monto:v.total, desc:items.map(i => i.n).join(", "), abonos:[], venta:v.id, u:Date.now()}; D.fiados.push(f); subirDoc("f_" + f.id, f); }
       guardar(); subirDoc("v_" + v.id, v);
       toast("Cobrado " + plata(v.total) + (pago === "regalo" ? " (tarjeta de regalo)" : "") + " ✓");
+      if (vozBurbuja) { cerrarHoja(); volverSiBurbuja("✓ Cobrado " + plata(v.total)); return; }
       if (quien && telSV(quien.tel) && !(D.hechos && D.hechos["resena_" + pid])) {
         $("#hojaC").innerHTML = '<div class="card" style="text-align:center;margin-top:20px"><div style="font-size:40px">⭐</div><div style="font-size:20px;font-weight:800;margin-top:6px">¡Cobrado ' + plata(v.total) + '!</div><div class="small mut" style="margin-top:8px;line-height:1.5">¿Le pedís a ' + esc(primerNombre(quien.nombre)) + ' que te deje sus estrellas en Google? Más reseñas = más clientes nuevos en Maps.</div><button class="btn full" style="margin-top:14px" id="cbRes">Pedir reseña por WhatsApp</button><button class="mini" style="margin-top:10px" id="cbNo">Ahora no</button></div>';
         $("#hojaC").onclick = e => { const t = e.target.closest("button"); if (!t) return; if (t.id === "cbRes") { escribir(quien, llenar("resenaG", quien)); D.hechos = D.hechos || {}; D.hechos["resena_" + pid] = new Date().toISOString(); guardar(); } cerrarHoja(); };
@@ -2155,14 +2158,17 @@ function borrarUltimoVoz(txt) {
   v.borrado = true; v.u = Date.now(); subirDoc("v_" + v.id, v);
   (v.items || []).forEach(i => { if (i.inv) { const x = D.inv.find(y => y.id === i.inv); if (x) { x.stock = (Number(x.stock) || 0) + 1; x.u = Date.now(); subirDoc("i_" + x.id, x); } } });
   const f = D.fiados.find(f => f.venta === v.id); if (f) { f.borrado = true; f.u = Date.now(); subirDoc("f_" + f.id, f); }
-  guardar(); pintar(); toast("Cobro de " + plata(v.total) + " borrado");
+  guardar(); pintar(); toast("Cobro de " + plata(v.total) + " borrado"); volverSiBurbuja("🗑 Borrado: " + plata(v.total) + (v.nombre ? " · " + v.nombre : ""));
 }
+let vozBurbuja = false;
+const volverSiBurbuja = aviso => { if (vozBurbuja && APP && typeof Android.volver === "function") { vozBurbuja = false; setTimeout(() => Android.volver(aviso || ""), aviso ? 900 : 0); } };
+window.dictarDesdeBurbuja = () => { cerrarHoja && $("#hoja").classList.contains("on") && cerrarHoja(); vozBurbuja = true; $("#fabVoz").click(); };
 window.onVoz = txt => {
   $("#fabVoz").classList.remove("on");
-  if (!txt) return;
+  if (!txt) { volverSiBurbuja(""); return; }
   if (/\b(borr|elimin|quit|cancel|deshac|anul|me equivoque|error)/.test(SIN(txt))) { borrarUltimoVoz(txt); return; }
   const r = entenderCobro(txt);
-  if (!r.items.length) { toast("No entendí el cobro: «" + txt + "». Probá: «un combo el patrón en efectivo»"); return; }
+  if (!r.items.length) { toast("No entendí el cobro: «" + txt + "». Probá: «un combo el patrón en efectivo»"); if (vozBurbuja) volverSiBurbuja("No entendí: «" + txt + "»"); return; }
   const p = r.nombre ? gente().find(x => x.nombre === r.nombre) : null;
   if (r.apellido) { guardarCobroVoz(r, p, txt); return; }
   cobrar({items:r.items, pago:r.pago, p, nombre:r.nombre});
@@ -2178,6 +2184,7 @@ function guardarCobroVoz(r, quien, txt) {
   guardar(); subirDoc("v_" + v.id, v); pintar();
   const e = $("#deshacer"); e.innerHTML = '<div style="flex:1;line-height:1.35"><b>✓ ' + plata(total) + ' · ' + esc(PAGO_N[r.pago] || r.pago) + '</b><br><span style="font-weight:500;font-size:12.5px">' + esc(items.map(i => i.n).join(" + ")) + ' · ' + esc(r.nombre) + '</span></div><button class="mini" id="dshB" style="background:#111;color:#e9c46a">Deshacer</button>';
   e.style.display = "flex"; clearTimeout(guardarCobroVoz.k); guardarCobroVoz.k = setTimeout(() => e.style.display = "none", 7000);
+  volverSiBurbuja("✓ Anotado " + plata(total) + " · " + items.map(i => i.n).join(" + ") + " · " + r.nombre);
   $("#dshB").onclick = () => { v.borrado = true; v.u = Date.now(); subirDoc("v_" + v.id, v); inv.forEach(x => { x.stock = (Number(x.stock) || 0) + 1; x.u = Date.now(); subirDoc("i_" + x.id, x); }); if (f) { f.borrado = true; f.u = Date.now(); subirDoc("f_" + f.id, f); } guardar(); pintar(); e.style.display = "none"; toast("Cobro borrado"); };
 }
 $("#fabVoz").onclick = () => {

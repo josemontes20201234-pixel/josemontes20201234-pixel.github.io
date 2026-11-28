@@ -39,6 +39,7 @@ public class MainActivity extends Activity {
     private static final String LOGIN = "https://josemontes20201234-pixel.github.io/crm/login.html";
     private WebView web;
     private String pendienteLogin;
+    private boolean listo = false, vozPendiente = false;
 
     @Override
     protected void onCreate(Bundle b) {
@@ -66,11 +67,15 @@ public class MainActivity extends Activity {
             @Override
             public void onPageFinished(WebView v, String url) {
                 if (pendienteLogin != null) { entregarLogin(pendienteLogin); pendienteLogin = null; }
+                listo = true;
+                if (vozPendiente) { vozPendiente = false; js("window.dictarDesdeBurbuja&&dictarDesdeBurbuja()"); }
             }
         });
         web.loadUrl("file:///android_asset/index.html");
         setContentView(web);
         leerLogin(getIntent());
+        leerVoz(getIntent());
+        if (Burbuja.activa(this)) Burbuja.encender(this);
 
         if (Build.VERSION.SDK_INT >= 33
                 && checkSelfPermission("android.permission.POST_NOTIFICATIONS") != PackageManager.PERMISSION_GRANTED) {
@@ -82,6 +87,7 @@ public class MainActivity extends Activity {
     protected void onNewIntent(Intent i) {
         super.onNewIntent(i);
         leerLogin(i);
+        leerVoz(i);
     }
 
     /** Vuelve de la página de inicio de sesión (merakicrm://login) con la llave de Tarjeta Meraki. */
@@ -122,6 +128,7 @@ public class MainActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
+        if (Burbuja.activa(this) && Burbuja.puede(this)) Burbuja.encender(this);
         if (web != null) web.evaluateJavascript("window.alVolver&&window.alVolver()", null);
     }
 
@@ -133,6 +140,12 @@ public class MainActivity extends Activity {
         } catch (Exception e) {
             Toast.makeText(this, "No hay app para abrir eso", Toast.LENGTH_SHORT).show();
         }
+    }
+
+    private void leerVoz(Intent i) {
+        if (i == null || !i.getBooleanExtra("voz", false)) return;
+        i.removeExtra("voz");
+        if (listo) js("window.dictarDesdeBurbuja&&dictarDesdeBurbuja()"); else vozPendiente = true;
     }
 
     void js(String codigo) { runOnUiThread(() -> web.evaluateJavascript(codigo, null)); }
@@ -246,6 +259,28 @@ public class MainActivity extends Activity {
                 }
                 js("window.__http&&window.__http(" + JSONObject.quote(id) + "," + estado + "," + JSONObject.quote(texto) + ")");
             }).start();
+        }
+
+        /** Micrófono flotante fuera del CRM. Devuelve "ok", "permiso" (abre el ajuste) o "apagado". */
+        @JavascriptInterface
+        public String burbuja(boolean on) {
+            if (!on) { Burbuja.guardar(MainActivity.this, false); Burbuja.apagar(MainActivity.this); return "apagado"; }
+            if (!Burbuja.puede(MainActivity.this)) {
+                Burbuja.guardar(MainActivity.this, true);
+                runOnUiThread(() -> { try { startActivity(new Intent(android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:" + getPackageName()))); } catch (Exception ignored) { } });
+                return "permiso";
+            }
+            Burbuja.guardar(MainActivity.this, true); Burbuja.encender(MainActivity.this); return "ok";
+        }
+        @JavascriptInterface
+        public boolean burbujaActiva() { return Burbuja.activa(MainActivity.this) && Burbuja.puede(MainActivity.this); }
+        /** Vuelve a la app que Jose estaba usando (música, video…) y deja un aviso corto. */
+        @JavascriptInterface
+        public void volver(final String aviso) {
+            runOnUiThread(() -> {
+                if (aviso != null && !aviso.isEmpty()) Toast.makeText(MainActivity.this, aviso, Toast.LENGTH_LONG).show();
+                moveTaskToBack(true);
+            });
         }
 
         /** Abre el dictado de Google: Jose dice el cobro y vuelve como texto a window.onVoz. */
