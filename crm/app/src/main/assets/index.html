@@ -1904,7 +1904,7 @@ function cobrar(pre) {
   const C = hoja("Cobrar", '<label class="l">Servicios</label><div class="chips" id="cbS" style="flex-wrap:wrap">' + SERVICIOS().map((s, i) => '<button class="chip" data-s="' + i + '">' + esc(s[0]) + ' · ' + plata(s[1]) + '</button>').join("") + '</div>' +
     '<label class="l">Bebidas y productos</label><div class="chips" id="cbB" style="flex-wrap:wrap">' + BEBIDAS_X().map((s, i) => '<button class="chip" data-b="' + i + '">' + esc(s.n) + ' · ' + plata(s.p) + (s.stock <= 0 ? ' <span class="warn">(0)</span>' : '') + '</button>').join("") + '</div>' +
     '<label class="l">Otro (opcional)</label><div class="row" style="gap:8px"><input type="text" id="cbON" placeholder="Ej.: domicilio, producto" style="flex:2"><input type="number" id="cbOM" inputmode="decimal" step="0.05" min="0" placeholder="$" style="flex:1"><button class="mini" id="cbOA">Agregar</button></div>' +
-    '<div class="card" style="margin-top:14px" id="cbL"></div>' +
+    '<div class="card" style="margin-top:14px" id="cbL"></div><button class="mini" id="cbMic" style="margin-top:8px">🎙 Decir (ej.: «quitá el café», «agregá una barba»)</button>' +
     '<label class="l">Cómo pagó</label><div class="chips" id="cbP" style="flex-wrap:wrap">' + PAGOS_COBRO.map(k => '<button class="chip' + (k === pago ? " on" : "") + '" data-pg="' + k + '">' + PAGO_N[k] + '</button>').join("") + '</div>' +
     '<label class="l">Cliente (opcional: así te aviso cuándo le toca volver)</label><input type="text" id="cbC" list="cbCL" placeholder="Escribí el nombre" value="' + esc(persona ? persona.nombre || "" : (pre && pre.nombre) || "") + '"><datalist id="cbCL">' + G.slice(0, 400).map(p => '<option value="' + esc(p.nombre) + '">').join("") + '</datalist>' +
     '<button class="btn full" style="margin-top:16px" id="cbOk">Guardar cobro</button>');
@@ -1913,13 +1913,34 @@ function cobrar(pre) {
     $("#cbL").innerHTML = items.length ? items.map((i, k) => '<div class="row small" style="padding:4px 0"><span>' + esc(i.n) + '</span><span class="sp"></span><b>' + plata(i.m) + '</b><button class="mini" data-q="' + k + '" style="margin-left:8px">✕</button></div>').join("") + '<div class="row" style="margin-top:8px;border-top:1px solid var(--line);padding-top:8px"><b>Total</b><span class="sp"></span><b style="font-size:22px;color:var(--gold2)">' + plata(t) + '</b></div>' + (pago === "regalo" ? '<div class="small mut" style="margin-top:6px">Con tarjeta de regalo no suma a la caja: esa plata ya entró cuando la vendiste.</div>' : pago === "fiado" ? '<div class="small warn" style="margin-top:6px">Queda en Fiados. Escribí el nombre del cliente abajo. Suma a la caja cuando te pague.</div>' : '') : '<div class="mut small">Tocá lo que hizo y se va sumando.</div>';
   };
   pintarL();
+  const ponerPago = k => { pago = k; C.querySelectorAll("#cbP .chip").forEach(x => x.classList.toggle("on", x.dataset.pg === k)); };
+  cobrar.voz = txt => {   // con la hoja de cobro abierta, la voz edita ESTA lista
+    const s = " " + SIN(txt).replace(/[.,;:¿?¡!]/g, " ") + " ";
+    if (/ (borr|elimin|quit|sac|cancel|anul|ya no|no era|me equivoque)/.test(s)) {
+      if (/ (todo|todos|toda|la lista) /.test(s)) { items.length = 0; pintarL(); toast("Lista vacía"); return; }
+      const busca = [...CLAVES_S.map(([re, n]) => [re, x => !x.inv && SIN(x.n).includes(SIN(n).split(" ").pop())]), ...CLAVES_B.map(([re, pref]) => [re, x => x.inv && SIN(x.n).includes(pref)]), [/domicilio/, x => /domicilio/i.test(x.n)], [/ corte /, x => /corte/i.test(x.n)]];
+      let k = -1; for (const [re, f] of busca) if (re.test(s)) { for (let j = items.length - 1; j >= 0; j--) if (f(items[j])) { k = j; break; } if (k >= 0) break; }
+      if (k < 0 && / (ultimo|eso|ese|esa|lo|la) /.test(s)) k = items.length - 1;
+      if (k < 0) k = items.length - 1;
+      if (k < 0) { toast("¿Cuál quito? Decí el nombre: «quitá el combo»"); return; }
+      const q = items.splice(k, 1)[0]; pintarL(); toast("Quitado: " + q.n); return;
+    }
+    const r = entenderCobro(txt);
+    if (/fiad|me debe|credito|tarjeta|pos|transfer|deposit|regalo|gift|efectivo|cash/.test(s)) ponerPago(r.pago);
+    if (r.nombre) $("#cbC").value = r.nombre;
+    if (r.items.length) { items.push(...r.items); pintarL(); toast("Agregado: " + r.items.map(i => i.n).join(", ")); }
+    else if (/ (guard|listo|cobra|termin|ya esta) /.test(s)) $("#cbOk").click();
+    else if (!r.nombre) toast("No entendí: «" + txt + "»");
+    else pintarL();
+  };
   C.onclick = e => {
     const b = e.target.closest("button"); if (!b) return;
+    if (b.id === "cbMic") { $("#fabVoz").click(); return; }
     if (b.dataset.s) { const s = SERVICIOS()[b.dataset.s]; items.push({n:s[0], m:s[1]}); }
     else if (b.dataset.b) { const s = BEBIDAS_X()[b.dataset.b]; items.push({n:s.n, m:s.p, inv:s.id}); }
     else if (b.dataset.q) items.splice(Number(b.dataset.q), 1);
     else if (b.id === "cbOA") { const n = $("#cbON").value.trim() || "Otro", m = parseFloat($("#cbOM").value); if (!(m > 0)) { toast("Poné cuánto cobraste"); return; } items.push({n, m:Math.round(m * 100) / 100}); $("#cbON").value = ""; $("#cbOM").value = ""; }
-    else if (b.dataset.pg) { pago = b.dataset.pg; C.querySelectorAll("#cbP .chip").forEach(x => x.classList.toggle("on", x === b)); }
+    else if (b.dataset.pg) ponerPago(b.dataset.pg);
     else if (b.id === "cbOk") {
       if (!items.length) { toast("Tocá al menos un servicio"); return; }
       if (pago === "fiado" && !$("#cbC").value.trim()) { toast("¿A quién le fiás? Escribí su nombre"); $("#cbC").focus(); return; }
@@ -2162,10 +2183,11 @@ function borrarUltimoVoz(txt) {
 }
 let vozBurbuja = false;
 const volverSiBurbuja = aviso => { if (vozBurbuja && APP && typeof Android.volver === "function") { vozBurbuja = false; setTimeout(() => Android.volver(aviso || ""), aviso ? 900 : 0); } };
-window.dictarDesdeBurbuja = () => { cerrarHoja && $("#hoja").classList.contains("on") && cerrarHoja(); vozBurbuja = true; $("#fabVoz").click(); };
+window.dictarDesdeBurbuja = () => { if ($("#cbL") && $("#hoja").classList.contains("on")) { $("#fabVoz").click(); return; } cerrarHoja && $("#hoja").classList.contains("on") && cerrarHoja(); vozBurbuja = true; $("#fabVoz").click(); };
 window.onVoz = txt => {
   $("#fabVoz").classList.remove("on");
   if (!txt) { volverSiBurbuja(""); return; }
+  if (cobrar.voz && $("#cbL") && $("#hoja").classList.contains("on")) { cobrar.voz(txt); return; }
   if (/\b(borr|elimin|quit|cancel|deshac|anul|me equivoque|error)/.test(SIN(txt))) { borrarUltimoVoz(txt); return; }
   const r = entenderCobro(txt);
   if (!r.items.length) { toast("No entendí el cobro: «" + txt + "». Probá: «un combo el patrón en efectivo»"); if (vozBurbuja) volverSiBurbuja("No entendí: «" + txt + "»"); return; }

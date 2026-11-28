@@ -15,7 +15,10 @@ import android.os.Bundle;
 import android.os.Environment;
 import android.provider.MediaStore;
 import android.util.Base64;
+import android.app.AlertDialog;
 import android.webkit.JavascriptInterface;
+import android.webkit.JsResult;
+import android.webkit.WebChromeClient;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
@@ -56,6 +59,24 @@ public class MainActivity extends Activity {
         s.setAllowFileAccess(true);
         s.setTextZoom(100);
         web.addJavascriptInterface(new Puente(), "Android");
+        // Sin esto, confirm() y alert() devuelven "no" en silencio y nada se borra
+        web.setWebChromeClient(new WebChromeClient() {
+            @Override
+            public boolean onJsConfirm(WebView v, String url, String msg, final JsResult r) {
+                new AlertDialog.Builder(MainActivity.this).setMessage(msg)
+                    .setPositiveButton("Sí", (d, w) -> r.confirm())
+                    .setNegativeButton("No", (d, w) -> r.cancel())
+                    .setOnCancelListener(d -> r.cancel()).show();
+                return true;
+            }
+            @Override
+            public boolean onJsAlert(WebView v, String url, String msg, final JsResult r) {
+                new AlertDialog.Builder(MainActivity.this).setMessage(msg)
+                    .setPositiveButton("OK", (d, w) -> r.confirm())
+                    .setOnCancelListener(d -> r.cancel()).show();
+                return true;
+            }
+        });
         web.setWebViewClient(new WebViewClient() {
             @Override
             public boolean shouldOverrideUrlLoading(WebView v, WebResourceRequest r) {
