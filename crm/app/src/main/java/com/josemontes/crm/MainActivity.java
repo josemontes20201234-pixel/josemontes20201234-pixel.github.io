@@ -42,7 +42,7 @@ public class MainActivity extends Activity {
     private static final String LOGIN = "https://josemontes20201234-pixel.github.io/crm/login.html";
     private WebView web;
     private String pendienteLogin;
-    private boolean listo = false, vozPendiente = false;
+    private boolean listo = false, vozPendiente = false, visible = false, vozFuera = false;
 
     @Override
     protected void onCreate(Bundle b) {
@@ -89,7 +89,7 @@ public class MainActivity extends Activity {
             public void onPageFinished(WebView v, String url) {
                 if (pendienteLogin != null) { entregarLogin(pendienteLogin); pendienteLogin = null; }
                 listo = true;
-                if (vozPendiente) { vozPendiente = false; js("window.dictarDesdeBurbuja&&dictarDesdeBurbuja()"); }
+                if (vozPendiente) { vozPendiente = false; js("window.dictarDesdeBurbuja&&dictarDesdeBurbuja(" + vozFuera + ")"); }
             }
         });
         web.loadUrl("file:///android_asset/index.html");
@@ -149,9 +149,13 @@ public class MainActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
+        visible = true;
         if (Burbuja.activa(this) && Burbuja.puede(this)) Burbuja.encender(this);
         if (web != null) web.evaluateJavascript("window.alVolver&&window.alVolver()", null);
     }
+
+    @Override
+    protected void onStop() { super.onStop(); visible = false; }
 
     void abrirFuera(String url) {
         try {
@@ -166,7 +170,8 @@ public class MainActivity extends Activity {
     private void leerVoz(Intent i) {
         if (i == null || !i.getBooleanExtra("voz", false)) return;
         i.removeExtra("voz");
-        if (listo) js("window.dictarDesdeBurbuja&&dictarDesdeBurbuja()"); else vozPendiente = true;
+        vozFuera = !visible;   // si ya estabas en el CRM, no te saca al terminar
+        if (listo) js("window.dictarDesdeBurbuja&&dictarDesdeBurbuja(" + vozFuera + ")"); else vozPendiente = true;
     }
 
     void js(String codigo) { runOnUiThread(() -> web.evaluateJavascript(codigo, null)); }

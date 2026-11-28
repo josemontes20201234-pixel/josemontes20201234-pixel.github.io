@@ -2183,7 +2183,7 @@ function borrarUltimoVoz(txt) {
 }
 let vozBurbuja = false;
 const volverSiBurbuja = aviso => { if (vozBurbuja && APP && typeof Android.volver === "function") { vozBurbuja = false; setTimeout(() => Android.volver(aviso || ""), aviso ? 900 : 0); } };
-window.dictarDesdeBurbuja = () => { if ($("#cbL") && $("#hoja").classList.contains("on")) { $("#fabVoz").click(); return; } cerrarHoja && $("#hoja").classList.contains("on") && cerrarHoja(); vozBurbuja = true; $("#fabVoz").click(); };
+window.dictarDesdeBurbuja = fuera => { vozBurbuja = false; if ($("#cbL") && $("#hoja").classList.contains("on")) { $("#fabVoz").click(); return; } if (fuera !== false) { cerrarHoja && $("#hoja").classList.contains("on") && cerrarHoja(); vozBurbuja = true; } $("#fabVoz").click(); };
 window.onVoz = txt => {
   $("#fabVoz").classList.remove("on");
   if (!txt) { volverSiBurbuja(""); return; }
