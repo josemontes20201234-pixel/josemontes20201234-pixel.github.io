@@ -35,6 +35,7 @@ import java.util.Iterator;
 /** Meraki CRM: la pantalla es index.html; aquí está lo que el navegador no puede hacer solo. */
 public class MainActivity extends Activity {
     private static final int REQ_FOTO = 11;
+    private static final int REQ_VOZ = 12;
     private static final String LOGIN = "https://josemontes20201234-pixel.github.io/crm/login.html";
     private WebView web;
     private String pendienteLogin;
@@ -139,6 +140,15 @@ public class MainActivity extends Activity {
     @Override
     protected void onActivityResult(int req, int res, Intent data) {
         super.onActivityResult(req, res, data);
+        if (req == REQ_VOZ) {
+            String t = null;
+            if (res == RESULT_OK && data != null) {
+                java.util.ArrayList<String> L = data.getStringArrayListExtra(android.speech.RecognizerIntent.EXTRA_RESULTS);
+                if (L != null && !L.isEmpty()) t = L.get(0);
+            }
+            js("window.onVoz&&window.onVoz(" + (t == null ? "null" : JSONObject.quote(t)) + ")");
+            return;
+        }
         if (req != REQ_FOTO) return;
         if (res != RESULT_OK || data == null || data.getData() == null) { js("window.onFoto&&window.onFoto(null)"); return; }
         final Uri u = data.getData();
@@ -236,6 +246,19 @@ public class MainActivity extends Activity {
                 }
                 js("window.__http&&window.__http(" + JSONObject.quote(id) + "," + estado + "," + JSONObject.quote(texto) + ")");
             }).start();
+        }
+
+        /** Abre el dictado de Google: Jose dice el cobro y vuelve como texto a window.onVoz. */
+        @JavascriptInterface
+        public void escuchar() {
+            runOnUiThread(() -> {
+                Intent i = new Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
+                i.putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE_MODEL, android.speech.RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
+                i.putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE, "es-SV");
+                i.putExtra(android.speech.RecognizerIntent.EXTRA_PROMPT, "Decí el cobro: «un combo el patrón en efectivo a Carlos»");
+                try { startActivityForResult(i, REQ_VOZ); }
+                catch (Exception e) { Toast.makeText(MainActivity.this, "Este teléfono no tiene dictado por voz", Toast.LENGTH_LONG).show(); js("window.onVoz&&window.onVoz(null)"); }
+            });
         }
 
         @JavascriptInterface

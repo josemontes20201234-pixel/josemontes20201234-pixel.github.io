@@ -48,6 +48,7 @@ textarea{resize:vertical;min-height:96px;line-height:1.45}
 input:focus,select:focus,textarea:focus{outline:none;border-color:var(--gold)}
 label.l{display:block;font-size:13px;color:var(--mut);margin:12px 0 6px;font-weight:600}
 .empty{color:var(--mut);font-size:14px;text-align:center;padding:18px 8px}
+#fabVoz{position:fixed;right:18px;bottom:calc(86px + env(safe-area-inset-bottom));width:62px;height:62px;border-radius:50%;border:0;background:linear-gradient(145deg,#e9c46a,#c9a24a);color:#14110b;box-shadow:0 6px 22px rgba(0,0,0,.55),0 0 0 3px rgba(233,196,106,.18);z-index:25;display:flex;align-items:center;justify-content:center}#fabVoz:active{transform:scale(.92)}#fabVoz.on{animation:latido 1s infinite}@keyframes latido{50%{box-shadow:0 0 0 12px rgba(233,196,106,.15)}}body.hoja-on #fabVoz{display:none}
 nav{position:fixed;bottom:0;left:0;right:0;background:rgba(14,13,10,.96);border-top:1px solid var(--line);display:flex;justify-content:center;z-index:20;padding-bottom:env(safe-area-inset-bottom)}
 nav .in{display:flex;max-width:600px;width:100%}
 nav button{flex:1;background:none;border:0;color:var(--mut);padding:10px 0 12px;font-size:11px;display:flex;flex-direction:column;align-items:center;gap:4px;font-weight:700;position:relative}
@@ -214,6 +215,7 @@ code{background:var(--card2);border:1px solid var(--line);border-radius:6px;padd
   <section class="view" id="v-caja"><div id="caja"></div></section>
 </div>
 
+<button id="fabVoz" aria-label="Dictar un cobro"><svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></button>
 <nav><div class="in">
   <button data-v="hoy" class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/></svg>Hoy<span class="dot" id="dotHoy"></span></button>
   <button data-v="gente"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18.5 14.8c1.6.8 2.6 2.5 3 5.2"/></svg>Gente</button>
@@ -1894,14 +1896,14 @@ function pintarCaja() {
 
 function cobrar(pre) {
   const items = [], it = pre && pre.items ? pre.items.slice() : []; items.push(...it);
-  let pago = "efectivo", persona = pre && pre.p ? pre.p : null;
+  let pago = pre && pre.pago ? pre.pago : "efectivo", persona = pre && pre.p ? pre.p : null;
   const G = gente().filter(p => p.nombre);
   const C = hoja("Cobrar", '<label class="l">Servicios</label><div class="chips" id="cbS" style="flex-wrap:wrap">' + SERVICIOS().map((s, i) => '<button class="chip" data-s="' + i + '">' + esc(s[0]) + ' · ' + plata(s[1]) + '</button>').join("") + '</div>' +
     '<label class="l">Bebidas y productos</label><div class="chips" id="cbB" style="flex-wrap:wrap">' + BEBIDAS_X().map((s, i) => '<button class="chip" data-b="' + i + '">' + esc(s.n) + ' · ' + plata(s.p) + (s.stock <= 0 ? ' <span class="warn">(0)</span>' : '') + '</button>').join("") + '</div>' +
     '<label class="l">Otro (opcional)</label><div class="row" style="gap:8px"><input type="text" id="cbON" placeholder="Ej.: domicilio, producto" style="flex:2"><input type="number" id="cbOM" inputmode="decimal" step="0.05" min="0" placeholder="$" style="flex:1"><button class="mini" id="cbOA">Agregar</button></div>' +
     '<div class="card" style="margin-top:14px" id="cbL"></div>' +
     '<label class="l">Cómo pagó</label><div class="chips" id="cbP" style="flex-wrap:wrap">' + PAGOS_COBRO.map(k => '<button class="chip' + (k === pago ? " on" : "") + '" data-pg="' + k + '">' + PAGO_N[k] + '</button>').join("") + '</div>' +
-    '<label class="l">Cliente (opcional: así te aviso cuándo le toca volver)</label><input type="text" id="cbC" list="cbCL" placeholder="Escribí el nombre" value="' + esc(persona ? persona.nombre || "" : "") + '"><datalist id="cbCL">' + G.slice(0, 400).map(p => '<option value="' + esc(p.nombre) + '">').join("") + '</datalist>' +
+    '<label class="l">Cliente (opcional: así te aviso cuándo le toca volver)</label><input type="text" id="cbC" list="cbCL" placeholder="Escribí el nombre" value="' + esc(persona ? persona.nombre || "" : (pre && pre.nombre) || "") + '"><datalist id="cbCL">' + G.slice(0, 400).map(p => '<option value="' + esc(p.nombre) + '">').join("") + '</datalist>' +
     '<button class="btn full" style="margin-top:16px" id="cbOk">Guardar cobro</button>');
   const pintarL = () => {
     const t = items.reduce((s, i) => s + i.m, 0);
@@ -2119,6 +2121,43 @@ const cjAcciones = {
     C.onclick = e => { const b = e.target.closest("button"); if (!b || b.id !== "npOk") return; const n = $("#npN").value.trim(), p = parseFloat($("#npP").value); if (!n || !(p >= 0)) { toast("Poné nombre y precio"); return; } const i = {id:uid(), n, p:Math.round(p * 100) / 100, stock:parseInt($("#npS").value, 10) || 0, min:parseInt($("#npM").value, 10) || 0, u:Date.now()}; D.inv.push(i); guardar(); subirDoc("i_" + i.id, i); toast(n + " agregado"); cerrarHoja(); };
   },
   cerrar() { cjAcciones._cierre && cjAcciones._cierre(); }
+};
+
+/* ================================================================ botón de voz: dictar un cobro */
+const SIN = s => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+const NUMS = {un:1, una:1, uno:1, dos:2, tres:3, cuatro:4, cinco:5, seis:6, siete:7, ocho:8, nueve:9, diez:10};
+const CLAVES_S = [[/combo|patron/, "Combo el patrón"], [/full|detalle|completo/, "Servicio full detalle"], [/spa|ritual/, "Ritual Meraki Spa"], [/perfilad|express/, "Perfilado express"], [/barba/, "Diseño de barba"], [/moderno/, "Corte moderno"], [/clasico|tradicional|corte normal|corte sencillo/, "Corte clásico"]];
+const CLAVES_B = [[/cafe/, "caf"], [/gaseosa|coca|soda|tropical|fresca/, "gaseo"], [/jugo|nectar|petit/, "jug"], [/energ|hi energy|volt|monster/, "energ"]];
+function entenderCobro(txt) {
+  let t = " " + SIN(txt).replace(/[.,;:¿?¡!]/g, " ").replace(/\s+/g, " ") + " ";
+  const items = [], S = SERVICIOS(), B = BEBIDAS_X();
+  let pago = /fiad|me debe|al credito|despues me paga/.test(t) ? "fiado" : /tarjeta|pos|acercamiento/.test(t) ? "tarjeta" : /transfer|deposit/.test(t) ? "transferencia" : /regalo|gift/.test(t) ? "regalo" : "efectivo";
+  let nombre = "";
+  const mN = t.match(/ (?:a|para|de parte de|cliente|le hice a) ([a-zñ]+(?: [a-zñ]+)?) /);
+  if (mN) { const cand = mN[1].split(" ").filter(w => !/^(el|la|los|las|un|una|de|del|con|y|por|en|efectivo|tarjeta|fiado|transferencia|domicilio|cuenta|credito|corte|combo|dolares|dolar)$/.test(w)); if (cand.length) { const G = gente().filter(p => p.nombre); const q = G.find(p => SIN(p.nombre).startsWith(cand.join(" "))) || G.find(p => SIN(p.nombre).split(" ")[0] === cand[0]); nombre = q ? q.nombre : cand.map(w => w[0].toUpperCase() + w.slice(1)).join(" "); } }
+  const cuantos = re => { const m = t.match(new RegExp("(\\d+|" + Object.keys(NUMS).join("|") + ") (?:\\w+ ){0,2}?(?:" + re.source + ")")); return m ? (Number(m[1]) || NUMS[m[1]] || 1) : 1; };
+  for (const [re, nom] of CLAVES_S) if (re.test(t)) { const s = S.find(x => SIN(x[0]).startsWith(SIN(nom).slice(0, 10))) || S.find(x => SIN(x[0]).includes(SIN(nom).split(" ")[0])); if (s) { for (let k = 0; k < cuantos(re); k++) items.push({n:s[0], m:s[1]}); t = t.replace(re, " "); } }
+  const mMonto = t.match(/(\d+(?:[.,]\d+)?) ?(?:dolar|\$)|\$ ?(\d+(?:[.,]\d+)?)/), monto = mMonto ? Number((mMonto[1] || mMonto[2]).replace(",", ".")) : 0;
+  if (!items.some(i => /corte|combo|detalle/i.test(i.n)) && / corte /.test(t)) { if (monto) items.push({n:"Corte", m:monto}); else { const s = S[0]; items.push({n:s[0], m:s[1]}); } }
+  for (const [re, pref] of CLAVES_B) if (re.test(t)) { const b = B.find(x => SIN(x.n).includes(pref)); if (b) for (let k = 0; k < cuantos(re); k++) items.push({n:b.n, m:b.p, inv:b.id}); }
+  if (/domicilio/.test(t)) { const m = t.match(/domicilio (?:de )?\$?(\d+(?:[.,]\d+)?)/); items.push({n:"Recargo a domicilio", m:m ? Number(m[1].replace(",", ".")) : 1}); }
+  if (!items.length) { const m = t.match(/(\d+(?:[.,]\d+)?) ?(?:dolar|\$|bucks)|\$ ?(\d+(?:[.,]\d+)?)/); if (m) items.push({n:"Servicio", m:Number((m[1] || m[2]).replace(",", "."))}); }
+  return {items, pago, nombre};
+}
+window.onVoz = txt => {
+  $("#fabVoz").classList.remove("on");
+  if (!txt) return;
+  const r = entenderCobro(txt);
+  if (!r.items.length) { toast("No entendí el cobro: «" + txt + "». Probá: «un combo el patrón en efectivo»"); return; }
+  const p = r.nombre ? gente().find(x => x.nombre === r.nombre) : null;
+  cobrar({items:r.items, pago:r.pago, p, nombre:r.nombre});
+  toast("Escuché: «" + txt + "»");
+};
+$("#fabVoz").onclick = () => {
+  if (APP && typeof Android.escuchar === "function") { $("#fabVoz").classList.add("on"); Android.escuchar(); return; }
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (SR) { const r = new SR(); r.lang = "es-SV"; $("#fabVoz").classList.add("on"); r.onresult = e => window.onVoz(e.results[0][0].transcript); r.onerror = r.onend = () => $("#fabVoz").classList.remove("on"); r.start(); return; }
+  const t = prompt("Escribí el cobro (ej.: un combo el patrón en efectivo a Carlos)"); window.onVoz(t);
 };
 
 pintarTodo();
