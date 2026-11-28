@@ -1928,10 +1928,11 @@ function cobrar(pre) {
     const r = entenderCobro(txt);
     if (/fiad|me debe|credito|tarjeta|pos|transfer|deposit|regalo|gift|efectivo|cash/.test(s)) ponerPago(r.pago);
     if (r.nombre) $("#cbC").value = r.nombre;
-    if (r.items.length) { items.push(...r.items); pintarL(); toast("Agregado: " + r.items.map(i => i.n).join(", ")); }
-    else if (/ (guard|listo|cobra|termin|ya esta) /.test(s)) $("#cbOk").click();
-    else if (!r.nombre) toast("No entendí: «" + txt + "»");
+    const guarda = / (guard|listo|lista|cobr|termin|ya esta|dale|anota|de un solo)/.test(s);
+    if (r.items.length) { items.push(...r.items); pintarL(); if (!guarda) toast("Agregado: " + r.items.map(i => i.n).join(", ")); }
     else pintarL();
+    if (guarda) { $("#cbOk").click(); return; }
+    if (!r.items.length && !r.nombre && !/fiad|tarjeta|transfer|regalo|efectivo/.test(s)) toast("No entendí: «" + txt + "»");
   };
   C.onclick = e => {
     const b = e.target.closest("button"); if (!b) return;
@@ -2155,6 +2156,7 @@ const CLAVES_S = [[/combo|patron/, "Combo el patrón"], [/full|detalle|completo/
 const CLAVES_B = [[/cafe/, "caf"], [/gaseosa|coca|soda|tropical|fresca/, "gaseo"], [/jugo|nectar|petit/, "jug"], [/energ|hi energy|volt|monster/, "energ"]];
 function entenderCobro(txt) {
   let t = " " + SIN(txt).replace(/[.,;:¿?¡!]/g, " ").replace(/\s+/g, " ") + " ";
+  t = t.replace(/ (un|uno|una|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez) (dolar|dolares) /g, (m, n, d) => " " + NUMS[n] + " " + d + " ");
   const items = [], S = SERVICIOS(), B = BEBIDAS_X();
   let pago = /fiad|me debe|al credito|despues me paga/.test(t) ? "fiado" : /tarjeta|pos|acercamiento/.test(t) ? "tarjeta" : /transfer|deposit/.test(t) ? "transferencia" : /regalo|gift/.test(t) ? "regalo" : "efectivo";
   let nombre = "", apellido = false;
@@ -2192,9 +2194,9 @@ window.onVoz = txt => {
   const r = entenderCobro(txt);
   if (!r.items.length) { toast("No entendí el cobro: «" + txt + "». Probá: «un combo el patrón en efectivo»"); if (vozBurbuja) volverSiBurbuja("No entendí: «" + txt + "»"); return; }
   const p = r.nombre ? gente().find(x => x.nombre === r.nombre) : null;
-  if (r.apellido) { guardarCobroVoz(r, p, txt); return; }
+  if (r.pago !== "fiado" || r.nombre) { guardarCobroVoz(r, p, txt); return; }   // se guarda de un solo; si te equivocaste, Deshacer
   cobrar({items:r.items, pago:r.pago, p, nombre:r.nombre});
-  toast("Escuché: «" + txt + "»");
+  toast("¿A quién le fiás? Escribí el nombre y tocá Guardar");
 };
 function guardarCobroVoz(r, quien, txt) {
   const items = r.items, total = Math.round(items.reduce((s, i) => s + i.m, 0) * 100) / 100;
@@ -2204,9 +2206,9 @@ function guardarCobroVoz(r, quien, txt) {
   const inv = []; items.forEach(i => { if (i.inv) { const x = D.inv.find(y => y.id === i.inv); if (x) { x.stock = (Number(x.stock) || 0) - 1; x.u = Date.now(); subirDoc("i_" + x.id, x); inv.push(x); } } });
   let f = null; if (r.pago === "fiado") { f = {id:uid(), t:Date.now(), pid, nombre:r.nombre, tel:quien ? quien.tel || "" : "", monto:total, desc:items.map(i => i.n).join(", "), abonos:[], venta:v.id, u:Date.now()}; D.fiados.push(f); subirDoc("f_" + f.id, f); }
   guardar(); subirDoc("v_" + v.id, v); pintar();
-  const e = $("#deshacer"); e.innerHTML = '<div style="flex:1;line-height:1.35"><b>✓ ' + plata(total) + ' · ' + esc(PAGO_N[r.pago] || r.pago) + '</b><br><span style="font-weight:500;font-size:12.5px">' + esc(items.map(i => i.n).join(" + ")) + ' · ' + esc(r.nombre) + '</span></div><button class="mini" id="dshB" style="background:#111;color:#e9c46a">Deshacer</button>';
+  const e = $("#deshacer"); e.innerHTML = '<div style="flex:1;line-height:1.35"><b>✓ ' + plata(total) + ' · ' + esc(PAGO_N[r.pago] || r.pago) + '</b><br><span style="font-weight:500;font-size:12.5px">' + esc(items.map(i => i.n).join(" + ")) + (r.nombre ? ' · ' + esc(r.nombre) : '') + '</span></div><button class="mini" id="dshB" style="background:#111;color:#e9c46a">Deshacer</button>';
   e.style.display = "flex"; clearTimeout(guardarCobroVoz.k); guardarCobroVoz.k = setTimeout(() => e.style.display = "none", 7000);
-  volverSiBurbuja("✓ Anotado " + plata(total) + " · " + items.map(i => i.n).join(" + ") + " · " + r.nombre);
+  volverSiBurbuja("✓ Anotado " + plata(total) + " · " + items.map(i => i.n).join(" + ") + (r.nombre ? " · " + r.nombre : ""));
   $("#dshB").onclick = () => { v.borrado = true; v.u = Date.now(); subirDoc("v_" + v.id, v); inv.forEach(x => { x.stock = (Number(x.stock) || 0) + 1; x.u = Date.now(); subirDoc("i_" + x.id, x); }); if (f) { f.borrado = true; f.u = Date.now(); subirDoc("f_" + f.id, f); } guardar(); pintar(); e.style.display = "none"; toast("Cobro borrado"); };
 }
 $("#fabVoz").onclick = () => {
