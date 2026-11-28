@@ -2135,7 +2135,7 @@ function entenderCobro(txt) {
   let pago = /fiad|me debe|al credito|despues me paga/.test(t) ? "fiado" : /tarjeta|pos|acercamiento/.test(t) ? "tarjeta" : /transfer|deposit/.test(t) ? "transferencia" : /regalo|gift/.test(t) ? "regalo" : "efectivo";
   let nombre = "", apellido = false;
   const mN = t.match(/ (?:a nombre de|de parte de|le hice a|cliente|para|a) ([a-zñ]+(?: [a-zñ]+){0,2}) /);
-  if (mN) { { const cand = mN[1].split(" ").filter(w => !/^(el|la|los|las|un|una|de|del|con|y|por|en|efectivo|tarjeta|fiado|transferencia|domicilio|cuenta|credito|corte|combo|dolares|dolar)$/.test(w)); const ci = cand.findIndex(w => /^(efectivo|tarjeta|fiado|transferencia|y|con|por|en)$/.test(w)); if (ci > 0) cand.length = ci;
+  if (mN) { { const cand = mN[1].split(" ").filter(w => !/^(el|la|los|las|un|una|de|del|con|y|por|en|lista|listo|eso|ya|eliminado|borrado|efectivo|tarjeta|fiado|transferencia|domicilio|cuenta|credito|corte|combo|dolares|dolar)$/.test(w)); const ci = cand.findIndex(w => /^(efectivo|tarjeta|fiado|transferencia|y|con|por|en)$/.test(w)); if (ci > 0) cand.length = ci;
     if (cand.length) { const G = gente().filter(p => p.nombre); const full = cand.join(" "); const q = G.find(p => SIN(p.nombre).startsWith(full)) || (cand.length === 1 ? G.find(p => SIN(p.nombre).split(" ")[0] === cand[0]) : null); const orig = String(txt).split(/[\s.,;:¿?¡!]+/); nombre = q ? q.nombre : cand.map(w => { const o = orig.find(x => SIN(x) === w) || w; return o[0].toUpperCase() + o.slice(1).toLowerCase(); }).join(" "); apellido = cand.length >= 2; } } }
   const cuantos = re => { const m = t.match(new RegExp("(\\d+|" + Object.keys(NUMS).join("|") + ") (?:\\w+ ){0,2}?(?:" + re.source + ")")); return m ? (Number(m[1]) || NUMS[m[1]] || 1) : 1; };
   for (const [re, nom] of CLAVES_S) if (re.test(t)) { const s = S.find(x => SIN(x[0]).startsWith(SIN(nom).slice(0, 10))) || S.find(x => SIN(x[0]).includes(SIN(nom).split(" ")[0])); if (s) { for (let k = 0; k < cuantos(re); k++) items.push({n:s[0], m:s[1]}); t = t.replace(re, " "); } }
@@ -2146,9 +2146,21 @@ function entenderCobro(txt) {
   if (!items.length) { const m = t.match(/(\d+(?:[.,]\d+)?) ?(?:dolar|\$|bucks)|\$ ?(\d+(?:[.,]\d+)?)/); if (m) items.push({n:"Servicio", m:Number((m[1] || m[2]).replace(",", "."))}); }
   return {items, pago, nombre, apellido};
 }
+function borrarUltimoVoz(txt) {
+  const h0 = hoy0(), V = vivas().filter(v => v.t >= h0).sort((a, b) => b.t - a.t);
+  const nom = (SIN(txt).match(/(?:de|a) ([a-zñ]+(?: [a-zñ]+)?)\s*$/) || [])[1];
+  const v = (nom && V.find(x => SIN(x.nombre).startsWith(nom))) || V[0];
+  if (!v) { toast("No hay cobros de hoy para borrar"); return; }
+  if (!confirm("¿Borrar el último cobro?\n\n" + plata(v.total) + " · " + (v.items || []).map(i => i.n).join(", ") + (v.nombre ? " · " + v.nombre : "") + " (" + hora(v.t) + ")")) return;
+  v.borrado = true; v.u = Date.now(); subirDoc("v_" + v.id, v);
+  (v.items || []).forEach(i => { if (i.inv) { const x = D.inv.find(y => y.id === i.inv); if (x) { x.stock = (Number(x.stock) || 0) + 1; x.u = Date.now(); subirDoc("i_" + x.id, x); } } });
+  const f = D.fiados.find(f => f.venta === v.id); if (f) { f.borrado = true; f.u = Date.now(); subirDoc("f_" + f.id, f); }
+  guardar(); pintar(); toast("Cobro de " + plata(v.total) + " borrado");
+}
 window.onVoz = txt => {
   $("#fabVoz").classList.remove("on");
   if (!txt) return;
+  if (/\b(borr|elimin|quit|cancel|deshac|anul|me equivoque|error)/.test(SIN(txt))) { borrarUltimoVoz(txt); return; }
   const r = entenderCobro(txt);
   if (!r.items.length) { toast("No entendí el cobro: «" + txt + "». Probá: «un combo el patrón en efectivo»"); return; }
   const p = r.nombre ? gente().find(x => x.nombre === r.nombre) : null;
